@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+body {
+  margin: 0;
+}
+
+@keyframes toast-slide-in {
+  from {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast-slide-in {
+  animation: toast-slide-in 0.25s ease-out;
+}
+
+
+@keyframes modal-pop-in {
+  from {
+    transform: scale(0.95) translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-pop-in {
+  animation: modal-pop-in 0.18s ease-out;
+}
+
+@keyframes overlay-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.overlay-fade-in {
+  animation: overlay-fade-in 0.18s ease-out;
+}
+
+/* --- QR Scanner Custom Styling --- */
+#reader {
+  border: none !important;
+  padding: 0 !important;
+}
+
+/* Style the "Request Camera Permission" and "Stop Scanning" buttons */
+#reader button, 
+#html5-qrcode-button-camera-permission, 
+#html5-qrcode-button-camera-stop,
+#html5-qrcode-button-camera-start {
+  background-color: #2563eb !important; /* blue-600 */
+  color: white !important;
+  padding: 10px 20px !important;
+  border-radius: 12px !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: all 0.2s !important;
+  margin-top: 10px !important;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
+}
+
+#reader button:hover {
+  background-color: #1d4ed8 !important; /* blue-700 */
+  transform: translateY(-1px) !important;
+}
+
+/* Style the "Scan an image file" link */
+#html5-qrcode-anchor-scan-type {
+  color: #64748b !important; /* slate-500 */
+  text-decoration: none !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  display: block !important;
+  margin-top: 15px !important;
+}
+
+#html5-qrcode-anchor-scan-type:hover {
+  color: #2563eb !important;
+  text-decoration: underline !important;
+}
+
+/* Hide the library's default "information" icon */
+#reader img[alt="Info icon"] {
+  display: none !important;
+}
+
+/* Center the camera selection dropdown */
+#reader select {
+  padding: 8px !important;
+  border-radius: 8px !important;
+  border: 1px solid #e2e8f0 !important;
+  margin-bottom: 10px !important;
+  font-size: 14px !important;
+  color: #1e293b !important;
+}
