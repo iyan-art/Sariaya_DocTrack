@@ -206,3 +206,13 @@ else:
 # `runserver` is up. 900s = 15 minutes; lower this during a live demo to see
 # an overdue warning email fire sooner without waiting.
 SLA_SCAN_INTERVAL_SECONDS = 900
+
+# Idagdag sa settings.py
+CORS_ALLOWED_ORIGINS = [
+    "https://sariaya-doctrack-frontend.onrender.com",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://sariaya-doctrack-frontend.onrender.com",
+    "https://sariaya-doctrack-backend.onrender.com",
+]
