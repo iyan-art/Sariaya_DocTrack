@@ -51,23 +51,27 @@ urlpatterns = [
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-# Temporary Admin Auto-Creation
+# Temporary Admin Auto-Creation (Email-only login support)
 from django.contrib.auth import get_user_model
+
 try:
     User = get_user_model()
-    # Tinitiyak na may admin account
-    if not User.objects.filter(username='admin').exists():
-        User.objects.create_superuser(
-            username='admin',
-            email='admin@gmail.com',
-            password='admin123'
-        )
-    else:
-        u = User.objects.get(username='admin')
-        u.email = 'admin@gmail.com'
-        u.set_password('admin123')
-        u.is_active = True
-        u.save()
-except Exception as e:
-    print(f"Admin creation status: {e}")
+    email_target = 'admin@gmail.com'
     
+    # Hanapin o gawaan ng user ang email na ito
+    user, created = User.objects.get_or_create(email=email_target)
+    
+    # Kung may 'username' field ang model na ito (karaniwan sa Django default User), 
+    # itakda rin natin para hindi mag-error ang database constraint.
+    if hasattr(user, 'username') and not user.username:
+        user.username = 'admin'
+        
+    user.set_password('admin123')
+    user.is_superuser = True
+    user.is_staff = True
+    user.is_active = True
+    user.save()
+    
+    print("Admin email user configured successfully!")
+except Exception as e:
+    print(f"Error configuring admin email: {e}")
