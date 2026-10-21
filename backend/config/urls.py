@@ -51,11 +51,24 @@ urlpatterns = [
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-# Temporary Admin Auto-Creation
+# Temporary Admin Auto-Creation using Email
 from django.contrib.auth import get_user_model
 try:
     User = get_user_model()
-    if not User.objects.filter(username='admin').exists():
-        User.objects.create_superuser('admin', 'admin@gmail.com', 'admin123')
-except Exception:
-    pass
+    # Sinisigurado nating gumagamit ito ng tamang email
+    email = "admin@gmail.com"
+    if not User.objects.filter(email=email).exists():
+        User.objects.create_superuser(
+            username='admin', 
+            email=email, 
+            password='admin123'
+        )
+        print("Superuser created with email successfully!")
+    else:
+        # Kung nag-e-exist na, i-update natin ang password para sigurado
+        admin_user = User.objects.get(email=email)
+        admin_user.set_password('admin123')
+        admin_user.save()
+        print("Admin password updated successfully!")
+except Exception as e:
+    print(e)
