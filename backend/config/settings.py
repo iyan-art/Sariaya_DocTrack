@@ -35,9 +35,13 @@ SECRET_KEY = 'django-insecure-^kma8+x0fj21cd8sk6z8*qgotg!-=!e0x5pr!$ck0t@qbl&=l4
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
-
-
+ALLOWED_HOSTS = [
+    'sariaya-doctrack-backend.onrender.com',
+    'sariaya-doctrack-frontend.onrender.com',
+    'localhost',
+    '127.0.0.1',
+    '*', 
+    
 # Application definition
 
 INSTALLED_APPS = [
@@ -216,3 +220,4 @@ CSRF_TRUSTED_ORIGINS = [
     "https://sariaya-doctrack-frontend.onrender.com",
     "https://sariaya-doctrack-backend.onrender.com",
 ]
+CORS_ALLOW_CREDENTIALS = True
