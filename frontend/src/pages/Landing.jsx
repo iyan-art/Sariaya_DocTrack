@@ -10,6 +10,7 @@ import DiscoverSection from '../components/landing/DiscoverSection';
 import MunicipalInfoSection from '../components/landing/MunicipalInfoSection';
 import ContactSection from '../components/landing/ContactSection';
 import LandingFooter from '../components/landing/LandingFooter';
+import ScrollToTopButton from '../components/ScrollToTopButton';
 
 /**
  * Public Landing page — the Municipality of Sariaya's digital front door,
@@ -35,6 +36,7 @@ export default function Landing() {
       <MunicipalInfoSection />
       <ContactSection />
       <LandingFooter />
+      <ScrollToTopButton />
     </div>
   );
 }

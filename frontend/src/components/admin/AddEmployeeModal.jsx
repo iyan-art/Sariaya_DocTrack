@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { createEmployee, fetchOffices } from '../../api/axios';
 import { useToast } from '../../context/ToastContext';
 import { extractErrorMessage } from '../../utils/apiError';
+import { EyeIcon, EyeOffIcon } from '../Icons';
 
 const BLANK_FORM = {
   first_name: '', last_name: '', email: '',
@@ -19,6 +20,7 @@ export default function AddEmployeeModal({ onClose, onCreated }) {
   // password is ever visible, so the modal switches to a dedicated
   // "copy this now" screen instead of closing immediately.
   const [created, setCreated] = useState(null); // { employee_id, temporary_password, email }
+  const [showPassword, setShowPassword] = useState(false);
 
   // Sourced from the Office catalog — office here MUST match an Office.code
   // for scan/release permission checks and document-log attribution to
@@ -46,43 +48,63 @@ export default function AddEmployeeModal({ onClose, onCreated }) {
     }
   };
 
-  const copyPassword = () => {
-    navigator.clipboard.writeText(created.temporary_password);
-    showToast('Temporary password copied.', 'success');
+  // Credentials copy format: "Username/ID: <login email> | Temp Password:
+  // <password>". Uses the account's EMAIL as the "Username/ID" rather than
+  // the employee_id shown above it — email is what USERNAME_FIELD actually
+  // is on the User model, so it's what the employee really logs in with;
+  // the employee_id is an internal reference number, not a credential.
+  const copyCredentials = () => {
+    const text = `Username/ID: ${created.email} | Temp Password: ${created.temporary_password}`;
+    navigator.clipboard.writeText(text);
+    showToast('Credentials copied.', 'success');
   };
 
   if (created) {
     return (
       <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4 overlay-fade-in">
-        <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-7 modal-pop-in">
-          <h2 className="text-xl font-bold text-slate-900">Account Created</h2>
-          <p className="text-sm text-slate-500 mt-1">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-md p-7 modal-pop-in">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Account Created Successfully</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Share these credentials with <span className="font-semibold">{created.email}</span> securely —
             the password won't be shown again.
           </p>
 
           <div className="mt-5 space-y-3">
-            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Employee ID</p>
-              <p className="font-mono font-bold text-slate-900 mt-1">{created.employee_id}</p>
+            <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-xl p-4">
+              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Employee ID</p>
+              <p className="font-mono font-bold text-slate-900 dark:text-slate-100 mt-1">{created.employee_id}</p>
             </div>
-            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Temporary Password</p>
+            <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-xl p-4">
+              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Username / Login Email</p>
+              <p className="font-mono font-bold text-slate-900 dark:text-slate-100 mt-1 break-all">{created.email}</p>
+            </div>
+            <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-xl p-4">
+              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Temporary Password</p>
               <div className="flex items-center justify-between gap-2 mt-1">
-                <p className="font-mono font-bold text-slate-900">{created.temporary_password}</p>
+                <p className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                  {showPassword ? created.temporary_password : '•'.repeat(created.temporary_password.length)}
+                </p>
                 <button
-                  onClick={copyPassword}
-                  className="text-xs font-bold text-blue-600 hover:text-blue-700 shrink-0"
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 shrink-0"
                 >
-                  Copy
+                  {showPassword ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
                 </button>
               </div>
             </div>
           </div>
 
           <button
+            onClick={copyCredentials}
+            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg py-2.5 mt-5 transition-colors"
+          >
+            Copy Credentials
+          </button>
+          <button
             onClick={onClose}
-            className="w-full bg-slate-900 hover:bg-black text-white font-medium rounded-lg py-2.5 mt-6 transition-colors"
+            className="w-full bg-slate-900 dark:bg-slate-700 hover:bg-black dark:hover:bg-slate-600 text-white font-medium rounded-lg py-2.5 mt-2 transition-colors"
           >
             Done
           </button>
@@ -93,17 +115,17 @@ export default function AddEmployeeModal({ onClose, onCreated }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4 overlay-fade-in">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-7 modal-pop-in">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-md p-7 modal-pop-in">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-slate-900">Add Employee</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">×</button>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Add Employee</h2>
+          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-xl">×</button>
         </div>
-        <p className="text-sm text-slate-500 mt-1">
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
           Create an employee or admin account. A secure temporary password is generated automatically.
         </p>
 
         {error && (
-          <div className="mt-4 text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+          <div className="mt-4 text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/30 rounded-lg px-3 py-2">
             {error}
           </div>
         )}
@@ -111,36 +133,36 @@ export default function AddEmployeeModal({ onClose, onCreated }) {
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-700">First name</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">First name</label>
               <input name="first_name" required value={form.first_name} onChange={handleChange}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700">Last name</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Last name</label>
               <input name="last_name" required value={form.last_name} onChange={handleChange}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">Email</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Email</label>
             <input type="email" name="email" required value={form.email} onChange={handleChange}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">Account type</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Account type</label>
             <select name="role" value={form.role} onChange={handleChange}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="employee">Employee</option>
               <option value="admin">Admin</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">Office</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Office</label>
             <select name="office" value={form.office} onChange={handleChange}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">Select office…</option>
               {offices.map((o) => (
                 <option key={o.id} value={o.code}>{o.code} — {o.name}</option>
@@ -149,10 +171,10 @@ export default function AddEmployeeModal({ onClose, onCreated }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">Position</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Position</label>
             <input name="position" value={form.position} onChange={handleChange}
               placeholder="e.g. HR Officer"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
 
           <button type="submit" disabled={loading}

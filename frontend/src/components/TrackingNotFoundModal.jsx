@@ -6,19 +6,19 @@
 export default function TrackingNotFoundModal({ onCancel, onRetry }) {
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 overlay-fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-7 modal-pop-in text-center">
-        <div className="w-14 h-14 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl dark:shadow-none w-full max-w-sm p-7 modal-pop-in text-center">
+        <div className="w-14 h-14 bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
           !
         </div>
-        <h2 className="text-lg font-bold text-slate-900">Document Not Found</h2>
-        <p className="text-sm text-slate-500 mt-2">
+        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Document Not Found</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
           Your Document tracking number does not exist or Wrong Document Tracking, Please Try Again
         </p>
 
         <div className="flex gap-3 mt-6">
           <button
             onClick={onCancel}
-            className="flex-1 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-colors"
+            className="flex-1 py-3 rounded-xl font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
             Cancel
           </button>

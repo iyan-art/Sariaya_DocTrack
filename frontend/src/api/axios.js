@@ -93,8 +93,8 @@ export const fetchAccessLogs = (page = 1, action = '') => {
 };
 
 // Admin-only audit trail of automated emails (SLA overdue/due-soon warnings,
-// citizen ready-for-release notices) — powers NotificationBell, the admin's
-// only access point for this activity (there is no separate page for it).
+// citizen ready-for-release notices) — powers EmailNotificationBell, the
+// admin's only access point for this activity (there is no separate page for it).
 export const fetchEmailNotifications = (page = 1, type = '', status = '') => {
   const params = new URLSearchParams({ page });
   if (type) params.append('type', type);
@@ -105,6 +105,28 @@ export const fetchEmailNotifications = (page = 1, type = '', status = '') => {
 // Manually triggers the same SLA scans the background scheduler runs
 // automatically, for instant verification/demo purposes.
 export const runSlaScanNow = () => api.post('/documents/email-notifications/run-scan/');
+
+// --- In-app Notifications (NotificationBell — both Admin and Employee) ---
+// Distinct from the email-activity log above: these are real-time, per-user,
+// mark-as-read inbox items (incoming/returned documents, expedite requests,
+// bottleneck alerts, urgent feedback), not a diagnostic of outbound emails.
+
+export const fetchNotifications = (page = 1, unreadOnly = false) => {
+  const params = new URLSearchParams({ page });
+  if (unreadOnly) params.append('unread', 'true');
+  return api.get(`/notifications/?${params.toString()}`);
+};
+
+export const fetchUnreadNotificationCount = () => api.get('/notifications/unread-count/');
+
+export const markNotificationRead = (id, isRead = true) => {
+  return api.patch(`/notifications/${id}/read/`, { is_read: isRead });
+};
+
+export const markAllNotificationsRead = () => api.post('/notifications/mark-all-read/');
+
+// Citizen "Follow-Up / Expedite Request" on their own delayed document.
+export const expediteDocument = (id) => api.post(`/documents/${id}/expedite/`);
 
 
 // --- Document API calls ---
@@ -119,6 +141,12 @@ export const fetchDocumentDetail = (id) => {
   return api.get(`/documents/${id}/`);
 };
 
+// Staff/admin delete — only while the document is still untouched at its
+// origin office, unless the caller is an admin (server-side override).
+export const deleteDocument = (id) => {
+  return api.delete(`/documents/${id}/`);
+};
+
 // --- Citizen "My Documents" (view/print/download own requests only, no edit) ---
 
 export const fetchMyDocuments = (page = 1) => {
@@ -128,6 +156,12 @@ export const fetchMyDocuments = (page = 1) => {
 
 export const fetchMyDocumentDetail = (id) => {
   return api.get(`/documents/mine/${id}/`);
+};
+
+// Citizen cancelling their own request — same "still untouched" rule as
+// deleteDocument above, no admin override on this endpoint.
+export const deleteMyDocument = (id) => {
+  return api.delete(`/documents/mine/${id}/`);
 };
 
 // Per-office citizen evaluation of a RELEASED document — see
@@ -326,13 +360,57 @@ export const deleteSurvey = (id) => {
   return api.delete(`/documents/surveys/${id}/`);
 };
 
-// questions: [{ order, text, question_type: 'rating' | 'text' }, ...]
+// questions: [{ order, text, question_type, options? }, ...]
+//   question_type: 'rating' | 'likert' | 'single' | 'multiple' | 'text'
+//   options: ['Label A', 'Label B', ...]  (only for likert/single/multiple)
 export const saveSurveyQuestions = (surveyId, questions) => {
   return api.put(`/documents/surveys/${surveyId}/questions/`, { questions });
 };
 
 export const fetchSurveyAnalytics = () => {
   return api.get('/documents/surveys/analytics/');
+};
+
+// Full per-question aggregation for one survey — powers AdminSurveyAnalytics
+// (bar charts per choice question, rating distribution pie, CSAT, comments).
+export const fetchSurveyDetailedAnalytics = (surveyId) => {
+  return api.get(`/documents/surveys/${surveyId}/analytics/`);
+};
+
+// --- Public landing-page survey (no account, no document needed) ---
+
+export const fetchPublicSurvey = () => api.get('/documents/surveys/public/');
+
+// answers: [{ question, rating_value? , text_value? , selected_option_ids? }, ...]
+export const submitPublicSurvey = (answers) => {
+  return api.post('/documents/surveys/public/', { answers });
+};
+
+// --- Post-scan citizen survey (shown after a citizen scans their own QR) ---
+
+export const fetchPostScanSurvey = (documentId) => {
+  return api.get(`/documents/${documentId}/post-scan-survey/`);
+};
+
+// answers: [{ question, rating_value? , text_value? , selected_option_ids? }, ...]
+export const submitPostScanSurvey = (documentId, answers) => {
+  return api.post(`/documents/${documentId}/post-scan-survey/`, { answers });
+};
+
+// --- Municipal Suggestion Box ---
+
+// Logged-in citizen: their own suggestions + filing a new one.
+export const fetchMySuggestions = () => api.get('/documents/suggestions/');
+export const createSuggestion = (data) => api.post('/documents/suggestions/', data);
+
+// Admin review dashboard. params: { status?, category?, page? }
+export const fetchAdminSuggestions = (params = {}) => {
+  return api.get('/documents/suggestions/admin/', { params });
+};
+
+// data: { status?, admin_notes? }
+export const updateSuggestion = (id, data) => {
+  return api.patch(`/documents/suggestions/admin/${id}/`, data);
 };
 
 // Admin-only, anonymized citizen comments feed — powers CitizenCommentsWidget.

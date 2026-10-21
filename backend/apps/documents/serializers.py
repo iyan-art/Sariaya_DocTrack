@@ -6,11 +6,14 @@ from django.utils import timezone
 from rest_framework import serializers
 from .models import (
     DocumentType, WorkflowStep, Office, Document, DocumentLog, MissingDocumentAlert,
-    Survey, SurveyQuestion, SurveyAnswer, SurveyResponse, RequestStatusHistory,
+    Survey, SurveyQuestion, SurveyQuestionOption, SurveyAnswer, SurveyResponse,
+    CitizenSuggestion, RequestStatusHistory,
     DocumentTemplateField, GeneratedDocument, EmailNotificationLog, Announcement, Event,
+    Notification,
 )
-from .services import resolve_office
+from .services import resolve_office, release_document
 from .qr_services import generate_qr_code
+from .sla_scan import DUE_SOON_THRESHOLD_RATIO
 
 
 def format_duration(delta):
@@ -230,7 +233,6 @@ class DocumentSerializer(serializers.ModelSerializer):
     requested_by_name = serializers.SerializerMethodField()
     status_label = serializers.SerializerMethodField()
     processing_stage_label = serializers.CharField(source='get_processing_stage_display', read_only=True)
-    copy_preference_label = serializers.CharField(source='get_copy_preference_display', read_only=True)
     has_official_file = serializers.SerializerMethodField()
     dwell_display = serializers.SerializerMethodField()
     step_statuses = serializers.SerializerMethodField()
@@ -246,7 +248,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             'form_data', 'requested_by', 'requested_by_name', 'guest_name', 'guest_email', 'origin_office',
             'route_position', 'current_step_number', 'current_office', 'current_office_detail',
             'status', 'status_label', 'is_returning', 'was_returned', 'processing_stage', 'processing_stage_label',
-            'copy_preference', 'copy_preference_label', 'has_official_file',
+            'has_official_file',
             'step_statuses', 'current_handler',
             'created_at', 'updated_at', 'entered_current_office_at', 'dwell_display', 'qr_code',
             'released_at', 'released_by_name',
@@ -314,10 +316,12 @@ class DocumentSerializer(serializers.ModelSerializer):
     def get_step_statuses(self, obj):
         """
         One status per WorkflowStep, driving the color-coded progress pill:
-        'completed' (green), 'active' (yellow), 'delayed' (red — sitting
-        past this step's own SLA), or 'pending' (gray). A MISSING document
-        always shows its current step as delayed regardless of the SLA math,
-        since it's already been formally flagged.
+        'completed' (green), 'active' (green — on track), 'near_due' (yellow
+        — past DUE_SOON_THRESHOLD_RATIO of this step's own SLA but not over
+        it yet), 'delayed' (red — over this step's SLA), or 'pending' (gray).
+        A MISSING document always shows its current step as delayed
+        regardless of the SLA math, since it's already been formally
+        flagged.
         """
         steps = list(obj.document_type.steps.all())  # Meta.ordering = ['step_number']
         statuses = []
@@ -337,7 +341,12 @@ class DocumentSerializer(serializers.ModelSerializer):
                     statuses.append('active')
                 else:
                     dwell_hours = (timezone.now() - obj.entered_current_office_at).total_seconds() / 3600
-                    statuses.append('delayed' if dwell_hours > step.max_hours_allowed else 'active')
+                    if dwell_hours > step.max_hours_allowed:
+                        statuses.append('delayed')
+                    elif dwell_hours >= step.max_hours_allowed * DUE_SOON_THRESHOLD_RATIO:
+                        statuses.append('near_due')
+                    else:
+                        statuses.append('active')
         return statuses
 
 
@@ -419,7 +428,6 @@ class PublicDocumentTrackingSerializer(serializers.ModelSerializer):
     document_type_name = serializers.CharField(source='document_type.name', read_only=True)
     status_label = serializers.SerializerMethodField()
     processing_stage_label = serializers.CharField(source='get_processing_stage_display', read_only=True)
-    copy_preference_label = serializers.CharField(source='get_copy_preference_display', read_only=True)
     has_official_file = serializers.SerializerMethodField()
     current_step_number = serializers.IntegerField(read_only=True)
     total_steps = serializers.SerializerMethodField()
@@ -432,7 +440,7 @@ class PublicDocumentTrackingSerializer(serializers.ModelSerializer):
         fields = [
             'tracking_number', 'document_type_name', 'status_label',
             'processing_stage', 'processing_stage_label', 'is_returning',
-            'copy_preference', 'copy_preference_label', 'has_official_file',
+            'has_official_file',
             'current_office', 'current_step_number', 'total_steps',
             'created_at', 'stage_history', 'activity_log', 'current_location',
         ]
@@ -490,18 +498,9 @@ class CreateDocumentSerializer(serializers.ModelSerializer):
     DocumentLog entry and generates the document's tracking number.
     """
 
-    # Overrides the auto-generated field (which would be required=False,
-    # since the model column itself is blank=True for DB safety) — staff
-    # must explicitly ask the citizen and select one, no silent default.
-    copy_preference = serializers.ChoiceField(
-        choices=Document.CopyPreference.choices,
-        error_messages={'required': 'Please select a delivery type: Hard Copy or Soft Copy.',
-                         'invalid_choice': 'Please select a valid delivery type: Hard Copy or Soft Copy.'},
-    )
-
     class Meta:
         model = Document
-        fields = ['document_type', 'form_data', 'requested_by', 'guest_name', 'guest_email', 'copy_preference']
+        fields = ['document_type', 'form_data', 'requested_by', 'guest_name', 'guest_email']
 
     def validate_requested_by(self, value):
         # Optional (a walk-in citizen with no account stays unlinked, tracked
@@ -617,6 +616,36 @@ class CreateDocumentSerializer(serializers.ModelSerializer):
             notes='Document created and entered into workflow.',
         )
         generate_qr_code(document)
+
+        # Auto-forward: if the creator IS staff at the document's own
+        # origin office, immediately release it toward Step 2 instead of
+        # requiring a separate manual "Release" click/QR scan right after
+        # creation — Step 1's dwell time reads as completed instantly, and
+        # the audit trail shows it was auto-forwarded rather than scanned.
+        # Every office AFTER this one still has to perform its own receive
+        # action to confirm physical arrival — this only automates the
+        # first hand-off, and only once nothing ambiguous is involved.
+        # Silently left alone (document just stays at origin, un-released,
+        # same as before this feature existed) for anyone creating on
+        # behalf of a different office — e.g. an admin entering a walk-in
+        # citizen's request — since there's no one to attribute an
+        # auto-forward hand-off to in that case; it goes through the
+        # ordinary manual release flow instead.
+        route = document.document_type.route
+        if len(route) > 1:
+            next_office = resolve_office(route[1])
+            next_office_name = next_office.name if next_office else route[1]
+            try:
+                document = release_document(
+                    document, request.user,
+                    notes=(
+                        f"Document created and auto-forwarded to {next_office_name} by "
+                        f"{request.user.full_name} ({request.user.employee_id or request.user.email})."
+                    ),
+                )
+            except serializers.ValidationError:
+                pass
+
         return document
 
 
@@ -673,10 +702,18 @@ class DocumentTransferSerializer(serializers.Serializer):
         return path.rstrip('/').rsplit('/', 1)[-1]
 
 
+class SurveyQuestionOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SurveyQuestionOption
+        fields = ['id', 'order', 'label']
+
+
 class SurveyQuestionSerializer(serializers.ModelSerializer):
+    options = SurveyQuestionOptionSerializer(many=True, read_only=True)
+
     class Meta:
         model = SurveyQuestion
-        fields = ['id', 'order', 'text', 'question_type']
+        fields = ['id', 'order', 'text', 'question_type', 'options']
 
 
 class SurveySerializer(serializers.ModelSerializer):
@@ -777,6 +814,31 @@ class SurveyQuestionInputSerializer(serializers.Serializer):
     order = serializers.IntegerField(min_value=1)
     text = serializers.CharField(max_length=500)
     question_type = serializers.ChoiceField(choices=SurveyQuestion.QuestionType.choices, default=SurveyQuestion.QuestionType.RATING)
+    # Plain list of choice labels, in display order — only meaningful for
+    # the CHOICE_TYPES (likert/single/multiple); ignored for rating/text.
+    # SurveyQuestionsView turns these into SurveyQuestionOption rows.
+    options = serializers.ListField(
+        child=serializers.CharField(max_length=200, allow_blank=False),
+        required=False, default=list,
+    )
+
+    def validate(self, attrs):
+        qtype = attrs.get('question_type')
+        options = [o.strip() for o in attrs.get('options', []) if o and o.strip()]
+        if qtype in SurveyQuestion.CHOICE_TYPES:
+            if qtype in ('single', 'multiple') and len(options) < 2:
+                raise serializers.ValidationError(
+                    {"options": f"'{attrs.get('text', '')[:40]}' needs at least two choices."}
+                )
+            if qtype == 'likert' and not options:
+                # A Likert question with no scale supplied gets the standard
+                # 5-point agreement scale so the admin isn't forced to retype
+                # it every time.
+                options = ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree']
+        else:
+            options = []
+        attrs['options'] = options
+        return attrs
 
 
 class SurveyQuestionsReplaceSerializer(serializers.Serializer):
@@ -795,5 +857,67 @@ class SurveyQuestionsReplaceSerializer(serializers.Serializer):
                 f"duplicates (got {numbers}, expected {expected})."
             )
         return questions
+
+
+class CitizenSuggestionSerializer(serializers.ModelSerializer):
+    """Citizen-facing: create a suggestion, and read back one's own. The
+    triage fields (status/admin_notes/reviewed_at) are visible but never
+    writable from here."""
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = CitizenSuggestion
+        fields = [
+            'id', 'category', 'category_display', 'subject', 'message',
+            'status', 'status_display', 'admin_notes', 'created_at', 'reviewed_at',
+        ]
+        read_only_fields = ['status', 'admin_notes', 'created_at', 'reviewed_at']
+
+
+class CitizenSuggestionAdminSerializer(serializers.ModelSerializer):
+    """Admin review dashboard: everything the citizen serializer exposes,
+    plus who sent it, and with `status`/`admin_notes` writable."""
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    respondent_name = serializers.SerializerMethodField()
+    reviewed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CitizenSuggestion
+        fields = [
+            'id', 'category', 'category_display', 'subject', 'message',
+            'status', 'status_display', 'admin_notes',
+            'respondent_name', 'reviewed_by_name', 'created_at', 'reviewed_at',
+        ]
+        read_only_fields = ['category', 'subject', 'message', 'created_at', 'reviewed_at']
+
+    def get_respondent_name(self, obj):
+        u = obj.respondent
+        if not u:
+            return 'Deleted account'
+        full = f"{u.first_name} {u.last_name}".strip()
+        return full or u.email
+
+    def get_reviewed_by_name(self, obj):
+        u = obj.reviewed_by
+        return f"{u.first_name} {u.last_name}".strip() or u.email if u else None
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    """Powers the NotificationBell dropdown — Admin and Employee alike."""
+    notification_type_label = serializers.CharField(source='get_notification_type_display', read_only=True)
+    sender_name = serializers.SerializerMethodField()
+    document_tracking_number = serializers.CharField(source='related_document.tracking_number', read_only=True, default=None)
+
+    class Meta:
+        model = Notification
+        fields = [
+            'id', 'title', 'message', 'notification_type', 'notification_type_label',
+            'sender_name', 'related_document', 'document_tracking_number', 'is_read', 'created_at',
+        ]
+
+    def get_sender_name(self, obj):
+        return obj.sender.full_name if obj.sender else None
 
 

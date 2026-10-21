@@ -121,6 +121,11 @@ class AccessLog(models.Model):
         LOGIN_FAILED = 'login_failed', 'Login Failed'
         VIEW_DOCUMENT = 'view_document', 'Viewed Document'
         SCAN_QR = 'scan_qr', 'Scanned QR Code'
+        DELETE_DOCUMENT = 'delete_document', 'Deleted Document'
+        # Automatic Guest-to-User Account Linking — see
+        # accounts/services.py::link_guest_documents(), run on both
+        # registration and login.
+        GUEST_DOCUMENTS_LINKED = 'guest_documents_linked', 'Guest Documents Linked'
         OTHER = 'other', 'Other'
 
     # SET_NULL (not CASCADE) so deleting a user doesn't erase the audit trail,
@@ -129,9 +134,16 @@ class AccessLog(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='access_logs',
     )
-    action = models.CharField(max_length=20, choices=Action.choices, db_index=True)
+    action = models.CharField(max_length=30, choices=Action.choices, db_index=True)
     ip_address = models.GenericIPAddressField()
     user_agent = models.CharField(max_length=255, blank=True)
+    # Free-text context for actions that need more than "who/when" to be
+    # useful in review — e.g. which tracking number a DELETE_DOCUMENT entry
+    # is about, since the Document itself is gone by the time anyone reads
+    # this (that's also why this lives here and not on DocumentLog, which
+    # CASCADE-deletes with its Document and would vanish right along with
+    # the very action it's supposed to record).
+    detail = models.CharField(max_length=255, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:

@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import NotificationBell from './admin/NotificationBell';
+import { useTheme } from '../context/ThemeContext';
+import NotificationBell from './NotificationBell';
+import ScrollToTopButton from './ScrollToTopButton';
 import {
   ArrowRightLeftIcon,
   BarChart3Icon,
@@ -10,15 +12,18 @@ import {
   ClipboardListIcon,
   Clock3Icon,
   FileTextIcon,
+  HandshakeIcon,
   HomeIcon,
   LayoutGridIcon,
   LogOutIcon,
   MapPinIcon,
   MenuIcon,
+  MoonIcon,
   ScanLineIcon,
   SettingsIcon,
   ShieldCheckIcon,
   StarIcon,
+  SunIcon,
   UserCircleIcon,
   UsersIcon,
 } from './Icons';
@@ -41,6 +46,7 @@ const MENUS = {
     },
     { label: 'Access Logs', path: '/admin/access-logs', icon: ShieldCheckIcon },
     { label: 'Surveys', path: '/admin/surveys', icon: StarIcon },
+    { label: 'Suggestion Box', path: '/admin/suggestions', icon: HandshakeIcon },
     { label: 'QR Code Scan', path: '/admin/qr-scan', icon: ScanLineIcon },
   ],
   employee: [
@@ -51,25 +57,29 @@ const MENUS = {
   citizen: [
     { label: 'Home', path: '/citizen/home', icon: HomeIcon },
     { label: 'History', path: '/citizen/history', icon: Clock3Icon },
+    { label: 'Scan Document', path: '/citizen/scan', icon: ScanLineIcon },
+    { label: 'Suggestion Box', path: '/citizen/suggestions', icon: HandshakeIcon },
   ],
 };
 
 export default function DashboardLayout() {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
   const [profileOpen, setProfileOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile toggle
   const [openSubmenu, setOpenSubmenu] = useState(null);
 
   const menu = MENUS[user.role] || [];
 
+  // logout() itself now clears storage and navigates to "/" — see
+  // AuthContext.jsx — so there's nothing left for this handler to do beyond
+  // calling it. (A second navigate() call here would just race it.)
   const handleLogout = () => {
     logout();
-    navigate('/login');
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-50">
+    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950">
 
       {/* Mobile overlay when sidebar open */}
       {sidebarOpen && (
@@ -80,18 +90,18 @@ export default function DashboardLayout() {
       )}
 
       {/* SIDEBAR */}
-      <aside className={`fixed lg:static z-30 inset-y-0 left-0 w-64 bg-white border-r border-slate-100 flex flex-col transition-transform duration-200
+      <aside className={`fixed lg:static z-30 inset-y-0 left-0 w-64 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 flex flex-col transition-transform duration-200
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
 
         {/* Logo */}
-        <div className="h-20 flex items-center gap-3 px-6 border-b border-slate-100">
+        <div className="h-20 flex items-center gap-3 px-6 border-b border-slate-100 dark:border-slate-800">
           {/* Swap this for the Sariaya seal: <img src="/seal.png" className="h-10 w-10" /> */}
           <div className="h-10 w-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold shrink-0">
             S
           </div>
           <div className="leading-tight">
-            <p className="font-bold text-slate-900 text-sm">QR-Track</p>
-            <p className="text-xs text-slate-400">Sariaya LGU</p>
+            <p className="font-bold text-slate-900 dark:text-white text-sm">QR-Track</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500">Sariaya LGU</p>
           </div>
         </div>
 
@@ -102,7 +112,7 @@ export default function DashboardLayout() {
               <div key={item.label}>
                 <button
                   onClick={() => setOpenSubmenu(openSubmenu === item.label ? null : item.label)}
-                  className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
+                  className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
                   <span className="flex items-center gap-3">
                     <item.icon className="w-4 h-4" />
@@ -120,7 +130,7 @@ export default function DashboardLayout() {
                         to={child.path}
                         onClick={() => setSidebarOpen(false)}
                         className={({ isActive }) =>
-                          `block px-3 py-2 rounded-lg text-sm ${isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-500 hover:bg-slate-50'}`
+                          `block px-3 py-2 rounded-lg text-sm ${isActive ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 font-medium' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`
                         }
                       >
                         {child.label}
@@ -135,7 +145,7 @@ export default function DashboardLayout() {
                 to={item.path}
                 onClick={() => setSidebarOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium ${isActive ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`
+                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium ${isActive ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`
                 }
               >
                 <item.icon className="w-4 h-4" />
@@ -150,20 +160,33 @@ export default function DashboardLayout() {
       <div className="flex-1 flex flex-col min-w-0">
 
         {/* TOPBAR */}
-        <header className="h-20 bg-white border-b border-slate-100 flex items-center justify-between px-4 sm:px-8 sticky top-0 z-10">
-          <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-500 hover:text-slate-700">
+        <header className="h-20 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between px-4 sm:px-8 sticky top-0 z-10">
+          <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
             <MenuIcon className="w-6 h-6" />
           </button>
           <div className="hidden lg:block" />
 
           <div className="flex items-center gap-5">
-            {/* Admin's email-notification activity lives behind this icon — there is no
-                separate Email Notifications page. Other roles keep the plain, decorative
-                bell unchanged (nothing to view yet for them). */}
-            {user.role === 'admin' ? (
+            <button
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-label="Toggle dark mode"
+              className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            >
+              {theme === 'dark' ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
+            </button>
+
+            {/* NotificationBell (the general in-app inbox — incoming/returned
+                documents, expedite requests, bottleneck/feedback alerts) shows for
+                both Admin and Employee. The separate SLA-email activity log
+                (EmailNotificationBell) was removed from the admin header per
+                request — still exists as a component if it's ever wanted back,
+                just not rendered anywhere now. Citizen keeps the plain,
+                decorative bell (nothing wired up for that role yet). */}
+            {(user.role === 'admin' || user.role === 'employee') ? (
               <NotificationBell />
             ) : (
-              <button className="relative text-slate-500 hover:text-slate-700">
+              <button className="relative text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
                 <BellIcon className="w-5 h-5" />
                 <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500" />
               </button>
@@ -174,37 +197,37 @@ export default function DashboardLayout() {
                 onClick={() => setProfileOpen(!profileOpen)}
                 className="flex items-center gap-2"
               >
-                <div className="h-9 w-9 rounded-full bg-slate-200 flex items-center justify-center text-sm font-semibold text-slate-600">
+                <div className="h-9 w-9 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-semibold text-slate-600 dark:text-slate-200">
                   {user.first_name?.[0]}{user.last_name?.[0]}
                 </div>
                 <div className="hidden sm:block text-left">
-                  <p className="text-sm font-medium text-slate-800 leading-tight">{user.full_name}</p>
-                  <p className="text-xs text-slate-400 capitalize leading-tight">{user.role}</p>
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-100 leading-tight">{user.full_name}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 capitalize leading-tight">{user.role}</p>
                 </div>
               </button>
 
               {profileOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-100 py-2 z-20">
-                    <div className="px-4 py-2.5 border-b border-slate-100">
-                    <p className="text-sm font-semibold text-slate-800">{user.full_name}</p>
-                    <p className="text-xs text-slate-400">{user.email}</p>
+                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-100 dark:border-slate-700 py-2 z-20">
+                    <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-700">
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{user.full_name}</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500">{user.email}</p>
                     </div>
                     <button
                     onClick={() => setProfileOpen(false)}
-                    className="w-full flex items-center gap-2 text-left px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50"
+                    className="w-full flex items-center gap-2 text-left px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                     >
                     <UserCircleIcon className="w-4 h-4" /> Profile
                     </button>
                     <button
                     onClick={() => setProfileOpen(false)}
-                    className="w-full flex items-center gap-2 text-left px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50"
+                    className="w-full flex items-center gap-2 text-left px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                     >
                     <SettingsIcon className="w-4 h-4" /> Settings
                     </button>
-                    <div className="border-t border-slate-100 mt-1">
+                    <div className="border-t border-slate-100 dark:border-slate-700 mt-1">
                     <button
                         onClick={handleLogout}
-                        className="w-full flex items-center gap-2 text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
+                        className="w-full flex items-center gap-2 text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10"
                     >
                         <LogOutIcon className="w-4 h-4" /> Sign out
                     </button>
@@ -220,6 +243,8 @@ export default function DashboardLayout() {
           <Outlet />
         </main>
       </div>
+
+      <ScrollToTopButton />
     </div>
   );
 }

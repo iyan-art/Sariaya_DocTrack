@@ -106,15 +106,15 @@ export default function DocumentEvaluationModal({
           never scrolls away and the upper part of the survey is always
           visible the moment it opens — only the question list below
           scrolls, same pattern used throughout this app's other modals. */}
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] modal-pop-in flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl dark:shadow-none w-full max-w-lg max-h-[90vh] modal-pop-in flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <StarIcon className="w-5 h-5 text-amber-500" filled /> Rate Your Experience
           </h2>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="text-slate-400 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-200 rounded-lg text-2xl leading-none w-8 h-8 flex items-center justify-center shrink-0 transition-colors"
+            className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-700 rounded-lg text-2xl leading-none w-8 h-8 flex items-center justify-center shrink-0 transition-colors"
           >
             ×
           </button>
@@ -122,40 +122,40 @@ export default function DocumentEvaluationModal({
 
         <div className="flex-1 overflow-y-auto min-h-0 p-6 sm:p-8">
           {loading ? (
-            <p className="text-slate-400 text-center py-16">Loading…</p>
+            <p className="text-slate-400 dark:text-slate-500 text-center py-16">Loading…</p>
           ) : !survey ? (
-            <p className="text-slate-400 text-center py-10">No evaluation form is available right now.</p>
+            <p className="text-slate-400 dark:text-slate-500 text-center py-10">No evaluation form is available right now.</p>
           ) : submitted || pendingOffices.length === 0 ? (
             <div className="text-center py-8">
               <div className="w-14 h-14 bg-green-500 text-white rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle2Icon className="w-7 h-7" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900">Thank you for your feedback!</h3>
-              <p className="text-sm text-slate-500 mt-1">It helps us improve every office involved in your request.</p>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Thank you for your feedback!</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">It helps us improve every office involved in your request.</p>
               <button
                 onClick={onClose}
-                className="mt-6 bg-slate-900 hover:bg-black text-white font-bold px-6 py-2.5 rounded-xl transition-colors"
+                className="mt-6 bg-slate-900 dark:bg-slate-700 hover:bg-black dark:hover:bg-slate-600 text-white font-bold px-6 py-2.5 rounded-xl transition-colors"
               >
                 Close
               </button>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-8">
-              <p className="text-sm text-slate-500 -mt-2">
+              <p className="text-sm text-slate-500 dark:text-slate-400 -mt-2">
                 Please rate each office that handled your request — your feedback goes straight into that office's performance record.
               </p>
 
               {pendingOffices.map((office) => (
-                <div key={office.id} className="border border-slate-100 rounded-2xl p-5">
+                <div key={office.id} className="border border-slate-100 dark:border-slate-800 rounded-2xl p-5">
                   <div className="flex items-center gap-2 mb-4">
-                    <MapPinIcon className="w-4 h-4 text-blue-600" />
-                    <h3 className="font-bold text-slate-900">{office.name}</h3>
+                    <MapPinIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <h3 className="font-bold text-slate-900 dark:text-slate-100">{office.name}</h3>
                   </div>
 
                   <div className="space-y-5">
                     {survey.questions.map((q) => (
                       <div key={q.id}>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">{q.text}</label>
+                        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">{q.text}</label>
                         {q.question_type === 'rating' ? (
                           <StarRatingInput
                             value={answers[office.id]?.[q.id]?.rating_value || 0}
@@ -167,7 +167,7 @@ export default function DocumentEvaluationModal({
                             value={answers[office.id]?.[q.id]?.text_value || ''}
                             onChange={(e) => setText(office.id, q.id, e.target.value)}
                             placeholder="Your answer (optional)…"
-                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         )}
                       </div>

@@ -44,8 +44,8 @@ function fieldHasValue(field, value) {
 // last, suffix}) and joined into a single rendered line server-side — see
 // DocumentTemplateField.FieldType.NAME's docstring.
 function FieldControl({ field, value, onChange, error }) {
-  const baseClass = `w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-    error ? 'border-red-300' : 'border-slate-200'
+  const baseClass = `w-full border rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+    error ? 'border-red-300 dark:border-red-500/50' : 'border-slate-200 dark:border-slate-700'
   }`;
 
   if (field.field_type === 'name') {
@@ -56,30 +56,30 @@ function FieldControl({ field, value, onChange, error }) {
     return (
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">First Name</label>
+          <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">First Name</label>
           <input value={nameValue.first || ''} onChange={(e) => update('first', e.target.value)}
             placeholder="Juan" className={baseClass} />
         </div>
         <div>
-          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Middle Name</label>
+          <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Middle Name</label>
           <input value={nameValue.middle || ''} onChange={(e) => update('middle', e.target.value)}
             placeholder="Dela Cruz" className={baseClass} />
         </div>
         <div>
-          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Last Name</label>
+          <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Last Name</label>
           <input value={nameValue.last || ''} onChange={(e) => update('last', e.target.value)}
             placeholder="Santos" className={baseClass} />
         </div>
         <div>
-          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Suffix</label>
+          <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Suffix</label>
           <select value={nameValue.suffix || ''} onChange={(e) => update('suffix', e.target.value)}
-            className={`${baseClass} bg-white`}>
+            className={baseClass}>
             <option value="">—</option>
             {SUFFIX_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         {legacyValue && (
-          <p className="col-span-2 text-[11px] text-amber-600">
+          <p className="col-span-2 text-[11px] text-amber-600 dark:text-amber-400">
             Previously saved as "{legacyValue}" — fill in the split fields above to update it.
           </p>
         )}
@@ -96,7 +96,7 @@ function FieldControl({ field, value, onChange, error }) {
 
   if (field.field_type === 'select') {
     return (
-      <select value={value || ''} onChange={(e) => onChange(e.target.value)} className={`${baseClass} bg-white`}>
+      <select value={value || ''} onChange={(e) => onChange(e.target.value)} className={baseClass}>
         <option value="">-- Select --</option>
         {(field.options || []).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
       </select>
@@ -105,9 +105,9 @@ function FieldControl({ field, value, onChange, error }) {
 
   if (field.field_type === 'checkbox') {
     return (
-      <label className="flex items-center gap-2 text-sm text-slate-700 mt-1">
+      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 mt-1">
         <input type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)}
-          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+          className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500" />
         {field.placeholder || 'Yes'}
       </label>
     );
@@ -240,39 +240,39 @@ export default function DocumentGenerateModal({ documentId, documentTypeId, onCl
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 overlay-fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden modal-pop-in flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl dark:shadow-none w-full max-w-5xl max-h-[90vh] overflow-hidden modal-pop-in flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Fill / Generate Official Document</h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Fill / Generate Official Document</h2>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
               Values already on the citizen's request are pre-filled — edit anything that needs it.
             </p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">×</button>
+          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-xl">×</button>
         </div>
 
         {loading ? (
-          <p className="text-slate-400 text-center py-16">Loading…</p>
+          <p className="text-slate-400 dark:text-slate-500 text-center py-16">Loading…</p>
         ) : (
           <div className="flex-1 overflow-y-auto grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 min-w-0">
             <div className="space-y-5 min-w-0">
               {fields.length === 0 ? (
-                <p className="text-sm text-slate-400">No fillable fields are configured for this document type yet.</p>
+                <p className="text-sm text-slate-400 dark:text-slate-500">No fillable fields are configured for this document type yet.</p>
               ) : (
                 sections.map(([sectionName, sectionFields]) => (
-                  <div key={sectionName} className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">
+                  <div key={sectionName} className="bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-xl p-4">
+                    <p className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">
                       {sectionName}
                     </p>
                     <div className="space-y-4">
                       {sectionFields.map((field) => (
                         <div key={field.key} className="min-w-0">
                           {field.field_type !== 'checkbox' && (
-                            <label className="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-1 break-words">
+                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest mb-1 break-words">
                               {field.label}
                               {field.required && <span className="text-red-500"> *</span>}
                               {field.source_request_key && field.field_type !== 'name' && (
-                                <span className="ml-1.5 normal-case font-medium text-blue-500">(from request)</span>
+                                <span className="ml-1.5 normal-case font-medium text-blue-500 dark:text-blue-400">(from request)</span>
                               )}
                             </label>
                           )}
@@ -283,12 +283,12 @@ export default function DocumentGenerateModal({ documentId, documentTypeId, onCl
                             error={fieldErrors[field.key]}
                           />
                           {field.field_type === 'name' && nameReferenceValues[field.key] && (
-                            <p className="text-[11px] text-blue-500 mt-1 break-words">
+                            <p className="text-[11px] text-blue-500 dark:text-blue-400 mt-1 break-words">
                               As entered in original request: "{nameReferenceValues[field.key]}"
                             </p>
                           )}
                           {fieldErrors[field.key] && (
-                            <p className="text-[11px] text-red-600 mt-1">{fieldErrors[field.key]}</p>
+                            <p className="text-[11px] text-red-600 dark:text-red-400 mt-1">{fieldErrors[field.key]}</p>
                           )}
                         </div>
                       ))}
@@ -298,11 +298,11 @@ export default function DocumentGenerateModal({ documentId, documentTypeId, onCl
               )}
             </div>
 
-            <div className="bg-slate-50 rounded-xl border border-slate-200 flex flex-col overflow-hidden min-w-0">
+            <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden min-w-0">
               {previewUrl ? (
                 <iframe ref={previewFrameRef} src={previewUrl} title="Preview" className="w-full h-full min-h-[50vh]" />
               ) : (
-                <div className="flex-1 flex items-center justify-center text-sm text-slate-400 min-h-[50vh] text-center px-4">
+                <div className="flex-1 flex items-center justify-center text-sm text-slate-400 dark:text-slate-500 min-h-[50vh] text-center px-4">
                   Click Preview to see the filled document
                 </div>
               )}
@@ -310,18 +310,18 @@ export default function DocumentGenerateModal({ documentId, documentTypeId, onCl
           </div>
         )}
 
-        <div className="flex flex-wrap gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
+        <div className="flex flex-wrap gap-3 px-6 py-4 border-t border-slate-100 dark:border-slate-800 shrink-0">
           <button
             onClick={handleSaveDraft}
             disabled={saving || loading}
-            className="flex-1 min-w-[8rem] py-2.5 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-60 transition-colors"
+            className="flex-1 min-w-[8rem] py-2.5 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-60 transition-colors"
           >
             Save Draft
           </button>
           <button
             onClick={handlePreview}
             disabled={previewing || loading}
-            className="flex-1 min-w-[8rem] flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:opacity-60 transition-colors"
+            className="flex-1 min-w-[8rem] flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 disabled:opacity-60 transition-colors"
           >
             <PrinterIcon className="w-4 h-4" /> {previewing ? 'Rendering…' : 'Preview'}
           </button>

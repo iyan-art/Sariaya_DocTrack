@@ -1,7 +1,15 @@
 @import "tailwindcss";
 
+/* Tailwind v4 defaults `dark:` to the OS `prefers-color-scheme` media query.
+   This app toggles dark mode manually (ThemeContext, persisted in
+   localStorage) via a `dark` class on <html>, so `dark:` utilities need to
+   key off that class instead — this is the documented Tailwind v4 way to
+   do that. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 body {
   margin: 0;
+  @apply bg-slate-50 dark:bg-slate-950 transition-colors duration-150;
 }
 
 @keyframes toast-slide-in {

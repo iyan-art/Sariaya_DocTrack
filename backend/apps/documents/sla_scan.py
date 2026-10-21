@@ -14,9 +14,9 @@ from datetime import timedelta
 from django.utils import timezone
 
 from apps.accounts.models import User
-from .models import Document, EmailNotificationLog, MissingDocumentAlert
+from .models import Document, EmailNotificationLog, MissingDocumentAlert, Notification
 from .notifications import send_overdue_warning_email, send_due_soon_email
-from .services import _same_office, flag_missing
+from .services import _same_office, flag_missing, notify_admins
 
 # Only used if a document's route_position has somehow drifted out of range
 # for its DocumentType's WorkflowStep rows — a data-integrity edge case, not
@@ -111,6 +111,20 @@ def run_overdue_scan():
             for staff in _sla_recipients(document):
                 send_overdue_warning_email(document, staff, sla_hours, dwell_hours, due_at)
                 overdue_emails_sent += 1
+
+            # Admin-facing in-app bottleneck alert — gated by the same
+            # already_warned check above, so it fires once per overdue
+            # episode (re-arms once the document moves on), not every scan.
+            notify_admins(
+                title=f"Bottleneck: {document.tracking_number}",
+                message=(
+                    f"Document {document.tracking_number} ({document.document_type.name}) has "
+                    f"exceeded its allowed processing time at {document.current_office} "
+                    f"({round(dwell_hours, 1)}h elapsed, SLA: {sla_hours}h)."
+                ),
+                notification_type=Notification.NotificationType.BOTTLENECK_ALERT,
+                related_document=document,
+            )
 
         elif dwell_hours >= sla_hours * DUE_SOON_THRESHOLD_RATIO:
             documents_due_soon += 1

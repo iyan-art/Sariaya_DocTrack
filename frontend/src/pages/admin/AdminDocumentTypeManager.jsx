@@ -4,11 +4,11 @@ import {
 } from '../../api/axios';
 import { useToast } from '../../context/ToastContext';
 import { extractErrorMessage } from '../../utils/apiError';
-import { ClipboardListIcon } from '../../components/Icons';
+import { ClipboardListIcon, PencilIcon, ArchiveIcon, RotateCcwIcon, TrashIcon } from '../../components/Icons';
 
 const SCOPE_STYLES = {
-  external: 'bg-blue-50 text-blue-700 border-blue-200',
-  internal: 'bg-purple-50 text-purple-700 border-purple-200',
+  external: 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/30',
+  internal: 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-500/30',
 };
 
 const BLANK_FORM = { name: '', description: '', scope: 'external', daily_limit: '' };
@@ -104,17 +104,17 @@ export default function AdminDocumentTypeManager() {
     <div>
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-100">
+          <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-100 dark:shadow-none">
             <ClipboardListIcon className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Document Type Manager</h1>
-            <p className="text-slate-500 text-sm">Manage the catalog of document types citizens and staff can request.</p>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Document Type Manager</h1>
+            <p className="text-slate-500 dark:text-slate-400 text-sm">Manage the catalog of document types citizens and staff can request.</p>
           </div>
         </div>
         <button
           onClick={openCreateModal}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-100 transition-all"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-100 dark:shadow-none transition-all"
         >
           + Add Document Type
         </button>
@@ -126,13 +126,13 @@ export default function AdminDocumentTypeManager() {
           placeholder="Search document types…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full sm:w-80 rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full sm:w-80 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden overflow-x-auto">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
+          <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 text-xs uppercase">
             <tr>
               <th className="text-left px-5 py-3">Name</th>
               <th className="text-left px-5 py-3">Description</th>
@@ -143,25 +143,25 @@ export default function AdminDocumentTypeManager() {
               <th className="text-right px-5 py-3">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {loading ? (
-              <tr><td colSpan="7" className="text-center py-8 text-slate-400">Loading…</td></tr>
+              <tr><td colSpan="7" className="text-center py-8 text-slate-400 dark:text-slate-500">Loading…</td></tr>
             ) : filteredTypes.length === 0 ? (
-              <tr><td colSpan="7" className="text-center py-8 text-slate-400">No document types found.</td></tr>
+              <tr><td colSpan="7" className="text-center py-8 text-slate-400 dark:text-slate-500">No document types found.</td></tr>
             ) : (
               filteredTypes.map((t) => (
-                <tr key={t.id} className="hover:bg-slate-50">
-                  <td className="px-5 py-3 font-semibold text-slate-800">{t.name}</td>
-                  <td className="px-5 py-3 text-slate-500 max-w-xs truncate">{t.description || '—'}</td>
+                <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <td className="px-5 py-3 font-semibold text-slate-800 dark:text-slate-200">{t.name}</td>
+                  <td className="px-5 py-3 text-slate-500 dark:text-slate-400 max-w-xs truncate">{t.description || '—'}</td>
                   <td className="px-5 py-3">
                     <span className={`inline-flex text-[10px] font-bold px-2.5 py-1 rounded-full border capitalize ${SCOPE_STYLES[t.scope]}`}>
                       {t.scope_label || t.scope}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-slate-500">{t.steps.length || 0}</td>
-                  <td className="px-5 py-3 text-slate-500">
+                  <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{t.steps.length || 0}</td>
+                  <td className="px-5 py-3 text-slate-500 dark:text-slate-400">
                     {t.daily_limit ? (
-                      <span className={t.requests_today >= t.daily_limit ? 'text-red-600 font-bold' : ''}>
+                      <span className={t.requests_today >= t.daily_limit ? 'text-red-600 dark:text-red-400 font-bold' : ''}>
                         {t.requests_today}/{t.daily_limit}
                       </span>
                     ) : '—'}
@@ -169,22 +169,22 @@ export default function AdminDocumentTypeManager() {
                   <td className="px-5 py-3">
                     <span className={`inline-flex text-[10px] font-bold px-2.5 py-1 rounded-full border ${
                       t.is_active
-                        ? 'bg-green-50 text-green-700 border-green-200'
-                        : 'bg-slate-100 text-slate-500 border-slate-200'
+                        ? 'bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/30'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
                     }`}>
                       {t.is_active ? 'Active' : 'Archived'}
                     </span>
                   </td>
                   <td className="px-5 py-3">
-                    <div className="flex justify-end gap-2 text-xs font-bold">
-                      <button onClick={() => openEditModal(t)} className="text-blue-600 hover:text-blue-800">
-                        Edit
+                    <div className="flex justify-end gap-1">
+                      <button onClick={() => openEditModal(t)} title="Edit" className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 p-1.5 rounded-lg transition-colors">
+                        <PencilIcon className="w-4 h-4" />
                       </button>
-                      <button onClick={() => toggleArchive(t)} className="text-amber-600 hover:text-amber-800">
-                        {t.is_active ? 'Archive' : 'Restore'}
+                      <button onClick={() => toggleArchive(t)} title={t.is_active ? 'Archive' : 'Restore'} className="text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-500/10 p-1.5 rounded-lg transition-colors">
+                        {t.is_active ? <ArchiveIcon className="w-4 h-4" /> : <RotateCcwIcon className="w-4 h-4" />}
                       </button>
-                      <button onClick={() => handleDelete(t)} className="text-red-500 hover:text-red-700">
-                        Delete
+                      <button onClick={() => handleDelete(t)} title="Delete" className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 p-1.5 rounded-lg transition-colors">
+                        <TrashIcon className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
@@ -197,43 +197,43 @@ export default function AdminDocumentTypeManager() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4 overlay-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-7 modal-pop-in">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-md p-7 modal-pop-in">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-slate-900">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
                 {editingId ? 'Edit Document Type' : 'Add Document Type'}
               </h2>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 text-xl">×</button>
+              <button onClick={() => setShowModal(false)} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-xl">×</button>
             </div>
 
             <form onSubmit={handleSave} className="mt-5 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700">Document Name</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Document Name</label>
                 <input
                   required
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder="e.g. Occupancy Permit"
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700">Description</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Description</label>
                 <textarea
                   rows={2}
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700">Scope</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Scope</label>
                 <select
                   required
                   value={form.scope}
                   onChange={(e) => setForm({ ...form, scope: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="external">External — citizen-facing (permits, certificates)</option>
                   <option value="internal">Internal — staff-only (payroll, vouchers, requests)</option>
@@ -241,16 +241,16 @@ export default function AdminDocumentTypeManager() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700">Daily request limit</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Daily request limit</label>
                 <input
                   type="number"
                   min="1"
                   value={form.daily_limit}
                   onChange={(e) => setForm({ ...form, daily_limit: e.target.value })}
                   placeholder="Leave blank for no limit"
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                   Max new requests accepted for this type per day, to manage office workload.
                 </p>
               </div>

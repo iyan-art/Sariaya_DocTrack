@@ -70,27 +70,27 @@ export default function DocumentTrackingTimeline({ stageHistory, activityLog }) 
   const entries = buildTimelineEntries(stageHistory, activityLog);
 
   if (entries.length === 0) {
-    return <p className="text-sm text-slate-400">No activity recorded yet.</p>;
+    return <p className="text-sm text-slate-400 dark:text-slate-500">No activity recorded yet.</p>;
   }
 
   return (
     <div className="relative pl-1">
-      <div className="absolute left-[7px] top-2 bottom-2 w-0.5 bg-slate-100" />
+      <div className="absolute left-[7px] top-2 bottom-2 w-0.5 bg-slate-100 dark:bg-slate-800" />
       <div className="space-y-5">
         {entries.map((entry, idx) => (
           <div key={entry.key} className="relative pl-7">
             <div
               className={`absolute left-0 top-1 w-3.5 h-3.5 rounded-full border-2 ${
-                idx === 0 ? 'bg-blue-600 border-blue-100' : 'bg-slate-300 border-slate-100'
+                idx === 0 ? 'bg-blue-600 border-blue-100 dark:border-blue-500/30' : 'bg-slate-300 dark:bg-slate-600 border-slate-100 dark:border-slate-800'
               }`}
             />
-            <p className="font-bold text-slate-900 break-words">{entry.label}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">{formatTimestamp(entry.timestamp)}</p>
+            <p className="font-bold text-slate-900 dark:text-slate-100 break-words">{entry.label}</p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{formatTimestamp(entry.timestamp)}</p>
             {entry.description && (
-              <p className="text-sm text-slate-600 mt-1 break-words">{entry.description}</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 break-words">{entry.description}</p>
             )}
             {entry.notes && (
-              <p className="text-xs text-slate-500 mt-1 italic break-words">{entry.notes}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 italic break-words">{entry.notes}</p>
             )}
           </div>
         ))}

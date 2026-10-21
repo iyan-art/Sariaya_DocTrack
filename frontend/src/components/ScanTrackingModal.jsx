@@ -55,24 +55,24 @@ export default function ScanTrackingModal({ onScanned, onClose, title = 'Scan Tr
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 overlay-fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md modal-pop-in overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <ScanLineIcon className="w-5 h-5 text-blue-600" /> {title}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl dark:shadow-none w-full max-w-md modal-pop-in overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <ScanLineIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" /> {title}
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">×</button>
+          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-xl">×</button>
         </div>
 
         <div className="p-6 space-y-5">
-          <p className="text-sm text-slate-500 text-center -mb-1">
+          <p className="text-sm text-slate-500 dark:text-slate-400 text-center -mb-1">
             Position the QR code inside the frame.<br />
-            <span className="text-slate-400">Ilagay ang QR code sa loob ng frame.</span>
+            <span className="text-slate-400 dark:text-slate-500">Ilagay ang QR code sa loob ng frame.</span>
           </p>
-          <div id="landing-qr-reader" className="overflow-hidden rounded-2xl bg-slate-50 min-h-[280px]"></div>
+          <div id="landing-qr-reader" className="overflow-hidden rounded-2xl bg-slate-50 dark:bg-slate-800 min-h-[280px]"></div>
           <button
             type="button"
             onClick={() => setAttempt((a) => a + 1)}
-            className="w-full flex items-center justify-center gap-2 text-slate-500 hover:text-slate-700 text-sm font-medium py-2"
+            className="w-full flex items-center justify-center gap-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-sm font-medium py-2"
           >
             <CameraIcon className="w-4 h-4" /> Restart camera
           </button>

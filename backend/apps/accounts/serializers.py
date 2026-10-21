@@ -6,14 +6,39 @@ from rest_framework import serializers
 from .models import User, AccessLog
 
 
-def generate_temp_password(length=12):
+def generate_temp_password(length=None):
     """
-    A random, secure temporary password — used only when an admin creates a
-    staff account. Built from letters/digits/symbols via `secrets` (not
-    `random`), so it's suitable for this even though it's short-lived.
+    A random, secure temporary password — used when an admin creates a
+    staff account (CreateEmployeeSerializer) or resets one
+    (ResetUserPasswordView). Guarantees at least one uppercase letter, one
+    lowercase letter, one digit, and one symbol — not just a statistical
+    likelihood from a combined alphabet — and is built entirely from
+    `secrets` (never `random`, which isn't cryptographically secure),
+    including the final shuffle. Length is randomized between 8 and 10
+    characters when not given explicitly.
     """
-    alphabet = string.ascii_letters + string.digits + '!@#$%&*'
-    return ''.join(secrets.choice(alphabet) for _ in range(length))
+    if length is None:
+        length = secrets.choice(range(8, 11))
+
+    symbols = '!@#$%&*'
+    required = [
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.digits),
+        secrets.choice(symbols),
+    ]
+    alphabet = string.ascii_letters + string.digits + symbols
+    remaining_count = max(length - len(required), 0)
+    chars = required + [secrets.choice(alphabet) for _ in range(remaining_count)]
+
+    # Fisher-Yates shuffle via `secrets.randbelow`, so the four guaranteed
+    # characters above don't predictably end up at the front of every
+    # generated password.
+    for i in range(len(chars) - 1, 0, -1):
+        j = secrets.randbelow(i + 1)
+        chars[i], chars[j] = chars[j], chars[i]
+
+    return ''.join(chars)
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -89,7 +114,7 @@ class AccessLogSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AccessLog
-        fields = ['id', 'user_email', 'user_name', 'action', 'action_label', 'ip_address', 'user_agent', 'timestamp']
+        fields = ['id', 'user_email', 'user_name', 'action', 'action_label', 'detail', 'ip_address', 'user_agent', 'timestamp']
 
     def get_user_email(self, obj):
         return obj.user.email if obj.user else None

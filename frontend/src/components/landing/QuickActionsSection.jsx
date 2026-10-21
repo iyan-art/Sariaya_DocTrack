@@ -5,6 +5,9 @@ import { extractErrorMessage } from '../../utils/apiError';
 import PasswordInput from '../PasswordInput';
 import TrackDocumentCard from '../TrackDocumentCard';
 import CitizenFeedbackCard from './CitizenFeedbackCard';
+import PublicSurveyCard from './PublicSurveyCard';
+import InstallPWAButton from '../InstallPWAButton';
+import GuestDocumentsLinkedModal from './GuestDocumentsLinkedModal';
 
 /**
  * The section immediately below the hero: the three things a returning
@@ -24,6 +27,7 @@ export default function QuickActionsSection() {
           <div id="track" className="space-y-6 scroll-mt-24">
             <TrackDocumentCard />
             <CitizenFeedbackCard />
+            <PublicSurveyCard />
           </div>
 
           <div className="bg-white rounded-2xl shadow-xl border-t-4 border-blue-600 p-8 sm:p-10">
@@ -32,6 +36,10 @@ export default function QuickActionsSection() {
               <p className="text-sm text-slate-500 mt-1">
                 Log in to request documents, track applications, and access your municipal services.
               </p>
+            </div>
+
+            <div className="flex justify-center mb-7">
+              <InstallPWAButton variant="compact" />
             </div>
 
             <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-7">
@@ -82,7 +90,10 @@ function LoginForm({ onSwitch }) {
       const user = await login(form.email, form.password);
       if (user.role === 'admin') navigate('/admin/dashboard');
       else if (user.role === 'employee') navigate('/employee/dashboard');
-      else navigate('/citizen/home');
+      // linkedGuestDocuments (Automatic Guest-to-User Account Linking)
+      // only ever has anything for citizens — Home.jsx reads this via
+      // location.state and shows the welcome modal if it's set.
+      else navigate('/citizen/home', { state: { linkedGuestDocuments: user.linked_guest_documents } });
     } catch (err) {
       setError(err.response?.data?.detail || 'Invalid email or password.');
     } finally {
@@ -159,6 +170,7 @@ function RegisterForm({ onSwitch }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [linkedInfo, setLinkedInfo] = useState(null); // { email, count } — Automatic Guest-to-User Account Linking
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -174,9 +186,15 @@ function RegisterForm({ onSwitch }) {
 
     setLoading(true);
     try {
-      await register(form);
-      setSuccess('Account created successfully! You can now sign in.');
-      setTimeout(onSwitch, 1500);
+      const res = await register(form);
+      if (res.linked_guest_documents > 0) {
+        // Hold off on the auto-switch-to-login below — let them actually
+        // read the welcome message; the modal's "Got it" triggers it instead.
+        setLinkedInfo({ email: form.email, count: res.linked_guest_documents });
+      } else {
+        setSuccess('Account created successfully! You can now sign in.');
+        setTimeout(onSwitch, 1500);
+      }
     } catch (err) {
       setError(extractErrorMessage(err, 'Registration failed. Please check your details.'));
     } finally {
@@ -185,6 +203,7 @@ function RegisterForm({ onSwitch }) {
   };
 
   return (
+    <>
     <form onSubmit={handleSubmit}>
       <h2 className="text-2xl font-bold text-slate-900">Create citizen account</h2>
       <p className="text-slate-500 text-sm mt-2">Register as a citizen to request and track your documents.</p>
@@ -271,5 +290,14 @@ function RegisterForm({ onSwitch }) {
         </button>
       </p>
     </form>
+
+    {linkedInfo && (
+      <GuestDocumentsLinkedModal
+        email={linkedInfo.email}
+        count={linkedInfo.count}
+        onClose={() => { setLinkedInfo(null); onSwitch(); }}
+      />
+    )}
+    </>
   );
 }

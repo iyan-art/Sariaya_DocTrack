@@ -112,43 +112,43 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
       {/* flex-col + shrink-0 header/max-h keep the header and status always
           visible — only the body (which can grow with a long history log)
           scrolls, so staff never has to zoom out to find them again. */}
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg modal-pop-in max-h-[85vh] flex flex-col overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-lg modal-pop-in max-h-[85vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-7 pt-7 shrink-0">
-          <h2 className="text-xl font-bold text-slate-900">Document Details</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">×</button>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Document Details</h2>
+          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-xl">×</button>
         </div>
 
         {loading || !doc ? (
-          <p className="text-slate-400 text-center py-10">Loading…</p>
+          <p className="text-slate-400 dark:text-slate-500 text-center py-10">Loading…</p>
         ) : (
           <div className="flex-1 overflow-y-auto px-7 pb-7 min-h-0">
             <div className="mt-4">
-              <p className="font-mono text-sm text-blue-600">{doc.tracking_number}</p>
-              <p className="font-semibold text-slate-900 text-lg mt-1">{doc.document_type_name}</p>
-              {doc.description && <p className="text-sm text-slate-500 mt-1">{doc.description}</p>}
+              <p className="font-mono text-sm text-blue-600 dark:text-blue-400">{doc.tracking_number}</p>
+              <p className="font-semibold text-slate-900 dark:text-slate-100 text-lg mt-1">{doc.document_type_name}</p>
+              {doc.description && <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{doc.description}</p>}
               <div className="mt-2"><DocumentStatusBadge doc={doc} /></div>
             </div>
 
             <div className="mt-5 space-y-2 text-sm">
-              <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-500">Requested by</span>
-                <span className="text-slate-800">{doc.requested_by_name}</span>
+              <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                <span className="text-slate-500 dark:text-slate-400">Requested by</span>
+                <span className="text-slate-800 dark:text-slate-200">{doc.requested_by_name}</span>
               </div>
               {!doc.requested_by && (
-                <div className="flex justify-between border-b border-slate-100 pb-2">
-                  <span className="text-slate-500">Contact email</span>
-                  <span className="text-slate-800">
-                    {doc.guest_email || <span className="text-slate-400 italic">Not provided</span>}
+                <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <span className="text-slate-500 dark:text-slate-400">Contact email</span>
+                  <span className="text-slate-800 dark:text-slate-200">
+                    {doc.guest_email || <span className="text-slate-400 dark:text-slate-500 italic">Not provided</span>}
                   </span>
                 </div>
               )}
-              <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-500">Current office</span>
-                <span className="text-slate-800">{doc.current_office}</span>
+              <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                <span className="text-slate-500 dark:text-slate-400">Current office</span>
+                <span className="text-slate-800 dark:text-slate-200">{doc.current_office}</span>
               </div>
-              <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-500">Current handler</span>
-                <span className="text-slate-800">
+              <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                <span className="text-slate-500 dark:text-slate-400">Current handler</span>
+                <span className="text-slate-800 dark:text-slate-200">
                   {doc.current_handler ? `${doc.current_handler.full_name} (${doc.current_handler.position || doc.current_handler.role})` : '—'}
                 </span>
               </div>
@@ -156,13 +156,13 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
 
             {/* Action form — only shown if there are valid next actions */}
             {availableActions.length > 0 && (
-              <form onSubmit={handleTransition} className="mt-5 bg-slate-50 rounded-xl p-4 space-y-3">
-                <p className="text-sm font-semibold text-slate-700">Update status</p>
+              <form onSubmit={handleTransition} className="mt-5 bg-slate-50 dark:bg-slate-800/60 rounded-xl p-4 space-y-3">
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Update status</p>
                 <select
                   required
                   value={actionForm.action}
                   onChange={(e) => setActionForm({ ...actionForm, action: e.target.value })}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select action…</option>
                   {availableActions.map((a) => (
@@ -174,12 +174,12 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
                   placeholder="Receiving office (optional — defaults to your own office)"
                   value={actionForm.office}
                   onChange={(e) => setActionForm({ ...actionForm, office: e.target.value })}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 )}
                 <div>
                   {actionForm.action === 'return_to_office' && (
-                    <label className="block text-xs font-bold text-slate-500 mb-1">
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">
                       Reason for returning <span className="text-red-500">*</span>
                     </label>
                   )}
@@ -193,7 +193,7 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
                     rows={2}
                     value={actionForm.notes}
                     onChange={(e) => setActionForm({ ...actionForm, notes: e.target.value })}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <button type="submit" disabled={submitting}
@@ -202,12 +202,12 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
                 </button>
               </form>
             )}
-            <div className="mt-6 flex flex-col items-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-6">
+            <div className="mt-6 flex flex-col items-center bg-slate-50 dark:bg-slate-800/60 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl p-6">
                 {doc.qr_code ? (
-                    <img 
+                    <img
                         /* If the backend gave a full URL, use it. If not, add the domain. */
-                        src={doc.qr_code.startsWith('http') ? doc.qr_code : `http://127.0.0.1:8000${doc.qr_code}`} 
-                        alt="QR Code" 
+                        src={doc.qr_code.startsWith('http') ? doc.qr_code : `http://127.0.0.1:8000${doc.qr_code}`}
+                        alt="QR Code"
                         className="w-44 h-44 shadow-md rounded-lg mb-3 bg-white p-2"
                         onError={(e) => {
                             console.error("Path error on image:", e.target.src);
@@ -215,15 +215,15 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
                         }}
                     />
                 ) : (
-                    <p className="text-xs text-slate-400">No QR Code Generated</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500">No QR Code Generated</p>
                 )}
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Official Tracking QR</p>
-                <p className="text-xs text-slate-400 mt-1">Scan to advance or track status</p>
+                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Official Tracking QR</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Scan to advance or track status</p>
                 {doc.qr_code && (
                   <div className="mt-4 flex flex-wrap justify-center gap-2">
                     <button
                       onClick={() => setShowSlip(true)}
-                      className="flex items-center gap-2 bg-slate-900 hover:bg-black text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors"
+                      className="flex items-center gap-2 bg-slate-900 dark:bg-slate-700 hover:bg-black dark:hover:bg-slate-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors"
                     >
                       <PrinterIcon className="w-4 h-4" /> Print QR Slip
                     </button>
@@ -242,25 +242,25 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
                 than pushing the modal's own height (and the footer/close
                 button) further down. */}
             <div className="mt-6">
-              <p className="text-sm font-semibold text-slate-700 mb-2">History</p>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">History</p>
               <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
                 {doc.logs.map((log) => (
                   <div key={log.id} className="flex gap-3 text-sm">
                     <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-slate-800 break-words">
+                      <p className="text-slate-800 dark:text-slate-200 break-words">
                         <span className="font-medium capitalize">{log.action.replace(/_/g, ' ')}</span> at {log.office?.name || '—'}
                       </p>
-                      <p className="text-slate-400 text-xs break-words">
+                      <p className="text-slate-400 dark:text-slate-500 text-xs break-words">
                         {log.acted_by
                           ? `${log.acted_by.full_name} (${log.acted_by.position || log.acted_by.role})${log.acted_by.employee_id ? ` · ${log.acted_by.employee_id}` : ''}`
                           : 'Unknown'}
                         {' · '}
                         {new Date(log.timestamp).toLocaleString()}
                       </p>
-                      {log.notes && <p className="text-slate-500 text-xs mt-0.5 break-words">{log.notes}</p>}
+                      {log.notes && <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 break-words">{log.notes}</p>}
                       {log.duration_display && (
-                        <p className="text-blue-600 text-[10px] font-bold mt-1">
+                        <p className="text-blue-600 dark:text-blue-400 text-[10px] font-bold mt-1">
                             Time taken: {log.duration_display}
                         </p>
                         )}

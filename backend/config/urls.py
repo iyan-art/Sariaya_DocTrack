@@ -22,6 +22,7 @@ from django.urls import path, include
 from apps.documents.views import (
     MissingDocumentAlertListView, DocumentTypeListCreateView, DocumentTypeDetailView, DocumentTypeStepsView,
     OfficeListCreateView, OfficeDetailView, PublicOfficeListView,
+    NotificationListView, NotificationUnreadCountView, NotificationMarkReadView, NotificationMarkAllReadView,
 )
 
 urlpatterns = [
@@ -40,6 +41,11 @@ urlpatterns = [
     path('api/offices/public/', PublicOfficeListView.as_view(), name='office-list-public'),
     path('api/offices/', OfficeListCreateView.as_view(), name='office-list-create'),
     path('api/offices/<int:pk>/', OfficeDetailView.as_view(), name='office-detail'),
+
+    path('api/notifications/', NotificationListView.as_view(), name='notification-list'),
+    path('api/notifications/unread-count/', NotificationUnreadCountView.as_view(), name='notification-unread-count'),
+    path('api/notifications/mark-all-read/', NotificationMarkAllReadView.as_view(), name='notification-mark-all-read'),
+    path('api/notifications/<int:pk>/read/', NotificationMarkReadView.as_view(), name='notification-mark-read'),
 ]
 
 if settings.DEBUG:

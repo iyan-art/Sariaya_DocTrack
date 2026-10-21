@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { scrollToSection } from './LandingNavbar';
+import InstallPWAButton from '../InstallPWAButton';
 
 // Drop real files at these exact paths in frontend/public/ to activate the
 // video hero — nothing else needs to change. Vite serves anything under
@@ -98,6 +99,10 @@ export default function HeroSection() {
               >
                 Track My Document
               </button>
+            </div>
+
+            <div className="mt-5">
+              <InstallPWAButton variant="frosted" />
             </div>
           </div>
         </div>

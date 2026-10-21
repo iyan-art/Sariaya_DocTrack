@@ -2,6 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchEmailNotifications, runSlaScanNow } from '../../api/axios';
 import { BellIcon } from '../Icons';
 
+// Renamed from NotificationBell.jsx to make room for the general in-app
+// Notification system's own bell (components/NotificationBell.jsx) — this
+// one is specifically an SLA EMAIL activity log, distinct from that.
+//
 // How many recent notifications the dropdown shows — a quick activity feed,
 // not a substitute for a full audit page (there isn't one anymore; this
 // icon IS the admin's only access point for email notification activity).
@@ -33,7 +37,7 @@ function setLastSeen(iso) {
   }
 }
 
-export default function NotificationBell() {
+export default function EmailNotificationBell() {
   const [open, setOpen] = useState(false);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);

@@ -171,24 +171,11 @@ class Document(models.Model):
         COMPLETED = 'completed', 'Completed'
         REJECTED = 'rejected', 'Rejected'
 
-    class CopyPreference(models.TextChoices):
-        HARD = 'hard', 'Hard Copy'
-        SOFT = 'soft', 'Soft Copy'
-
     document_type = models.ForeignKey(DocumentType, on_delete=models.PROTECT, related_name='documents')
     tracking_number = models.CharField(max_length=25, unique=True, editable=False)
     origin_office = models.CharField(max_length=150, blank=True)
 
     form_data = models.JSONField(default=dict, blank=True)
-    # Set by staff at request-creation time, per the citizen's choice.
-    # Hard Copy -> physical release (Document.status reaching RELEASED);
-    # Soft Copy -> the citizen accesses the same official file digitally
-    # inside the system instead (see TrackingStepper's SOFT_COPY_STAGES).
-    # Required in practice (enforced by CreateDocumentSerializer.validate());
-    # defaults to HARD at the DB level only as a safety net.
-    copy_preference = models.CharField(
-        max_length=10, choices=CopyPreference.choices, default=CopyPreference.HARD, blank=True,
-    )
 
     requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
@@ -339,6 +326,11 @@ class DocumentLog(models.Model):
         # still moving); this one reopens a document that had already
         # reached its terminal state.
         CITIZEN_RETURN_INITIATED = 'citizen_return_initiated', 'Returned by Citizen'
+        # A citizen flagging their own delayed document for staff attention
+        # (services.py::expedite_document()) — purely informational, never
+        # changes status/route_position, just raises a Notification at the
+        # office currently holding it.
+        EXPEDITE_REQUESTED = 'expedite_requested', 'Expedite Requested'
 
     document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='logs')
     action = models.CharField(max_length=30, choices=Action.choices, db_index=True)
@@ -492,12 +484,22 @@ class Survey(models.Model):
 class SurveyQuestion(models.Model):
     class QuestionType(models.TextChoices):
         RATING = 'rating', '5-Star Rating'
-        TEXT = 'text', 'Text Response'
+        LIKERT = 'likert', 'Likert Scale'
+        SINGLE = 'single', 'Multiple Choice (Single Select)'
+        MULTIPLE = 'multiple', 'Checkboxes (Multi-Select)'
+        TEXT = 'text', 'Short Text Response'
+
+    # The question types whose answers are one or more SurveyQuestionOption
+    # rows rather than a star value or free text. LIKERT is included: a
+    # Likert question is stored as an ordered option list ("Strongly
+    # Disagree" … "Strongly Agree") so the admin can word the scale however
+    # they like, and the citizen picks exactly one.
+    CHOICE_TYPES = ('likert', 'single', 'multiple')
 
     survey = models.ForeignKey(Survey, on_delete=models.CASCADE, related_name='questions')
     order = models.PositiveIntegerField(default=1)
     text = models.CharField(max_length=500)
-    question_type = models.CharField(max_length=10, choices=QuestionType.choices, default=QuestionType.RATING)
+    question_type = models.CharField(max_length=20, choices=QuestionType.choices, default=QuestionType.RATING)
 
     class Meta:
         ordering = ['order']
@@ -507,6 +509,29 @@ class SurveyQuestion(models.Model):
 
     def __str__(self):
         return f"{self.survey.title} — Q{self.order}: {self.text[:40]}"
+
+
+class SurveyQuestionOption(models.Model):
+    """
+    One selectable choice under a LIKERT / SINGLE / MULTIPLE SurveyQuestion.
+    Admin-authored in SurveyBuilder.jsx and managed with the same atomic
+    replace as the question list itself (see SurveyQuestionsView.put): an
+    option carrying its real id is updated in place so any SurveyAnswer
+    already pointing at it survives an edit, and only a genuinely removed
+    option is deleted.
+    """
+    question = models.ForeignKey(SurveyQuestion, on_delete=models.CASCADE, related_name='options')
+    order = models.PositiveIntegerField(default=1)
+    label = models.CharField(max_length=200)
+
+    class Meta:
+        ordering = ['order']
+        constraints = [
+            models.UniqueConstraint(fields=['question', 'order'], name='unique_option_order_per_question'),
+        ]
+
+    def __str__(self):
+        return f"{self.question.text[:30]} · {self.label[:30]}"
 
 
 class SurveyResponse(models.Model):
@@ -522,8 +547,24 @@ class SurveyResponse(models.Model):
     real-world document/office interaction, so uniqueness is scoped to
     (document, office) regardless of who submitted it, not to the
     respondent.
+
+    `source` separates the two ways a response is collected:
+      - RELEASE   — the per-office evaluation prompted once a document is
+                    handed back (DocumentEvaluationView); `office` is set.
+      - POST_SCAN — the whole-transaction survey shown to a logged-in
+                    citizen right after they scan their own document's QR
+                    (PostScanSurveyView); `office` is null and the survey is
+                    answered at most once per (survey, document, respondent).
     """
+    class Source(models.TextChoices):
+        RELEASE = 'release', 'Post-Release Evaluation'
+        POST_SCAN = 'post_scan', 'Post-Scan Survey'
+        PUBLIC = 'public', 'Public Landing Survey'
+
     survey = models.ForeignKey(Survey, on_delete=models.CASCADE, related_name='responses')
+    source = models.CharField(
+        max_length=12, choices=Source.choices, default=Source.RELEASE, db_index=True,
+    )
     respondent = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='survey_responses',
@@ -543,11 +584,19 @@ class SurveyResponse(models.Model):
         constraints = [
             # One evaluation per office per document, period — stops a
             # resubmit (by the owner, a guest, or both) from double-counting
-            # toward that office's KPI.
+            # toward that office's KPI. Scoped to the RELEASE flow, the only
+            # one that sets `office`.
             models.UniqueConstraint(
                 fields=['document', 'office'],
-                condition=models.Q(document__isnull=False),
+                condition=models.Q(document__isnull=False, office__isnull=False),
                 name='unique_evaluation_per_document_office',
+            ),
+            # One post-scan survey per citizen per document — the DB backstop
+            # behind PostScanSurveyView's "you've already answered" check.
+            models.UniqueConstraint(
+                fields=['survey', 'document', 'respondent'],
+                condition=models.Q(source='post_scan'),
+                name='unique_post_scan_survey_per_document_respondent',
             ),
         ]
 
@@ -557,11 +606,21 @@ class SurveyResponse(models.Model):
 
 
 class SurveyAnswer(models.Model):
-    """One answer to one question within a SurveyResponse."""
+    """
+    One answer to one question within a SurveyResponse. Exactly one storage
+    slot is used per answer, matching the question's type:
+      - RATING              -> rating_value (1-5)
+      - TEXT                -> text_value
+      - LIKERT / SINGLE     -> exactly one selected_options row
+      - MULTIPLE            -> one or more selected_options rows
+    """
     response = models.ForeignKey(SurveyResponse, on_delete=models.CASCADE, related_name='answers')
     question = models.ForeignKey(SurveyQuestion, on_delete=models.CASCADE, related_name='answers')
     rating_value = models.PositiveSmallIntegerField(null=True, blank=True)  # 1-5, for RATING questions
     text_value = models.TextField(blank=True)  # for TEXT questions
+    selected_options = models.ManyToManyField(
+        SurveyQuestionOption, blank=True, related_name='answers',
+    )  # for LIKERT / SINGLE / MULTIPLE questions
 
     class Meta:
         constraints = [
@@ -570,6 +629,54 @@ class SurveyAnswer(models.Model):
 
     def __str__(self):
         return f"{self.question.text[:30]} -> {self.rating_value or self.text_value[:30]}"
+
+
+class CitizenSuggestion(models.Model):
+    """
+    A constructive suggestion a logged-in citizen sends to the Municipality
+    of Sariaya through the Suggestion Box (CitizenSuggestionBox.jsx),
+    independent of any specific document. Admin triages each one through a
+    small status lifecycle (New -> Reviewed -> In Progress -> Archived) on
+    the admin review dashboard (AdminSuggestions.jsx).
+    """
+    class Category(models.TextChoices):
+        INFRASTRUCTURE = 'infrastructure', 'Infrastructure'
+        DOCUMENT_PROCESSING = 'document_processing', 'Document Processing'
+        STAFF_COURTESY = 'staff_courtesy', 'Staff Courtesy'
+        PUBLIC_HEALTH = 'public_health', 'Public Health'
+        GENERAL = 'general', 'General LGU Services'
+
+    class Status(models.TextChoices):
+        NEW = 'new', 'New'
+        REVIEWED = 'reviewed', 'Reviewed'
+        IN_PROGRESS = 'in_progress', 'In Progress'
+        ARCHIVED = 'archived', 'Archived'
+
+    respondent = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='suggestions',
+    )
+    category = models.CharField(
+        max_length=24, choices=Category.choices, default=Category.GENERAL, db_index=True,
+    )
+    subject = models.CharField(max_length=160)
+    message = models.TextField()
+    status = models.CharField(
+        max_length=12, choices=Status.choices, default=Status.NEW, db_index=True,
+    )
+    admin_notes = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='reviewed_suggestions',
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"[{self.get_category_display()}] {self.subject[:50]}"
 
 
 class DocumentTemplateField(models.Model):
@@ -726,3 +833,46 @@ class Event(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.start_date})"
+
+
+class Notification(models.Model):
+    """
+    An in-app notification for one specific user — distinct from
+    EmailNotificationLog (a record of outbound SLA emails) and AccessLog (a
+    system-wide security/audit trail). This is the bell-icon inbox: staff
+    hearing about incoming/returned documents, citizens' expedite requests,
+    and admins hearing about bottlenecks or urgent feedback.
+    """
+    class NotificationType(models.TextChoices):
+        DOCUMENT_FORWARDED = 'document_forwarded', 'Document Forwarded'
+        DOCUMENT_RETURNED = 'document_returned', 'Document Returned'
+        EXPEDITE_REQUEST = 'expedite_request', 'Expedite Request'
+        BOTTLENECK_ALERT = 'bottleneck_alert', 'Bottleneck Alert'
+        SYSTEM_ALERT = 'system_alert', 'System Alert'
+
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications',
+    )
+    # Who/what triggered it — null for system-generated ones (SLA scans,
+    # bottleneck alerts) rather than a specific staff action.
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='sent_notifications',
+    )
+    title = models.CharField(max_length=200)
+    message = models.TextField()
+    notification_type = models.CharField(max_length=30, choices=NotificationType.choices, db_index=True)
+    related_document = models.ForeignKey(
+        Document, on_delete=models.CASCADE, null=True, blank=True, related_name='notifications',
+    )
+    is_read = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['recipient', 'is_read']),
+        ]
+
+    def __str__(self):
+        return f"{self.recipient} — {self.title}"

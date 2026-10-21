@@ -11,6 +11,7 @@ from django.db.models import Q
 from .models import User, AccessLog
 from .serializers import RegisterSerializer, UserSerializer, CreateEmployeeSerializer, AccessLogSerializer, generate_temp_password
 from .permissions import IsAdmin
+from .services import link_guest_documents
 from apps.documents.permissions import IsStaffUser
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -61,6 +62,20 @@ class LoginView(TokenObtainPairView):
             user=matched_user, action=AccessLog.Action.LOGIN,
             ip_address=ip_address, user_agent=user_agent,
         )
+
+        # Automatic Guest-to-User Account Linking — citizens only (a guest
+        # document's guest_email is only ever a citizen concept); cheap
+        # no-op for everyone else and for citizens with nothing to link.
+        if matched_user and matched_user.role == User.Role.CITIZEN:
+            linked_count = link_guest_documents(matched_user)
+            if linked_count:
+                AccessLog.objects.create(
+                    user=matched_user, action=AccessLog.Action.GUEST_DOCUMENTS_LINKED,
+                    detail=f"Linked {linked_count} guest document request(s) to account {matched_user.email} on login.",
+                    ip_address=ip_address, user_agent=user_agent,
+                )
+                response.data['linked_guest_documents'] = linked_count
+
         return response
 
 
@@ -77,8 +92,24 @@ class RegisterView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+
+        # Automatic Guest-to-User Account Linking — any document requested
+        # as a guest under this same email, before the account existed,
+        # gets attached to it right away.
+        linked_count = link_guest_documents(user)
+        if linked_count:
+            AccessLog.objects.create(
+                user=user, action=AccessLog.Action.GUEST_DOCUMENTS_LINKED,
+                detail=f"Linked {linked_count} guest document request(s) to newly registered account {user.email}.",
+                ip_address=_client_ip(request), user_agent=request.META.get('HTTP_USER_AGENT', '')[:255],
+            )
+
         return Response(
-            {"message": "Account created successfully.", "user": UserSerializer(user).data},
+            {
+                "message": "Account created successfully.",
+                "user": UserSerializer(user).data,
+                "linked_guest_documents": linked_count,
+            },
             status=status.HTTP_201_CREATED
         )
 

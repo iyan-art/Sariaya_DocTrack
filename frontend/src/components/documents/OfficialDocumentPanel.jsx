@@ -60,13 +60,13 @@ export default function OfficialDocumentPanel({ documentId }) {
   };
 
   if (status === 'loading') {
-    return <p className="text-sm text-slate-400 py-8 text-center">Loading official document…</p>;
+    return <p className="text-sm text-slate-400 dark:text-slate-500 py-8 text-center">Loading official document…</p>;
   }
 
   if (status === 'error') {
     return (
-      <div className="bg-slate-50 border border-slate-100 rounded-xl p-6 text-center">
-        <p className="text-sm text-slate-500">{errorMessage}</p>
+      <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-xl p-6 text-center">
+        <p className="text-sm text-slate-500 dark:text-slate-400">{errorMessage}</p>
       </div>
     );
   }
@@ -76,13 +76,13 @@ export default function OfficialDocumentPanel({ documentId }) {
       <div className="doc-view-no-print flex justify-end gap-2 mb-3">
         <button
           onClick={handlePrint}
-          className="flex items-center gap-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-lg transition-colors"
+          className="flex items-center gap-1.5 text-xs font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 px-3 py-2 rounded-lg transition-colors"
         >
           <PrinterIcon className="w-3.5 h-3.5" /> Print
         </button>
         <button
           onClick={handleDownload}
-          className="flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg transition-colors"
+          className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-3 py-2 rounded-lg transition-colors"
         >
           Download
         </button>
@@ -91,7 +91,7 @@ export default function OfficialDocumentPanel({ documentId }) {
         ref={iframeRef}
         src={fileUrl}
         title="Official Document"
-        className="w-full h-[70vh] rounded-xl border border-slate-200"
+        className="w-full h-[70vh] rounded-xl border border-slate-200 dark:border-slate-700"
       />
     </div>
   );

@@ -1,7 +1,61 @@
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
-from .models import Document, DocumentLog, EmailNotificationLog, Office, RequestStatusHistory
+from apps.accounts.models import User
+from .models import Document, DocumentLog, EmailNotificationLog, Notification, Office, RequestStatusHistory
 from .notifications import send_ready_for_release_email
+
+# Mirrors sla_scan.py's DEFAULT_FALLBACK_SLA_HOURS (duplicated, not
+# imported, to avoid a circular import — sla_scan.py already imports FROM
+# this module). Same data-integrity edge case: only used if a document's
+# route_position has somehow drifted out of range for its WorkflowStep rows.
+DEFAULT_FALLBACK_SLA_HOURS = 48
+
+
+def notify_office(office_label, title, message, notification_type, sender=None, related_document=None, exclude_user=None):
+    """
+    Creates an in-app Notification (the bell-icon inbox, NOT an
+    EmailNotificationLog) for every active staff member assigned to
+    `office_label` — case-insensitively, same seam as _same_office()/
+    resolve_office() between the free-text User.office and the canonical
+    Office.code. `exclude_user` skips the acting user themselves, so staff
+    never get notified about their own action.
+    """
+    recipients = User.objects.filter(
+        office__iexact=(office_label or '').strip(), role__in=[User.Role.EMPLOYEE, User.Role.ADMIN], is_active=True,
+    )
+    if exclude_user:
+        recipients = recipients.exclude(id=exclude_user.id)
+    Notification.objects.bulk_create([
+        Notification(
+            recipient=user, sender=sender, title=title, message=message,
+            notification_type=notification_type, related_document=related_document,
+        )
+        for user in recipients
+    ])
+
+
+def notify_admins(title, message, notification_type, sender=None, related_document=None):
+    """Same as notify_office(), but every active admin regardless of office."""
+    recipients = User.objects.filter(role=User.Role.ADMIN, is_active=True)
+    Notification.objects.bulk_create([
+        Notification(
+            recipient=user, sender=sender, title=title, message=message,
+            notification_type=notification_type, related_document=related_document,
+        )
+        for user in recipients
+    ])
+
+
+def can_delete_document(document, user):
+    """
+    A document request can be deleted/cancelled by its citizen owner or by
+    staff while it's still sitting untouched at its origin office — before
+    any office transfer has actually happened (status IN_PROGRESS,
+    route_position 0). An admin can override this and delete at any stage.
+    """
+    if user.role == 'admin':
+        return True
+    return document.status == Document.Status.IN_PROGRESS and document.route_position == 0
 
 
 def _maybe_notify_citizen_ready(document):
@@ -10,11 +64,10 @@ def _maybe_notify_citizen_ready(document):
     notifications.py::send_ready_for_release_email()) at most once per
     document, ever — this is a one-time terminal notification, not a
     recurring SLA reminder, so unlike the overdue/due-soon emails there's no
-    time window to re-arm. Both call sites below (advance_processing_stage's
-    automatic soft-copy trigger, and release_to_citizen's explicit "Release
-    to Citizen" button trigger for hard copies) go through this one guard,
-    so a document can never end up double-notified no matter which path (or
-    both, in some edge case) reaches it.
+    time window to re-arm. Called from release_to_citizen()'s explicit
+    "Release to Citizen" button/scan action; this guard just means a
+    document can never end up double-notified even if that's somehow
+    triggered more than once for the same document.
 
     Returns 'sent', 'failed', 'skipped' (no valid recipient — see
     _resolve_citizen_recipient()), or 'already_sent' (a previous call
@@ -69,30 +122,17 @@ def advance_processing_stage(document, stage, actor=None, note=''):
     fully routed back to origin -> "Ready for Release"; handed to the
     citizen -> "Completed"), and separately by staff for the earlier
     narrative stages that have no physical-transfer equivalent at all
-    (Under Review, Form Processing, For Approval, ...) — including a manual
-    PATCH straight to "Ready for Release" for soft-copy documents, which
-    never pass through receive_document()'s final leg.
+    (Under Review, Form Processing, For Approval, ...).
 
-    On a genuine transition into READY_FOR_RELEASE, emails the citizen right
-    here — but only for a SOFT copy document, since that's its only
-    notification point (there's no later physical hand-off/button for it).
-    A HARD copy document's citizen email is deliberately deferred to
-    release_to_citizen() instead — the actual "Release to Citizen" button
-    click, i.e. the moment staff confirms the document is ready, not the
-    earlier moment it merely arrived back at the origin office and could
-    still sit unconfirmed in a drawer for days.
+    Does NOT notify the citizen — every document's "ready for pickup" email
+    fires from release_to_citizen() instead, at the moment staff actually
+    confirms the hand-off, not the earlier moment it merely arrived back at
+    the origin office and could still sit unconfirmed in a drawer for days.
     """
     previous_stage = document.processing_stage
     document.processing_stage = stage
     document.save(update_fields=['processing_stage'])
     RequestStatusHistory.objects.create(document=document, stage=stage, changed_by=actor, note=note)
-
-    if (
-        stage == Document.ProcessingStage.READY_FOR_RELEASE
-        and previous_stage != Document.ProcessingStage.READY_FOR_RELEASE
-        and document.copy_preference != Document.CopyPreference.HARD
-    ):
-        _maybe_notify_citizen_ready(document)
 
 
 def release_document(document, releasing_user, notes='', qr_verified=False):
@@ -106,8 +146,8 @@ def release_document(document, releasing_user, notes='', qr_verified=False):
 
     if not _same_office(releasing_user.office, document.current_office):
         raise ValidationError(
-            f"Only staff at '{document.current_office}' can release this document, "
-            f"not '{releasing_user.office}'."
+            f"Your current assigned office ('{releasing_user.office or 'none'}') does not match the "
+            f"office required for this step ('{document.current_office}')."
         )
 
     route = document.document_type.route
@@ -127,6 +167,19 @@ def release_document(document, releasing_user, notes='', qr_verified=False):
         qr_verified=qr_verified,
         notes=notes,
     )
+
+    next_office = route[next_position]
+    notify_office(
+        next_office,
+        title=f"Incoming Document: {document.tracking_number}",
+        message=(
+            f"Document {document.tracking_number} ({document.document_type.name}) has been "
+            f"forwarded to your office from {document.current_office}."
+        ),
+        notification_type=Notification.NotificationType.DOCUMENT_FORWARDED,
+        sender=releasing_user, related_document=document, exclude_user=releasing_user,
+    )
+
     return document
 
 
@@ -145,8 +198,8 @@ def return_document(document, returning_user, notes=''):
 
     if not _same_office(returning_user.office, document.current_office):
         raise ValidationError(
-            f"Only staff at '{document.current_office}' can return this document, "
-            f"not '{returning_user.office}'."
+            f"Your current assigned office ('{returning_user.office or 'none'}') does not match the "
+            f"office required for this step ('{document.current_office}')."
         )
 
     if document.route_position == 0:
@@ -170,6 +223,18 @@ def return_document(document, returning_user, notes=''):
         acted_by=returning_user,
         notes=notes,
     )
+
+    notify_office(
+        previous_office,
+        title=f"Document Returned: {document.tracking_number}",
+        message=(
+            f"Document {document.tracking_number} ({document.document_type.name}) has been sent "
+            f"back to your office by {document.current_office}. Reason: {notes}"
+        ),
+        notification_type=Notification.NotificationType.DOCUMENT_RETURNED,
+        sender=returning_user, related_document=document, exclude_user=returning_user,
+    )
+
     return document
 
 
@@ -196,7 +261,8 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
 
         if not _same_office(scanning_office, expected_office):
             raise ValidationError(
-                f"This document is being returned to '{expected_office}', not '{scanning_office}'."
+                f"Your current assigned office ('{scanning_office or 'none'}') does not match the "
+                f"office required for this step ('{expected_office}')."
             )
 
         now = timezone.now()
@@ -234,7 +300,8 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
 
     if not _same_office(scanning_office, expected_office):
         raise ValidationError(
-            f"This document is headed to '{expected_office}', not '{scanning_office}'."
+            f"Your current assigned office ('{scanning_office or 'none'}') does not match the "
+            f"office required for this step ('{expected_office}')."
         )
 
     now = timezone.now()
@@ -286,12 +353,11 @@ def release_to_citizen(document, releasing_user, notes='', qr_verified=False):
     completed its full receipt chain first.
 
     Also fires the citizen's "ready for pickup" email right here (via
-    _maybe_notify_citizen_ready(), which no-ops if one was already sent —
-    e.g. for a soft-copy document that already got notified automatically
-    when it first reached READY_FOR_RELEASE). Returns (document,
-    email_status) instead of a bare document so the caller can surface a
-    truthful outcome to staff — 'sent', 'failed', 'skipped', or
-    'already_sent' — rather than assuming the email always goes out.
+    _maybe_notify_citizen_ready(), which no-ops if one was somehow already
+    sent for this document). Returns (document, email_status) instead of a
+    bare document so the caller can surface a truthful outcome to staff —
+    'sent', 'failed', 'skipped', or 'already_sent' — rather than assuming
+    the email always goes out.
     """
     if document.status != Document.Status.COMPLETED:
         raise ValidationError(
@@ -350,6 +416,54 @@ def citizen_return_document(document, citizen_user, notes=''):
     # timeline too — otherwise it would still say "Completed" even though
     # the document is physically back in the workflow.
     advance_processing_stage(document, Document.ProcessingStage.UNDER_REVIEW, actor=citizen_user, note=notes)
+    return document
+
+
+def expedite_document(document, citizen_user):
+    """
+    A citizen flagging their own delayed document for staff attention —
+    "Follow-Up / Expedite Request". Purely informational: never touches
+    status/route_position, just raises a Notification at whichever office
+    currently holds it. Ownership (only the requesting citizen may do this)
+    is checked by the view, not here, same convention as
+    citizen_return_document() above. Only allowed once the document is
+    actually running past its current step's own SLA — otherwise there's
+    nothing to expedite yet.
+    """
+    if document.status not in (Document.Status.IN_PROGRESS, Document.Status.IN_TRANSIT):
+        raise ValidationError(f"Cannot request a follow-up on a document that is '{document.status}'.")
+
+    steps = list(document.document_type.steps.all())  # Meta.ordering = ['step_number']
+    if document.route_position < len(steps):
+        sla_hours = steps[document.route_position].max_hours_allowed
+    else:
+        sla_hours = DEFAULT_FALLBACK_SLA_HOURS
+    dwell_hours = (timezone.now() - document.entered_current_office_at).total_seconds() / 3600
+
+    if dwell_hours <= sla_hours:
+        raise ValidationError(
+            "This document is still within its expected processing time — "
+            "a follow-up can only be requested once it's running late."
+        )
+
+    DocumentLog.objects.create(
+        document=document,
+        action=DocumentLog.Action.EXPEDITE_REQUESTED,
+        office=resolve_office(document.current_office),
+        acted_by=citizen_user,
+        notes=f"Citizen requested a follow-up — document has been at {document.current_office} for {round(dwell_hours, 1)}h (SLA: {sla_hours}h).",
+    )
+    notify_office(
+        document.current_office,
+        title=f"Follow-Up Requested: {document.tracking_number}",
+        message=(
+            f"The citizen who requested {document.tracking_number} ({document.document_type.name}) "
+            f"has flagged it as delayed — it's been at your office for {round(dwell_hours, 1)}h "
+            f"(expected: {sla_hours}h). Please review."
+        ),
+        notification_type=Notification.NotificationType.EXPEDITE_REQUEST,
+        sender=citizen_user, related_document=document,
+    )
     return document
 
 

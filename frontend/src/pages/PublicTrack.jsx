@@ -57,7 +57,7 @@ export default function PublicTrack() {
       .finally(() => setLoading(false));
   }, [trackingNumber]);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-900 dark:text-slate-100">Loading...</div>;
 
   if (!doc) {
     return (
@@ -66,12 +66,12 @@ export default function PublicTrack() {
           {errorMessage ? (
             <>
               <p className="text-4xl mb-3">🔒</p>
-              <p className="font-semibold text-slate-800">{errorMessage}</p>
+              <p className="font-semibold text-slate-800 dark:text-slate-200">{errorMessage}</p>
             </>
           ) : (
             <>
               <p className="text-4xl mb-3">⚠️</p>
-              <p className="font-semibold text-slate-800">
+              <p className="font-semibold text-slate-800 dark:text-slate-200">
                 Your Document tracking number does not exist or Wrong Document Tracking, Please Try Again
               </p>
             </>
@@ -99,7 +99,7 @@ export default function PublicTrack() {
     : doc.created_at;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 sm:p-8 flex items-start sm:items-center justify-center">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 sm:p-8 flex items-start sm:items-center justify-center">
       <style>{PRINT_STYLES}</style>
 
       {/* max-h + flex-col caps the panel so it never forces the whole
@@ -107,7 +107,7 @@ export default function PublicTrack() {
           body scrolls, while the header (title + tracking number + close
           X) stays fixed in place above it, same pattern used for every
           modal/panel elsewhere in this app. */}
-      <div className="max-w-xl w-full max-h-[92vh] bg-white rounded-3xl shadow-xl overflow-hidden track-printable flex flex-col">
+      <div className="max-w-xl w-full max-h-[92vh] bg-white dark:bg-slate-900 rounded-3xl shadow-xl dark:shadow-none overflow-hidden track-printable flex flex-col">
         {/* Header — shrink-0 so it never scrolls away */}
         <div className="bg-blue-600 p-8 text-white shrink-0 flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -129,7 +129,7 @@ export default function PublicTrack() {
            <div className="track-no-print flex justify-end mb-6">
               <button
                 onClick={() => window.print()}
-                className="flex items-center gap-2 text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-xl transition-colors"
+                className="flex items-center gap-2 text-sm font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 px-4 py-2 rounded-xl transition-colors"
               >
                 <PrinterIcon className="w-4 h-4" /> Print / Download
               </button>
@@ -140,18 +140,18 @@ export default function PublicTrack() {
                latest release/receive scan automatically, since it's
                re-fetched fresh on every page load. */}
            <div className="mb-6">
-              <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Current Location</h2>
-              <div className="flex items-start gap-4 p-4 bg-blue-50 rounded-2xl border border-blue-100">
+              <h2 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">Current Location</h2>
+              <div className="flex items-start gap-4 p-4 bg-blue-50 dark:bg-blue-500/10 rounded-2xl border border-blue-100 dark:border-blue-500/30">
                  <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white shrink-0">
                    <MapPinIcon className="w-5 h-5" />
                  </div>
                  <div className="min-w-0">
-                    <p className="font-bold text-blue-900 text-lg break-words">{doc.current_location?.office_name}</p>
+                    <p className="font-bold text-blue-900 dark:text-blue-300 text-lg break-words">{doc.current_location?.office_name}</p>
                     {doc.current_location?.office_floor && (
-                      <p className="text-sm text-blue-800/80">{doc.current_location.office_floor}</p>
+                      <p className="text-sm text-blue-800/80 dark:text-blue-400/80">{doc.current_location.office_floor}</p>
                     )}
                     {doc.current_location?.handled_by && (
-                      <p className="text-xs text-blue-700/70 mt-1 break-words">
+                      <p className="text-xs text-blue-700/70 dark:text-blue-400/70 mt-1 break-words">
                         Currently handled by <span className="font-semibold">{doc.current_location.handled_by}</span>
                       </p>
                     )}
@@ -162,12 +162,12 @@ export default function PublicTrack() {
            {/* Current status — one clear line derived from real data, not a
                position within a predefined list of every possible status. */}
            <div className="mb-8">
-              <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2">Current Status</h2>
+              <h2 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Current Status</h2>
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
-                <p className="font-bold text-slate-900 text-lg break-words">{doc.processing_stage_label}</p>
+                <p className="font-bold text-slate-900 dark:text-slate-100 text-lg break-words">{doc.processing_stage_label}</p>
               </div>
-              <p className="text-xs text-slate-400 mt-1">Last updated: {formatDateTime(lastUpdated)}</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Last updated: {formatDateTime(lastUpdated)}</p>
            </div>
 
            {/* Activity — one merged, chronological, data-driven timeline
@@ -176,24 +176,24 @@ export default function PublicTrack() {
                trail. Only real events appear here; nothing is shown just
                because a workflow could eventually reach that stage. */}
            <div className="mb-2">
-              <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Activity</h2>
+              <h2 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">Activity</h2>
               <DocumentTrackingTimeline stageHistory={doc.stage_history} activityLog={doc.activity_log} />
            </div>
 
            {/* The REAL official document file — no login needed, only once Released */}
            {doc.processing_stage === 'completed' && doc.has_official_file && (
-             <div className="track-no-print mt-10 pt-8 border-t border-slate-100">
-                <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Official Document</h2>
+             <div className="track-no-print mt-10 pt-8 border-t border-slate-100 dark:border-slate-800">
+                <h2 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">Official Document</h2>
                 <iframe
                   src={`${API_BASE_URL}/documents/track/${doc.tracking_number}/official-file/`}
                   title="Official Document"
-                  className="w-full h-[70vh] rounded-xl border border-slate-200"
+                  className="w-full h-[70vh] rounded-xl border border-slate-200 dark:border-slate-700"
                 />
                 <a
                   href={`${API_BASE_URL}/documents/track/${doc.tracking_number}/official-file/`}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-blue-700 hover:text-blue-800"
+                  className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                 >
                   <PrinterIcon className="w-4 h-4" /> Open in new tab to print / save
                 </a>
@@ -202,10 +202,10 @@ export default function PublicTrack() {
 
            {/* Rate your experience — no account needed, works straight off the tracking number */}
            {doc.processing_stage === 'completed' && (
-             <div className="track-no-print mt-10 pt-8 border-t border-slate-100 text-center">
+             <div className="track-no-print mt-10 pt-8 border-t border-slate-100 dark:border-slate-800 text-center">
                 <StarIcon className="w-6 h-6 text-amber-400 mx-auto mb-2" filled />
-                <p className="text-sm font-bold text-slate-800">This document has been released to you.</p>
-                <p className="text-xs text-slate-500 mt-1 mb-4">
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">This document has been released to you.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-4">
                   Rate each office that handled your request — no account needed.
                 </p>
                 <button
@@ -218,8 +218,8 @@ export default function PublicTrack() {
            )}
 
            {/* Login Redirect */}
-           <div className="track-no-print mt-8 pt-8 border-t border-slate-100 text-center">
-              <p className="text-sm text-slate-500 mb-4 font-medium">Want to save this to your account and get alerts?</p>
+           <div className="track-no-print mt-8 pt-8 border-t border-slate-100 dark:border-slate-800 text-center">
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4 font-medium">Want to save this to your account and get alerts?</p>
               <button
                 onClick={() => navigate('/login')}
                 className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-black transition-all"

@@ -72,17 +72,21 @@ export default function DocumentFormModal({ documentId, onClose, onManage, fetch
           zoom the browser out to reach the header/actions on a normal
           laptop screen no matter how long the routing history or how tall
           the embedded PDF preview gets. */}
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] modal-pop-in flex flex-col overflow-hidden">
-        <div className="doc-view-no-print flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-          <h2 className="text-lg font-bold text-slate-900">Official Document Record</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">×</button>
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] modal-pop-in flex flex-col overflow-hidden">
+        <div className="doc-view-no-print flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Official Document Record</h2>
+          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-xl">×</button>
         </div>
 
         {loading || !doc ? (
-          <p className="text-slate-400 text-center py-16">Loading…</p>
+          <p className="text-slate-400 dark:text-slate-500 text-center py-16">Loading…</p>
         ) : (
           <>
-            <div className="doc-view-printable flex-1 overflow-y-auto min-h-0 p-6 sm:p-8">
+            {/* bg-white here is deliberate and NOT theme-dependent: this
+                region (doc-view-printable) renders the official letterhead
+                record exactly as it will print, and should always look like
+                a sheet of paper regardless of the app's dark/light mode. */}
+            <div className="doc-view-printable bg-white flex-1 overflow-y-auto min-h-0 p-6 sm:p-8">
               {/* Letterhead */}
               <div className="text-center border-b-2 border-slate-800 pb-4">
                 <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Republic of the Philippines</p>
@@ -280,11 +284,11 @@ export default function DocumentFormModal({ documentId, onClose, onManage, fetch
               </p>
             </div>
 
-            <div className="doc-view-no-print flex flex-wrap gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
+            <div className="doc-view-no-print flex flex-wrap gap-3 px-6 py-4 border-t border-slate-100 dark:border-slate-800 shrink-0">
               {onManage && (
                 <button
                   onClick={onManage}
-                  className="flex-1 min-w-[10rem] bg-slate-900 hover:bg-black text-white font-bold py-2.5 rounded-xl transition-colors"
+                  className="flex-1 min-w-[10rem] bg-slate-900 dark:bg-slate-700 hover:bg-black dark:hover:bg-slate-600 text-white font-bold py-2.5 rounded-xl transition-colors"
                 >
                   Manage / Update Status
                 </button>
@@ -297,7 +301,7 @@ export default function DocumentFormModal({ documentId, onClose, onManage, fetch
               </button>
               <button
                 onClick={onClose}
-                className="flex-1 min-w-[10rem] py-2.5 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors"
+                className="flex-1 min-w-[10rem] py-2.5 rounded-xl text-sm font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               >
                 Close
               </button>

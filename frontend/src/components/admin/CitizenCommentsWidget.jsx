@@ -41,43 +41,43 @@ export default function CitizenCommentsWidget({
   }, [fetchComments]);
 
   return (
-    <div className="mt-8 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-      <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
+    <div className="mt-8 bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-800">
+      <h2 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
         <StarIcon className="w-4 h-4 text-amber-500" filled /> Citizen Comments &amp; Suggestions
       </h2>
-      <p className="text-xs text-slate-400 mb-5">{subtitle}</p>
+      <p className="text-xs text-slate-400 dark:text-slate-500 mb-5">{subtitle}</p>
 
       {loading ? (
-        <p className="text-sm text-slate-400 text-center py-8">Loading…</p>
+        <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">Loading…</p>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-slate-400 text-center py-8">No written comments yet.</p>
+        <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">No written comments yet.</p>
       ) : (
         <div className="space-y-4 max-h-[28rem] overflow-y-auto pr-1">
           {rows.map((row) => (
-            <div key={row.id} className="border border-slate-100 rounded-2xl p-4">
+            <div key={row.id} className="border border-slate-100 dark:border-slate-800 rounded-2xl p-4">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
-                  <p className="text-sm font-bold text-slate-700">Anonymous Citizen</p>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Anonymous Citizen</p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500">
                     {row.office_name || 'Unknown office'}
                     {row.document_type_name && <span> · {row.document_type_name}</span>}
                   </p>
                 </div>
-                <p className="text-[11px] text-slate-400 shrink-0">{formatDate(row.submitted_at)}</p>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 shrink-0">{formatDate(row.submitted_at)}</p>
               </div>
 
               {row.ratings.length > 0 && (
                 <div className="mt-3 space-y-1">
                   {row.ratings.map((r, idx) => (
                     <div key={idx} className="flex items-center justify-between gap-3 text-xs">
-                      <span className="text-slate-500 break-words">{r.question}</span>
+                      <span className="text-slate-500 dark:text-slate-400 break-words">{r.question}</span>
                       <StarRow value={r.value} />
                     </div>
                   ))}
                 </div>
               )}
 
-              <p className="text-sm text-slate-700 mt-3 break-words">"{row.comment}"</p>
+              <p className="text-sm text-slate-700 dark:text-slate-300 mt-3 break-words">"{row.comment}"</p>
             </div>
           ))}
         </div>

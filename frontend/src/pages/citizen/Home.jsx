@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { fetchMyDocuments } from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import GuestDocumentsLinkedModal from '../../components/landing/GuestDocumentsLinkedModal';
 import { FileTextIcon, Clock3Icon, CheckCircle2Icon } from '../../components/Icons';
 
 // The citizen's post-login landing screen. Surfaces a quick summary of
@@ -10,8 +11,24 @@ import { FileTextIcon, Clock3Icon, CheckCircle2Icon } from '../../components/Ico
 // not here.
 export default function Home() {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Automatic Guest-to-User Account Linking — set by QuickActionsSection's
+  // LoginForm via navigate(..., { state }) when the login response reported
+  // newly-linked guest documents. docs below already includes them (same
+  // requested_by-scoped query), this is purely the one-time heads-up.
+  const [linkedCount] = useState(location.state?.linkedGuestDocuments || 0);
+  const [showLinkedModal, setShowLinkedModal] = useState(linkedCount > 0);
+
+  useEffect(() => {
+    // Drop the state so a refresh/back-navigation doesn't re-show the modal.
+    if (location.state?.linkedGuestDocuments) {
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     fetchMyDocuments()
@@ -24,39 +41,47 @@ export default function Home() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-900">Welcome, {user.first_name}!</h1>
-      <p className="text-slate-500 mt-1">Here's a quick look at your document requests.</p>
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Welcome, {user.first_name}!</h1>
+      <p className="text-slate-500 dark:text-slate-400 mt-1">Here's a quick look at your document requests.</p>
 
       {/* Quick stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6">
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-3">
             <FileTextIcon className="w-5 h-5" />
           </div>
-          <p className="text-2xl font-black text-slate-900">{loading ? '—' : docs.length}</p>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Total Requests</p>
+          <p className="text-2xl font-black text-slate-900 dark:text-slate-100">{loading ? '—' : docs.length}</p>
+          <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Total Requests</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-3">
             <Clock3Icon className="w-5 h-5" />
           </div>
-          <p className="text-2xl font-black text-slate-900">{loading ? '—' : active.length}</p>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">In Progress</p>
+          <p className="text-2xl font-black text-slate-900 dark:text-slate-100">{loading ? '—' : active.length}</p>
+          <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">In Progress</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-3">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5">
+          <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-3">
             <CheckCircle2Icon className="w-5 h-5" />
           </div>
-          <p className="text-2xl font-black text-slate-900">{loading ? '—' : released.length}</p>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Released to You</p>
+          <p className="text-2xl font-black text-slate-900 dark:text-slate-100">{loading ? '—' : released.length}</p>
+          <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Released to You</p>
         </div>
       </div>
 
       <div className="mt-8 text-center">
-        <Link to="/citizen/history" className="text-sm font-bold text-blue-600 hover:text-blue-700">
+        <Link to="/citizen/history" className="text-sm font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
           View full request history →
         </Link>
       </div>
+
+      {showLinkedModal && (
+        <GuestDocumentsLinkedModal
+          email={user.email}
+          count={linkedCount}
+          onClose={() => setShowLinkedModal(false)}
+        />
+      )}
     </div>
   );
 }

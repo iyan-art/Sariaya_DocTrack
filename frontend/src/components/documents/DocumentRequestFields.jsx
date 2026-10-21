@@ -20,12 +20,12 @@ export default function DocumentRequestFields({ fields, value, onChange }) {
     <div className="space-y-4">
       {effectiveFields.map((f) => (
         <div key={f.key}>
-          <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
             {f.label}{' '}
             {f.required ? (
               <span className="text-red-500">*</span>
             ) : (
-              <span className="text-slate-400 normal-case font-normal">(optional)</span>
+              <span className="text-slate-400 dark:text-slate-500 normal-case font-normal">(optional)</span>
             )}
           </label>
 
@@ -36,14 +36,14 @@ export default function DocumentRequestFields({ fields, value, onChange }) {
               onChange={(e) => onChange(f.key, e.target.value)}
               placeholder={f.placeholder}
               rows={2}
-              className="w-full border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           ) : f.type === 'select' ? (
             <select
               required={f.required}
               value={value[f.key] || ''}
               onChange={(e) => onChange(f.key, e.target.value)}
-              className="w-full border border-slate-200 rounded-lg p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">-- Select --</option>
               {(f.options || []).map((opt) => (
@@ -57,11 +57,11 @@ export default function DocumentRequestFields({ fields, value, onChange }) {
               value={value[f.key] || ''}
               onChange={(e) => onChange(f.key, e.target.value)}
               placeholder={f.placeholder}
-              className="w-full border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           )}
 
-          {f.help_text && <p className="text-[10px] text-slate-400 mt-1">{f.help_text}</p>}
+          {f.help_text && <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{f.help_text}</p>}
         </div>
       ))}
     </div>

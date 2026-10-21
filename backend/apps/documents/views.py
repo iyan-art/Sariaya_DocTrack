@@ -12,22 +12,25 @@ from django.shortcuts import get_object_or_404
 
 from .models import (
     Document, DocumentType, WorkflowStep, Office, DocumentLog, MissingDocumentAlert,
-    Survey, SurveyQuestion, SurveyAnswer, SurveyResponse, GeneratedDocument, EmailNotificationLog,
-    DocumentTemplateField, Announcement, Event,
+    Survey, SurveyQuestion, SurveyQuestionOption, SurveyAnswer, SurveyResponse,
+    CitizenSuggestion, GeneratedDocument, EmailNotificationLog,
+    DocumentTemplateField, Announcement, Event, Notification,
 )
 from .serializers import (
     DocumentSerializer, DocumentDetailSerializer, CreateDocumentSerializer, DocumentTypeSerializer,
     DocumentTypeWriteSerializer, WorkflowStepsReplaceSerializer, OfficeSerializer,
     DocumentTransferSerializer, MissingDocumentAlertSerializer, PublicDocumentTrackingSerializer,
     SurveySerializer, SurveyWriteSerializer, SurveyQuestionsReplaceSerializer, GeneratedDocumentSerializer,
-    SurveyCommentSerializer, EmailNotificationLogSerializer, PublicOfficeSerializer,
+    SurveyCommentSerializer, CitizenSuggestionSerializer, CitizenSuggestionAdminSerializer,
+    EmailNotificationLogSerializer, PublicOfficeSerializer,
     AnnouncementSerializer, EventSerializer, PublicDocumentTypeSerializer,
+    NotificationSerializer,
 )
 from .document_generation import render_generated_document
 from django.core.files.base import ContentFile
 from .permissions import IsStaffUser
 from apps.accounts.permissions import IsAdmin
-from .services import release_document, receive_document, return_document, citizen_return_document, release_to_citizen, flag_missing, resolve_office, advance_processing_stage
+from .services import release_document, receive_document, return_document, citizen_return_document, release_to_citizen, flag_missing, resolve_office, advance_processing_stage, can_delete_document, expedite_document
 from .sla_scan import run_overdue_scan, run_missing_scan
 from .qr_services import resolve_and_verify, enforce_scope_access, build_scan_context
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -38,6 +41,7 @@ from django.utils import timezone
 from datetime import timedelta
 
 from apps.accounts.models import AccessLog
+from apps.accounts.views import _client_ip
 
 
 class OfficeListCreateView(generics.ListCreateAPIView):
@@ -283,13 +287,43 @@ class DocumentListCreateView(generics.ListCreateAPIView):
         return Response(DocumentDetailSerializer(document).data, status=status.HTTP_201_CREATED)
 
 
-class DocumentDetailView(generics.RetrieveAPIView):
+def _delete_document_and_log(request, document):
     """
-    GET /api/documents/<id>/   full detail INCLUDING history log
+    Shared by DocumentDetailView and MyDocumentDetailView's DELETE handler.
+    Hard-deletes the document and records it in AccessLog rather than
+    DocumentLog — DocumentLog rows CASCADE-delete with their Document, which
+    would erase the very record of this action along with the document
+    itself; AccessLog is tied to the acting user instead, so it survives.
+    """
+    detail = f"Deleted {document.tracking_number} ({document.document_type.name})"
+    document.delete()
+    AccessLog.objects.create(
+        user=request.user, action=AccessLog.Action.DELETE_DOCUMENT, detail=detail,
+        ip_address=_client_ip(request), user_agent=request.META.get('HTTP_USER_AGENT', '')[:255],
+    )
+
+
+class DocumentDetailView(generics.RetrieveDestroyAPIView):
+    """
+    GET    /api/documents/<id>/   full detail INCLUDING history log
+    DELETE /api/documents/<id>/   staff/admin delete — only while the
+                                   document is still untouched at its origin
+                                   office (see services.py::can_delete_document),
+                                   unless the requester is an admin (override).
     """
     queryset = Document.objects.all()
     serializer_class = DocumentDetailSerializer
     permission_classes = [IsStaffUser]
+
+    def destroy(self, request, *args, **kwargs):
+        document = self.get_object()
+        if not can_delete_document(document, request.user):
+            return Response(
+                {"detail": "This document can no longer be deleted — it has already been processed by an office."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        _delete_document_and_log(request, document)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class MyDocumentListView(generics.ListAPIView):
@@ -312,19 +346,35 @@ class MyDocumentListView(generics.ListAPIView):
         )
 
 
-class MyDocumentDetailView(generics.RetrieveAPIView):
+class MyDocumentDetailView(generics.RetrieveDestroyAPIView):
     """
-    GET /api/documents/mine/<id>/
-    Full detail (including history log) for one of the citizen's own
-    documents — powers their read-only "print / download" record view.
-    Scoped to requested_by=request.user, so a citizen can't view/print
-    someone else's document by guessing an id.
+    GET    /api/documents/mine/<id>/   full detail (history log) for one of
+                                        the citizen's own documents — powers
+                                        their read-only "print / download"
+                                        record view.
+    DELETE /api/documents/mine/<id>/   citizen cancels their own request —
+                                        only while it's still untouched at
+                                        its origin office (no admin override
+                                        here; this is the citizen's own
+                                        endpoint).
+    Scoped to requested_by=request.user, so a citizen can't view/print/
+    delete someone else's document by guessing an id.
     """
     serializer_class = DocumentDetailSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         return Document.objects.filter(requested_by=self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        document = self.get_object()
+        if not can_delete_document(document, request.user):
+            return Response(
+                {"detail": "This request can no longer be cancelled — it has already been processed by an office."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        _delete_document_and_log(request, document)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class DocumentCitizenReturnView(APIView):
@@ -355,6 +405,34 @@ class DocumentCitizenReturnView(APIView):
             return Response({"detail": str(e.detail[0]) if hasattr(e, 'detail') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(DocumentDetailSerializer(updated).data)
+
+
+class DocumentExpediteView(APIView):
+    """
+    POST /api/documents/<id>/expedite/
+    A citizen flagging their own delayed document request for staff
+    attention — the "Follow-Up / Expedite Request" button (see
+    services.py::expedite_document()). Ownership is checked here (403)
+    rather than in the service, same convention as
+    DocumentCitizenReturnView above.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            document = Document.objects.get(pk=pk)
+        except Document.DoesNotExist:
+            return Response({"detail": "Document not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if document.requested_by_id != request.user.id:
+            return Response({"detail": "You can only request a follow-up on your own document requests."}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            expedite_document(document, citizen_user=request.user)
+        except ValidationError as e:
+            return Response({"detail": str(e.detail[0]) if hasattr(e, 'detail') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({"detail": "Follow-up request sent to the office currently handling your document."})
 
 
 def _resolve_official_file(document):
@@ -835,10 +913,32 @@ class QRScanResolveView(APIView):
                 'scan_context': build_scan_context(document),
             })
 
-        return Response({
+        payload = {
             'role': 'public',
             'document': PublicDocumentTrackingSerializer(document).data,
-        })
+        }
+
+        # A logged-in citizen scanning THEIR OWN document gets the automated
+        # post-scan survey surfaced right here, so CitizenQRScanView.jsx can
+        # pop the survey modal without a second lookup. Guests and citizens
+        # scanning someone else's tag never see it.
+        is_owner_citizen = bool(
+            user and user.is_authenticated
+            and getattr(user, 'role', None) == 'citizen'
+            and document.requested_by_id == user.id
+        )
+        if is_owner_citizen:
+            survey = _active_evaluation_survey()
+            if survey:
+                payload['post_scan_survey'] = {
+                    'document_id': document.id,
+                    'already_submitted': SurveyResponse.objects.filter(
+                        survey=survey, document=document, respondent=user,
+                        source=SurveyResponse.Source.POST_SCAN,
+                    ).exists(),
+                }
+
+        return Response(payload)
 
 
 class DocumentScanView(APIView):
@@ -1455,13 +1555,52 @@ class SurveyQuestionsView(APIView):
                     SurveyQuestion.objects.filter(id=qid).update(
                         order=q_data['order'], text=q_data['text'], question_type=q_data['question_type'],
                     )
+                    question = SurveyQuestion.objects.get(id=qid)
                 else:
-                    SurveyQuestion.objects.create(
+                    question = SurveyQuestion.objects.create(
                         survey=survey, order=q_data['order'], text=q_data['text'],
                         question_type=q_data['question_type'],
                     )
+                _sync_question_options(question, q_data.get('options', []))
 
         return Response(SurveySerializer(survey).data)
+
+
+def _sync_question_options(question, labels):
+    """
+    Bring `question.options` in line with `labels` (a plain ordered list of
+    strings from SurveyBuilder.jsx). Matches existing rows by label text so
+    a reorder or an unrelated edit elsewhere keeps each option's primary key
+    — and therefore any SurveyAnswer.selected_options link pointing at it —
+    exactly the way SurveyQuestionsView keeps question rows. Only an option
+    whose text genuinely changed (or was removed) loses its row.
+    Non-choice questions end up with no options.
+    """
+    if question.question_type not in SurveyQuestion.CHOICE_TYPES:
+        question.options.all().delete()
+        return
+
+    wanted = [lbl.strip() for lbl in labels if lbl and lbl.strip()]
+    existing = {opt.label.strip().lower(): opt for opt in question.options.all()}
+    keep_ids = set()
+
+    # Park kept rows on temporary unique orders first, same collision-avoidance
+    # trick used for questions above.
+    for opt in question.options.all():
+        SurveyQuestionOption.objects.filter(id=opt.id).update(order=F('id') + 1000000)
+
+    for position, label in enumerate(wanted, start=1):
+        match = existing.get(label.lower())
+        if match:
+            SurveyQuestionOption.objects.filter(id=match.id).update(order=position, label=label)
+            keep_ids.add(match.id)
+        else:
+            new_opt = SurveyQuestionOption.objects.create(
+                question=question, order=position, label=label,
+            )
+            keep_ids.add(new_opt.id)
+
+    question.options.exclude(id__in=keep_ids).delete()
 
 
 class SurveyAnalyticsView(APIView):
@@ -1551,6 +1690,339 @@ class MySurveyCommentsView(generics.ListAPIView):
         )
 
 
+class SurveyDetailedAnalyticsView(APIView):
+    """
+    GET /api/documents/surveys/<id>/analytics/
+    Admin-only. Full per-question aggregation behind AdminSurveyAnalytics.jsx:
+      - rating   -> 1-5 distribution + average
+      - likert   -> per-option counts/percent + a numeric average over the
+                    option positions + a "positive" (top-2) share
+      - single   -> per-option counts/percent
+      - multiple -> per-option counts/percent (percent is of respondents who
+                    answered the question, so it can sum past 100%)
+      - text     -> the list of non-blank comments
+    Plus an overall CSAT block computed from the star-rating answers (the
+    classic "% who rated 4-5").
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request, pk):
+        try:
+            survey = Survey.objects.prefetch_related('questions__options').get(pk=pk)
+        except Survey.DoesNotExist:
+            return Response({"detail": "Survey not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        answers = list(
+            SurveyAnswer.objects
+            .filter(response__survey=survey)
+            .select_related('question')
+            .prefetch_related('selected_options')
+        )
+        answers_by_q = {}
+        for a in answers:
+            answers_by_q.setdefault(a.question_id, []).append(a)
+
+        questions_out = []
+        for q in survey.questions.all():
+            qa = answers_by_q.get(q.id, [])
+            row = {
+                "id": q.id,
+                "text": q.text,
+                "question_type": q.question_type,
+                "answer_count": len(qa),
+            }
+
+            if q.question_type == SurveyQuestion.QuestionType.RATING:
+                values = [a.rating_value for a in qa if a.rating_value]
+                row["distribution"] = [
+                    {"value": v, "count": sum(1 for x in values if x == v)} for v in range(1, 6)
+                ]
+                row["average"] = round(sum(values) / len(values), 2) if values else None
+
+            elif q.question_type in SurveyQuestion.CHOICE_TYPES:
+                options = list(q.options.all())
+                counts = {opt.id: 0 for opt in options}
+                for a in qa:
+                    for opt in a.selected_options.all():
+                        if opt.id in counts:
+                            counts[opt.id] += 1
+                denom = len(qa) or 1
+                row["options"] = [
+                    {
+                        "label": opt.label,
+                        "order": opt.order,
+                        "count": counts[opt.id],
+                        "percent": round(counts[opt.id] * 100 / denom, 1),
+                    }
+                    for opt in options
+                ]
+                if q.question_type == SurveyQuestion.QuestionType.LIKERT and options:
+                    top_orders = {options[-1].order, options[-2].order} if len(options) >= 2 else {options[-1].order}
+                    scored, positive = [], 0
+                    for a in qa:
+                        for opt in a.selected_options.all():
+                            scored.append(opt.order)
+                            if opt.order in top_orders:
+                                positive += 1
+                    row["average"] = round(sum(scored) / len(scored), 2) if scored else None
+                    row["scale_points"] = len(options)
+                    row["positive_percent"] = round(positive * 100 / len(qa), 1) if qa else None
+
+            elif q.question_type == SurveyQuestion.QuestionType.TEXT:
+                row["comments"] = [a.text_value.strip() for a in qa if a.text_value.strip()]
+
+            questions_out.append(row)
+
+        rating_values = [
+            a.rating_value for a in answers
+            if a.question.question_type == SurveyQuestion.QuestionType.RATING and a.rating_value
+        ]
+        csat = {
+            "rating_count": len(rating_values),
+            "average": round(sum(rating_values) / len(rating_values), 2) if rating_values else None,
+            "satisfied_percent": (
+                round(sum(1 for v in rating_values if v >= 4) * 100 / len(rating_values), 1)
+                if rating_values else None
+            ),
+        }
+
+        return Response({
+            "id": survey.id,
+            "title": survey.title,
+            "is_active": survey.is_active,
+            "response_count": survey.responses.count(),
+            "post_scan_response_count": survey.responses.filter(
+                source=SurveyResponse.Source.POST_SCAN
+            ).count(),
+            "public_response_count": survey.responses.filter(
+                source=SurveyResponse.Source.PUBLIC
+            ).count(),
+            "csat": csat,
+            "questions": questions_out,
+        })
+
+
+class PostScanSurveyView(APIView):
+    """
+    GET  /api/documents/<id>/post-scan-survey/   the active survey + whether
+                                                 this citizen has answered it
+                                                 for this document already
+    POST /api/documents/<id>/post-scan-survey/   submit answers (once)
+
+    The whole-transaction citizen survey shown right after a logged-in
+    citizen scans their own document's QR code (see CitizenQRScanView.jsx).
+    Unlike the per-office post-release evaluation, this is one survey for the
+    entire request, capped at one submission per (survey, document, citizen)
+    by SurveyResponse's unique_post_scan_survey_per_document_respondent
+    constraint.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def _get_document(self, request, pk):
+        try:
+            document = Document.objects.select_related('document_type').get(pk=pk)
+        except Document.DoesNotExist:
+            raise NotFound("Document not found.")
+        if document.requested_by_id != request.user.id:
+            raise NotFound("Document not found.")
+        return document
+
+    def _already_submitted(self, survey, document, user):
+        return SurveyResponse.objects.filter(
+            survey=survey, document=document, respondent=user,
+            source=SurveyResponse.Source.POST_SCAN,
+        ).exists()
+
+    def get(self, request, pk):
+        document = self._get_document(request, pk)
+        survey = _active_evaluation_survey()
+        return Response({
+            "survey": SurveySerializer(survey).data if survey else None,
+            "already_submitted": bool(survey) and self._already_submitted(survey, document, request.user),
+        })
+
+    def post(self, request, pk):
+        document = self._get_document(request, pk)
+        survey = _active_evaluation_survey()
+        if not survey:
+            return Response({"detail": "No active survey is configured."}, status=status.HTTP_400_BAD_REQUEST)
+        if self._already_submitted(survey, document, request.user):
+            return Response({"detail": "You have already answered this survey for this document."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        cleaned, error = _parse_survey_answers(survey, request.data.get('answers', []))
+        if error:
+            return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with transaction.atomic():
+                response = SurveyResponse.objects.create(
+                    survey=survey, respondent=request.user, document=document,
+                    office=None, source=SurveyResponse.Source.POST_SCAN,
+                )
+                _persist_survey_answers(response, cleaned)
+        except IntegrityError:
+            return Response({"detail": "You have already answered this survey for this document."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({"detail": "Thank you! Your feedback has been recorded."},
+                        status=status.HTTP_201_CREATED)
+
+
+def _parse_survey_answers(survey, raw_answers):
+    """
+    Validate a list of submitted answers against every question on `survey`.
+    Returns (cleaned, None) on success — `cleaned` is a list of
+    (question, payload) where payload is one of {rating_value}, {text_value},
+    {option_ids} — or ([], "error message") if anything is missing/invalid.
+    Shared by the post-scan survey and the public landing survey; the star/
+    choice rules are identical, only who may submit differs.
+    """
+    answers_in = {a.get('question'): a for a in raw_answers if isinstance(a, dict)}
+    cleaned = []
+    for q in survey.questions.prefetch_related('options'):
+        raw = answers_in.get(q.id)
+        if raw is None:
+            return [], f"Please answer: {q.text}"
+
+        if q.question_type == SurveyQuestion.QuestionType.RATING:
+            val = raw.get('rating_value')
+            if val not in (1, 2, 3, 4, 5):
+                return [], f"'{q.text}' needs a rating from 1 to 5."
+            cleaned.append((q, {"rating_value": val}))
+
+        elif q.question_type == SurveyQuestion.QuestionType.TEXT:
+            cleaned.append((q, {"text_value": str(raw.get('text_value', '')).strip()}))
+
+        else:  # likert / single / multiple
+            valid_ids = {o.id for o in q.options.all()}
+            picked = [oid for oid in raw.get('selected_option_ids', []) if oid in valid_ids]
+            if q.question_type == SurveyQuestion.QuestionType.MULTIPLE:
+                if not picked:
+                    return [], f"Pick at least one option for '{q.text}'."
+            elif len(picked) != 1:
+                return [], f"Pick one option for '{q.text}'."
+            cleaned.append((q, {"option_ids": picked}))
+
+    return cleaned, None
+
+
+def _persist_survey_answers(response, cleaned):
+    """Write the (question, payload) pairs from _parse_survey_answers onto a
+    freshly created SurveyResponse."""
+    for q, payload in cleaned:
+        answer = SurveyAnswer.objects.create(
+            response=response, question=q,
+            rating_value=payload.get('rating_value'),
+            text_value=payload.get('text_value', ''),
+        )
+        if payload.get('option_ids'):
+            answer.selected_options.set(payload['option_ids'])
+
+
+class PublicSurveyView(APIView):
+    """
+    GET  /api/documents/surveys/public/   the single active survey, for the
+                                          landing-page survey card — no
+                                          account, no document needed
+    POST /api/documents/surveys/public/   submit answers anonymously
+
+    Stored as a SurveyResponse with source=PUBLIC and no document / office /
+    respondent. There is no server-side one-per-person cap (there's no
+    identity to key it on); the landing card keeps a localStorage flag so a
+    given browser isn't re-prompted, and the endpoint is rate-limited by the
+    shared 'public-track' throttle scope.
+    """
+    permission_classes = [AllowAny]
+    throttle_scope = 'public-track'
+
+    def get(self, request):
+        survey = _active_evaluation_survey()
+        return Response({"survey": SurveySerializer(survey).data if survey else None})
+
+    def post(self, request):
+        survey = _active_evaluation_survey()
+        if not survey:
+            return Response({"detail": "No active survey is configured."}, status=status.HTTP_400_BAD_REQUEST)
+
+        cleaned, error = _parse_survey_answers(survey, request.data.get('answers', []))
+        if error:
+            return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            response = SurveyResponse.objects.create(
+                survey=survey, respondent=None, document=None, office=None,
+                source=SurveyResponse.Source.PUBLIC,
+            )
+            _persist_survey_answers(response, cleaned)
+
+        return Response({"detail": "Salamat! Your feedback has been recorded."},
+                        status=status.HTTP_201_CREATED)
+
+
+class CitizenSuggestionListCreateView(generics.ListCreateAPIView):
+    """
+    GET  /api/documents/suggestions/   the requesting citizen's own suggestions
+    POST /api/documents/suggestions/   file a new one (addressed to the LGU)
+    Logged-in citizens only — a suggestion is always tied to the account
+    that sent it so the office can follow up.
+    """
+    serializer_class = CitizenSuggestionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return CitizenSuggestion.objects.filter(respondent=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(respondent=self.request.user)
+
+
+class AdminSuggestionPagination(PageNumberPagination):
+    page_size = 20
+
+
+class AdminSuggestionListView(generics.ListAPIView):
+    """
+    GET /api/documents/suggestions/admin/?status=new|reviewed|in_progress|archived&category=<key>
+    Admin-only triage feed for the Suggestion Box review dashboard.
+    """
+    serializer_class = CitizenSuggestionAdminSerializer
+    permission_classes = [IsAdmin]
+    pagination_class = AdminSuggestionPagination
+
+    def get_queryset(self):
+        qs = CitizenSuggestion.objects.select_related('respondent', 'reviewed_by')
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            qs = qs.filter(status=status_param)
+        category = self.request.query_params.get('category')
+        if category:
+            qs = qs.filter(category=category)
+        return qs
+
+
+class AdminSuggestionDetailView(generics.RetrieveUpdateAPIView):
+    """
+    GET/PATCH /api/documents/suggestions/admin/<id>/
+    Admin-only. PATCH updates `status` and/or `admin_notes`; changing the
+    status stamps who reviewed it and when.
+    """
+    queryset = CitizenSuggestion.objects.select_related('respondent', 'reviewed_by')
+    serializer_class = CitizenSuggestionAdminSerializer
+    permission_classes = [IsAdmin]
+
+    def perform_update(self, serializer):
+        changing_status = (
+            'status' in serializer.validated_data
+            and serializer.validated_data['status'] != serializer.instance.status
+        )
+        instance = serializer.save()
+        if changing_status:
+            instance.reviewed_by = self.request.user
+            instance.reviewed_at = timezone.now()
+            instance.save(update_fields=['reviewed_by', 'reviewed_at'])
+
+
 class EmailNotificationLogPagination(PageNumberPagination):
     page_size = 20
 
@@ -1596,3 +2068,62 @@ class RunSlaScanView(APIView):
         overdue_result = run_overdue_scan()
         missing_result = run_missing_scan()
         return Response({'overdue': overdue_result, 'missing': missing_result})
+
+
+class NotificationPagination(PageNumberPagination):
+    page_size = 20
+
+
+class NotificationListView(generics.ListAPIView):
+    """
+    GET /api/notifications/?unread=true
+    The current user's own notifications — the NotificationBell dropdown,
+    for Admin and Employee alike (any authenticated role, scoped to
+    recipient=request.user, so there's nothing role-specific to enforce here
+    beyond being logged in).
+    """
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = NotificationPagination
+
+    def get_queryset(self):
+        qs = Notification.objects.filter(recipient=self.request.user).select_related('sender', 'related_document')
+        if self.request.query_params.get('unread') == 'true':
+            qs = qs.filter(is_read=False)
+        return qs
+
+
+class NotificationUnreadCountView(APIView):
+    """GET /api/notifications/unread-count/ — the bell's badge number, without paginating the full list."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        count = Notification.objects.filter(recipient=request.user, is_read=False).count()
+        return Response({"count": count})
+
+
+class NotificationMarkReadView(APIView):
+    """PATCH /api/notifications/<id>/read/ — toggles is_read (so the bell can also "mark as unread")."""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        try:
+            notification = Notification.objects.get(pk=pk, recipient=request.user)
+        except Notification.DoesNotExist:
+            return Response({"detail": "Notification not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if 'is_read' in request.data:
+            notification.is_read = bool(request.data['is_read'])
+        else:
+            notification.is_read = not notification.is_read
+        notification.save(update_fields=['is_read'])
+        return Response(NotificationSerializer(notification).data)
+
+
+class NotificationMarkAllReadView(APIView):
+    """POST /api/notifications/mark-all-read/"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        updated = Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+        return Response({"detail": f"{updated} notification(s) marked as read."})

@@ -28,30 +28,30 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-900">{user.office} Dashboard</h1>
-      <p className="text-slate-500 text-sm">How your office is performing, based on real processing and citizen-feedback data.</p>
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{user.office} Dashboard</h1>
+      <p className="text-slate-500 dark:text-slate-400 text-sm">How your office is performing, based on real processing and citizen-feedback data.</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-8">
         {/* Office Performance — average turnaround time */}
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-4 mb-4">
-            <div className="bg-indigo-500 w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg">
+            <div className="bg-indigo-500 w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg dark:shadow-none">
               <Clock3Icon className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Office Performance</p>
-              <p className="text-xs text-slate-400">Average processing turnaround time</p>
+              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Office Performance</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Average processing turnaround time</p>
             </div>
           </div>
 
           {loading ? (
-            <p className="text-slate-400 text-sm py-4">Loading…</p>
+            <p className="text-slate-400 dark:text-slate-500 text-sm py-4">Loading…</p>
           ) : !hasSpeedData ? (
-            <p className="text-slate-400 text-sm py-4">Not enough data yet — this office hasn't processed a timed document yet.</p>
+            <p className="text-slate-400 dark:text-slate-500 text-sm py-4">Not enough data yet — this office hasn't processed a timed document yet.</p>
           ) : (
             <>
-              <p className="text-4xl font-black text-indigo-700">{stats.avg_hours}<span className="text-lg">h</span></p>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">
+              <p className="text-4xl font-black text-indigo-700 dark:text-indigo-400">{stats.avg_hours}<span className="text-lg">h</span></p>
+              <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-2">
                 Based on {stats.count} document{stats.count === 1 ? '' : 's'} processed
               </p>
             </>
@@ -59,27 +59,27 @@ export default function Dashboard() {
         </div>
 
         {/* Citizen Satisfaction — average star rating */}
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-4 mb-4">
-            <div className="bg-amber-500 w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg">
+            <div className="bg-amber-500 w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg dark:shadow-none">
               <StarIcon className="w-5 h-5" filled />
             </div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Citizen Satisfaction</p>
-              <p className="text-xs text-slate-400">Average rating from citizen evaluations</p>
+              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Citizen Satisfaction</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Average rating from citizen evaluations</p>
             </div>
           </div>
 
           {loading ? (
-            <p className="text-slate-400 text-sm py-4">Loading…</p>
+            <p className="text-slate-400 dark:text-slate-500 text-sm py-4">Loading…</p>
           ) : !hasRatingData ? (
-            <p className="text-slate-400 text-sm py-4">No citizen evaluations for this office yet.</p>
+            <p className="text-slate-400 dark:text-slate-500 text-sm py-4">No citizen evaluations for this office yet.</p>
           ) : (
             <>
-              <p className="text-4xl font-black text-amber-600 flex items-center gap-2">
+              <p className="text-4xl font-black text-amber-600 dark:text-amber-400 flex items-center gap-2">
                 {stats.avg_rating} <StarIcon className="w-7 h-7" filled />
               </p>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">
+              <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-2">
                 Based on {stats.rating_count} rating{stats.rating_count === 1 ? '' : 's'}
               </p>
             </>
@@ -87,8 +87,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="mt-6 bg-blue-50 border border-blue-100 rounded-2xl p-5">
-        <p className="text-sm text-blue-800">
+      <div className="mt-6 bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/30 rounded-2xl p-5">
+        <p className="text-sm text-blue-800 dark:text-blue-300">
           These numbers reflect how quickly your office moves documents along and how citizens rate their experience — keep them in mind as you process requests.
         </p>
       </div>

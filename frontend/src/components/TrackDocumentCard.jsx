@@ -42,28 +42,28 @@ export default function TrackDocumentCard() {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 sm:p-8">
-      <div className="flex items-center gap-2 text-blue-600">
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm dark:shadow-none p-6 sm:p-8">
+      <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
         <MapPinIcon className="w-5 h-5" />
         <span className="text-xs font-black uppercase tracking-widest">Track Your Document</span>
       </div>
-      <h3 className="text-xl font-bold text-slate-900 mt-2">Where's my request?</h3>
-      <p className="text-sm text-slate-500 mt-1">
+      <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-2">Where's my request?</h3>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
         Scan or enter your tracking number — no account needed to check your request's status.
       </p>
 
       <button
         onClick={() => setScanning(true)}
         disabled={checking}
-        className="w-full mt-6 flex items-center justify-center gap-2 bg-slate-900 hover:bg-black disabled:opacity-60 text-white font-bold rounded-xl py-3.5 transition-colors"
+        className="w-full mt-6 flex items-center justify-center gap-2 bg-slate-900 dark:bg-slate-700 hover:bg-black dark:hover:bg-slate-600 disabled:opacity-60 text-white font-bold rounded-xl py-3.5 transition-colors"
       >
         <CameraIcon className="w-4 h-4" /> Scan Tracking Number
       </button>
 
       <div className="flex items-center gap-3 my-5">
-        <div className="flex-1 h-px bg-slate-100" />
-        <span className="text-xs font-bold text-slate-400 uppercase">or</span>
-        <div className="flex-1 h-px bg-slate-100" />
+        <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
+        <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">or</span>
+        <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
       </div>
 
       <form onSubmit={(e) => { e.preventDefault(); goTrack(trackingNumber); }} className="flex flex-col sm:flex-row gap-3">
@@ -74,7 +74,7 @@ export default function TrackDocumentCard() {
           value={trackingNumber}
           onChange={(e) => setTrackingNumber(e.target.value)}
           placeholder="e.g. DOC-2026-SRY-0001"
-          className="flex-1 rounded-lg border border-slate-200 px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
           type="submit"

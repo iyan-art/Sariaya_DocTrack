@@ -54,11 +54,11 @@ export default function EmployeeQRScanner({ onResolved, onError }) {
         <div className="absolute -top-2 -right-2 w-8 h-8 border-t-4 border-r-4 border-blue-600 rounded-tr-xl z-10"></div>
         <div className="absolute -bottom-2 -left-2 w-8 h-8 border-b-4 border-l-4 border-blue-600 rounded-bl-xl z-10"></div>
         <div className="absolute -bottom-2 -right-2 w-8 h-8 border-b-4 border-r-4 border-blue-600 rounded-br-xl z-10"></div>
-        <div id="employee-qr-reader" className="overflow-hidden rounded-2xl bg-slate-50 min-h-[320px]"></div>
+        <div id="employee-qr-reader" className="overflow-hidden rounded-2xl bg-slate-50 dark:bg-slate-800 min-h-[320px]"></div>
       </div>
 
       {loading && (
-        <div className="flex items-center justify-center gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-blue-600 font-semibold">
+        <div className="flex items-center justify-center gap-3 rounded-2xl border border-blue-100 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 px-4 py-3 text-blue-600 dark:text-blue-400 font-semibold">
           <ScanLineIcon className="w-5 h-5 animate-pulse" /> Resolving document…
         </div>
       )}
@@ -66,7 +66,7 @@ export default function EmployeeQRScanner({ onResolved, onError }) {
       <button
         type="button"
         onClick={() => setAttempt((a) => a + 1)}
-        className="w-full flex items-center justify-center gap-2 text-slate-500 hover:text-slate-700 text-sm font-medium py-2"
+        className="w-full flex items-center justify-center gap-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-sm font-medium py-2"
       >
         <CameraIcon className="w-4 h-4" /> Restart camera
       </button>

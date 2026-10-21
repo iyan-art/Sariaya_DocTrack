@@ -39,8 +39,8 @@ export default function Officials() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-900">Municipal Officials</h1>
-      <p className="text-slate-500 mt-1">Directory of officials and department heads.</p>
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Municipal Officials</h1>
+      <p className="text-slate-500 dark:text-slate-400 mt-1">Directory of officials and department heads.</p>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mt-6">
@@ -49,12 +49,12 @@ export default function Officials() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search officials…"
-          className="rounded-lg border border-slate-200 px-4 py-2 text-sm w-full sm:w-60 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 px-4 py-2 text-sm w-full sm:w-60 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="all">All roles</option>
           <option value="admin">Admin</option>
@@ -64,7 +64,7 @@ export default function Officials() {
         <select
           value={positionFilter}
           onChange={(e) => setPositionFilter(e.target.value)}
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="all">All positions</option>
           {positionOptions.map((p) => (
@@ -76,23 +76,23 @@ export default function Officials() {
       {/* Cards */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
         {loading ? (
-          <p className="text-slate-400 col-span-full text-center py-10">Loading…</p>
+          <p className="text-slate-400 dark:text-slate-500 col-span-full text-center py-10">Loading…</p>
         ) : filtered.length === 0 ? (
-          <p className="text-slate-400 col-span-full text-center py-10">No officials match this filter.</p>
+          <p className="text-slate-400 dark:text-slate-500 col-span-full text-center py-10">No officials match this filter.</p>
         ) : (
           filtered.map((o) => (
             <button
               key={o.id}
               onClick={() => setSelected(o)}
-              className="bg-white rounded-xl border border-slate-100 p-5 flex items-center gap-4 text-left shadow-sm hover:shadow-md hover:border-blue-200 transition-all"
+              className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 p-5 flex items-center gap-4 text-left shadow-sm hover:shadow-md dark:hover:shadow-none hover:border-blue-200 dark:hover:border-blue-500/40 transition-all"
             >
               <div className="h-12 w-12 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold shrink-0">
                 {initials(o)}
               </div>
               <div className="min-w-0">
-                <p className="font-semibold text-slate-900 truncate">{o.full_name}</p>
-                <p className="text-sm text-blue-600 truncate">{o.position}</p>
-                <span className="inline-block mt-1 bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-md">
+                <p className="font-semibold text-slate-900 dark:text-slate-100 truncate">{o.full_name}</p>
+                <p className="text-sm text-blue-600 dark:text-blue-400 truncate">{o.position}</p>
+                <span className="inline-block mt-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs px-2 py-0.5 rounded-md">
                   {o.office || '—'}
                 </span>
               </div>

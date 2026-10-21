@@ -35,18 +35,18 @@ export default function ResetPasswordModal({ user, onClose }) {
   if (result) {
     return (
       <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 overlay-fade-in">
-        <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-7 modal-pop-in">
-          <h2 className="text-xl font-bold text-slate-900">Password Reset</h2>
-          <p className="text-sm text-slate-500 mt-1">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-md p-7 modal-pop-in">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Password Reset</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Share this securely with <span className="font-semibold">{user.full_name}</span> —
             it won't be shown again.
           </p>
 
-          <div className="mt-5 bg-slate-50 border border-slate-100 rounded-xl p-4">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">New Temporary Password</p>
+          <div className="mt-5 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-xl p-4">
+            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">New Temporary Password</p>
             <div className="flex items-center justify-between gap-2 mt-1">
-              <p className="font-mono font-bold text-slate-900">{result.temporary_password}</p>
-              <button onClick={copyPassword} className="text-xs font-bold text-blue-600 hover:text-blue-700 shrink-0">
+              <p className="font-mono font-bold text-slate-900 dark:text-slate-100">{result.temporary_password}</p>
+              <button onClick={copyPassword} className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 shrink-0">
                 Copy
               </button>
             </div>
@@ -54,7 +54,7 @@ export default function ResetPasswordModal({ user, onClose }) {
 
           <button
             onClick={onClose}
-            className="w-full bg-slate-900 hover:bg-black text-white font-medium rounded-lg py-2.5 mt-6 transition-colors"
+            className="w-full bg-slate-900 dark:bg-slate-700 hover:bg-black dark:hover:bg-slate-600 text-white font-medium rounded-lg py-2.5 mt-6 transition-colors"
           >
             Done
           </button>
@@ -65,9 +65,9 @@ export default function ResetPasswordModal({ user, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 overlay-fade-in">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-7 modal-pop-in">
-        <h2 className="text-xl font-bold text-slate-900">Reset password?</h2>
-        <p className="text-sm text-slate-500 mt-2">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-md p-7 modal-pop-in">
+        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Reset password?</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
           <span className="font-semibold">{user.full_name}</span>'s current password will stop working
           immediately. A new secure temporary password will be generated for them.
         </p>
@@ -76,7 +76,7 @@ export default function ResetPasswordModal({ user, onClose }) {
           <button
             onClick={onClose}
             disabled={loading}
-            className="flex-1 py-2.5 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors"
+            className="flex-1 py-2.5 rounded-lg text-sm font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
             Cancel
           </button>

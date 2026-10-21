@@ -65,20 +65,20 @@ export default function CitizenPicker({
     <div ref={boxRef} className="space-y-3">
       {!readOnly && (
         <div className="relative">
-          <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
+          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
             Link an Existing Citizen Account (optional)
           </label>
 
           {value ? (
-            <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+            <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/30 rounded-xl px-4 py-3">
               <div>
-                <p className="text-sm font-bold text-blue-900">{value.full_name}</p>
-                <p className="text-xs text-blue-700/70">{value.email}</p>
+                <p className="text-sm font-bold text-blue-900 dark:text-blue-300">{value.full_name}</p>
+                <p className="text-xs text-blue-700/70 dark:text-blue-400/70">{value.email}</p>
               </div>
               <button
                 type="button"
                 onClick={() => onChange(null)}
-                className="text-xs font-bold text-blue-700 hover:text-blue-900"
+                className="text-xs font-bold text-blue-700 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
               >
                 Change
               </button>
@@ -91,24 +91,24 @@ export default function CitizenPicker({
                 onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
                 onFocus={() => setOpen(true)}
                 placeholder="Search by name or email — leave blank for walk-in"
-                className="w-full border border-slate-200 rounded-xl p-3 bg-slate-50 focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 text-sm"
               />
               {open && query.trim().length >= 2 && (
-                <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+                <div className="absolute z-10 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg max-h-56 overflow-y-auto">
                   {searching ? (
-                    <p className="text-xs text-slate-400 px-4 py-3">Searching…</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 px-4 py-3">Searching…</p>
                   ) : results.length === 0 ? (
-                    <p className="text-xs text-slate-400 px-4 py-3">No matching citizen account.</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 px-4 py-3">No matching citizen account.</p>
                   ) : (
                     results.map((c) => (
                       <button
                         key={c.id}
                         type="button"
                         onClick={() => select(c)}
-                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition-colors"
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                       >
-                        <p className="text-sm font-semibold text-slate-800">{c.full_name}</p>
-                        <p className="text-xs text-slate-400">{c.email}</p>
+                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{c.full_name}</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500">{c.email}</p>
                       </button>
                     ))
                   )}
@@ -125,7 +125,7 @@ export default function CitizenPicker({
           Internal: always shown, always read-only — see readOnly doc above. */}
       {(readOnly || !value) && onGuestNameChange && (
         <div>
-          <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
+          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
             {readOnly ? "Employee's Name" : 'Requesting Citizen Name'} {!readOnly && <span className="text-red-500">*</span>}
           </label>
           <input
@@ -138,21 +138,21 @@ export default function CitizenPicker({
             placeholder="e.g. Juan Dela Cruz"
             className={`w-full border rounded-xl p-3 text-sm ${
               readOnly
-                ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed'
-                : `bg-slate-50 focus:ring-2 focus:ring-blue-500 ${errors.guest_name ? 'border-red-300' : 'border-slate-200'}`
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                : `bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 ${errors.guest_name ? 'border-red-300 dark:border-red-500/50' : 'border-slate-200 dark:border-slate-700'}`
             }`}
           />
           {readOnly ? (
-            <p className="text-[11px] text-slate-400 mt-1">Automatically set from your staff/admin account.</p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Automatically set from your staff/admin account.</p>
           ) : (
-            errors.guest_name && <p className="text-[11px] text-red-600 mt-1">{errors.guest_name}</p>
+            errors.guest_name && <p className="text-[11px] text-red-600 dark:text-red-400 mt-1">{errors.guest_name}</p>
           )}
         </div>
       )}
 
       {(readOnly || !value) && onGuestEmailChange && (
         <div>
-          <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
+          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
             {readOnly ? "Employee's Email Address" : 'Requesting Citizen Email Address'} {!readOnly && <span className="text-red-500">*</span>}
           </label>
           <input
@@ -165,16 +165,16 @@ export default function CitizenPicker({
             placeholder="citizen@example.com"
             className={`w-full border rounded-xl p-3 text-sm ${
               readOnly
-                ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed'
-                : `bg-slate-50 focus:ring-2 focus:ring-blue-500 ${errors.guest_email ? 'border-red-300' : 'border-slate-200'}`
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                : `bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 ${errors.guest_email ? 'border-red-300 dark:border-red-500/50' : 'border-slate-200 dark:border-slate-700'}`
             }`}
           />
           {readOnly ? (
-            <p className="text-[11px] text-slate-400 mt-1">Automatically set from your staff/admin account.</p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Automatically set from your staff/admin account.</p>
           ) : errors.guest_email ? (
-            <p className="text-[11px] text-red-600 mt-1">{errors.guest_email}</p>
+            <p className="text-[11px] text-red-600 dark:text-red-400 mt-1">{errors.guest_email}</p>
           ) : (
-            <p className="text-[11px] text-slate-400 mt-1">
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
               Used to automatically notify the citizen when their document is ready for release.
             </p>
           )}
