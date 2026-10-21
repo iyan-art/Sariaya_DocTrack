@@ -55,17 +55,19 @@ if settings.DEBUG:
 from django.contrib.auth import get_user_model
 try:
     User = get_user_model()
-    # Gagawa ng admin user kung wala pa
+    # Tinitiyak na may admin account
     if not User.objects.filter(username='admin').exists():
-        admin_user = User.objects.create_superuser('admin', 'admin@gmail.com', 'admin123')
-        admin_user.is_active = True
-        admin_user.save()
+        User.objects.create_superuser(
+            username='admin',
+            email='admin@gmail.com',
+            password='admin123'
+        )
     else:
-        # Piliting i-reset ang password at panatilihing active
-        admin_user = User.objects.get(username='admin')
-        admin_user.email = 'admin@gmail.com'
-        admin_user.set_password('admin123')
-        admin_user.is_active = True
-        admin_user.save()
+        u = User.objects.get(username='admin')
+        u.email = 'admin@gmail.com'
+        u.set_password('admin123')
+        u.is_active = True
+        u.save()
 except Exception as e:
-    print(e)
+    print(f"Admin creation status: {e}")
+    
