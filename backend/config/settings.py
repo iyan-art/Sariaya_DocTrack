@@ -35,7 +35,7 @@ SECRET_KEY = 'django-insecure-^kma8+x0fj21cd8sk6z8*qgotg!-=!e0x5pr!$ck0t@qbl&=l4
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['.onrender.com', 'localhost', '127.0.0.1']
 # Application definition
 
 INSTALLED_APPS = [
@@ -204,18 +204,3 @@ else:
 # `runserver` is up. 900s = 15 minutes; lower this during a live demo to see
 # an overdue warning email fire sooner without waiting.
 SLA_SCAN_INTERVAL_SECONDS = 900
-
-CORS_ALLOW_ALL_ORIGINS = True  # Para sigurado habang testing
-
-CORS_ALLOWED_ORIGINS = [
-    "https://sariaya-doctrack-frontend.onrender.com",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
-
-CSRF_TRUSTED_ORIGINS = [
-    "https://sariaya-doctrack-frontend.onrender.com",
-    "https://sariaya-doctrack-backend.onrender.com",
-]
-
-CORS_ALLOW_CREDENTIALS = True
