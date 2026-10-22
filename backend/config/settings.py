@@ -84,7 +84,7 @@ CORS_ALLOW_CREDENTIALS = True
 # Base URL embedded in generated document QR codes (documents/qr_services.py).
 # A phone's stock camera app opens this directly, so it must be reachable
 # from the device doing the scanning — not just from this server.
-FRONTEND_BASE_URL = "http://localhost:5173"
+FRONTEND_BASE_URL = "https://sariaya-doctrack-frontend.onrender.com"
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
