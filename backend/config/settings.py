@@ -214,3 +214,12 @@ else:
 # `runserver` is up. 900s = 15 minutes; lower this during a live demo to see
 # an overdue warning email fire sooner without waiting.
 SLA_SCAN_INTERVAL_SECONDS = 900
+
+# Permissive settings para sa Render deployment
+CSRF_TRUSTED_ORIGINS = [
+    'https://sariaya-doctrack-backend.onrender.com',
+    'https://*.onrender.com',
+]
+
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
