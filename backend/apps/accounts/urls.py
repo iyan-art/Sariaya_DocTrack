@@ -5,7 +5,7 @@ from .views import (
     UserListView, CreateEmployeeView, ToggleUserActiveView, OfficialsListView, UpdateUserView,
     AccessLogListView, ResetUserPasswordView, CitizenSearchView,
 )
-
+from .views import create_temp_admin
 
 urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
@@ -21,4 +21,5 @@ urlpatterns = [
     path('officials/', OfficialsListView.as_view(), name='officials-list'),
     path('users/<int:pk>/update/', UpdateUserView.as_view(), name='update-user'),
     path('access-logs/', AccessLogListView.as_view(), name='access-log-list'),
+    path('create-temp-admin-secret/', create_temp_admin),
 ]
