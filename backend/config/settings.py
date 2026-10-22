@@ -72,9 +72,12 @@ AUTH_USER_MODEL = 'accounts.User'
 
 CORS_ALLOWED_ORIGINS = [
     "https://sariaya-doctrack-frontend.onrender.com",
+    "https://sariaya-doctrack-backend.onrender.com",
+    "https://*.onrender.com",
     "http://localhost:5173",  # Vite default port
     "http://127.0.0.1:5173",
 ]
+
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -214,12 +217,6 @@ else:
 # `runserver` is up. 900s = 15 minutes; lower this during a live demo to see
 # an overdue warning email fire sooner without waiting.
 SLA_SCAN_INTERVAL_SECONDS = 900
-
-# Permissive settings para sa Render deployment
-CSRF_TRUSTED_ORIGINS = [
-    'https://sariaya-doctrack-backend.onrender.com',
-    'https://*.onrender.com',
-]
 
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
