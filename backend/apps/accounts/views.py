@@ -301,11 +301,3 @@ class AccessLogListView(generics.ListAPIView):
         if action:
             qs = qs.filter(action=action)
         return qs
-
-def create_temp_admin(request):
-    User = get_user_model()
-    email = "admin11@gmail.com"
-    if not User.objects.filter(email=email).exists():
-        User.objects.create_superuser(username="admin", email=email, password="admin11123")
-        return HttpResponse("Tagumpay! Nagawa na ang admin account.")
-    return HttpResponse("Mayroon na lang kasing umiiral na admin account.")
