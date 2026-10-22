@@ -70,9 +70,12 @@ AUTH_USER_MODEL = 'accounts.User'
 
 
 CORS_ALLOWED_ORIGINS = [
+    "https://sariaya-doctrack-frontend.onrender.com",
     "http://localhost:5173",  # Vite default port
     "http://127.0.0.1:5173",
 ]
+
+CORS_ALLOW_CREDENTIALS = True
 
 # Base URL embedded in generated document QR codes (documents/qr_services.py).
 # A phone's stock camera app opens this directly, so it must be reachable
