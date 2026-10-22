@@ -14,32 +14,17 @@ from .permissions import IsAdmin
 from .services import link_guest_documents
 from apps.documents.permissions import IsStaffUser
 
-from django.contrib.auth import get_user_model
-
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
-    Extends the default JWT login serializer to allow login via email or username,
-    and returns the logged-in user's role and basic info alongside tokens.
+    Extends the default JWT login serializer to also return
+    the logged-in user's role and basic info alongside the tokens.
     """
+
     def validate(self, attrs):
-        # Kunin ang username/email input mula sa request
-        username_or_email = attrs.get(self.username_field)
-        password = attrs.get('password')
-        
-        User = get_user_model()
-        user = None
-        
-        # Suriin kung ang inilagay ay email
-        if '@' in username_or_email:
-            try:
-                user_obj = User.objects.get(email=username_or_email)
-                attrs[self.username_field] = user_obj.username # I-map sa actual username ng Django
-            except User.DoesNotExist:
-                pass
-                
-        data = super().validate(attrs) # Ito ang mag-a-authenticate
+        data = super().validate(attrs)  # this does the actual email/password check
         data['user'] = UserSerializer(self.user).data
         return data
+
 
 def _client_ip(request):
     # Prefer the original client IP from a forwarding header (dev proxy /
