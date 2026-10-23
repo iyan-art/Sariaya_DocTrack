@@ -62,11 +62,7 @@ numpy==2.1.2
 packaging==24.1
 pandas==2.3.2
 parso==0.8.4
-<<<<<<< HEAD
 Pillow==12.2.0
-=======
-pillow==10.2.0
->>>>>>> f304655a0ac9be528e3657e8988e4df20773b50f
 platformdirs==4.3.6
 prompt_toolkit==3.0.48
 propcache==0.4.1
