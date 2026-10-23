@@ -62,13 +62,11 @@ numpy==2.1.2
 packaging==24.1
 pandas==2.3.2
 parso==0.8.4
-pillow==10.2.0
+Pillow==12.2.0
 platformdirs==4.3.6
 prompt_toolkit==3.0.48
 propcache==0.4.1
 psutil==6.0.0
-psycopg==3.3.6
-psycopg-binary==3.3.6
 psycopg2-binary==2.9.11
 pure_eval==0.2.3
 Pygments==2.18.0
