@@ -6,7 +6,6 @@ from .views import (
     AccessLogListView, ResetUserPasswordView, CitizenSearchView,
 )
 
-
 urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
     path('login/refresh/', TokenRefreshView.as_view(), name='login-refresh'),

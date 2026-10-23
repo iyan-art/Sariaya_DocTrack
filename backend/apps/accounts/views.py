@@ -301,3 +301,4 @@ class AccessLogListView(generics.ListAPIView):
         if action:
             qs = qs.filter(action=action)
         return qs
+
