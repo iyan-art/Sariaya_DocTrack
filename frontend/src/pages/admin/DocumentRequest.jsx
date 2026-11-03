@@ -111,7 +111,7 @@ export default function DocumentRequest() {
           <button
             key={value}
             onClick={() => handleTabChange(value)}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            className={`px-4 py-2.5 sm:py-1.5 rounded-md text-sm font-medium transition-colors ${
               statusTab === value ? 'bg-white dark:bg-slate-700 shadow text-blue-700 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'
             }`}
           >
@@ -125,7 +125,7 @@ export default function DocumentRequest() {
       </div>
 
       <div className="mt-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="responsive-table w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 text-xs uppercase">
             <tr>
               <th className="text-left px-5 py-3">Tracking #</th>
@@ -153,10 +153,10 @@ export default function DocumentRequest() {
                   onClick={() => setSelectedId(doc.id)}
                   className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40"
                 >
-                  <td className="px-5 py-3 font-mono text-blue-600 dark:text-blue-400 text-xs">{doc.tracking_number}</td>
-                  <td className="px-5 py-3 font-medium text-slate-800 dark:text-slate-200">{doc.document_type_name}</td>
-                  <td className="px-5 py-3 text-slate-600 dark:text-slate-400">{doc.requested_by_name}</td>
-                  <td className="px-5 py-3">
+                  <td data-label="Tracking #" className="px-5 py-3 font-mono text-blue-600 dark:text-blue-400 text-xs">{doc.tracking_number}</td>
+                  <td data-label="Doc Type" className="px-5 py-3 font-medium text-slate-800 dark:text-slate-200">{doc.document_type_name}</td>
+                  <td data-label="Requester" className="px-5 py-3 text-slate-600 dark:text-slate-400">{doc.requested_by_name}</td>
+                  <td data-label="Status" className="px-5 py-3">
                     <div className="flex items-center gap-1.5">
                       <DocumentStatusBadge doc={doc} />
                       {doc.was_returned && (
@@ -166,16 +166,16 @@ export default function DocumentRequest() {
                       )}
                     </div>
                   </td>
-                  <td className="px-5 py-3">
+                  <td data-label="Progress" className="px-5 py-3">
                     <div className="flex items-center gap-2">
                       <StepStatusPill statuses={doc.step_statuses} />
                       <NearDueWarningBadge statuses={doc.step_statuses} />
                     </div>
                   </td>
-                  <td className="px-5 py-3 text-slate-600 dark:text-slate-400 text-xs">
+                  <td data-label="Dwell Time" className="px-5 py-3 text-slate-600 dark:text-slate-400 text-xs">
                     {doc.dwell_display ? `${doc.dwell_display} @ ${doc.current_office}` : '—'}
                   </td>
-                  <td className="px-5 py-3 text-slate-600 dark:text-slate-400">
+                  <td data-label="Handler" className="px-5 py-3 text-slate-600 dark:text-slate-400">
                     {doc.current_handler ? (
                       <>
                         <p>{doc.current_handler.full_name}</p>
@@ -185,10 +185,10 @@ export default function DocumentRequest() {
                       </>
                     ) : '—'}
                   </td>
-                  <td className="px-5 py-3 text-slate-400 dark:text-slate-500 text-xs">
+                  <td data-label="Requested" className="px-5 py-3 text-slate-400 dark:text-slate-500 text-xs">
                     {new Date(doc.created_at).toLocaleString()}
                   </td>
-                  <td className="px-5 py-3 text-slate-600 dark:text-slate-400 text-xs">
+                  <td data-label="Released" className="px-5 py-3 text-slate-600 dark:text-slate-400 text-xs">
                     {doc.released_at ? (
                       <>
                         <p>{new Date(doc.released_at).toLocaleString()}</p>
@@ -196,8 +196,8 @@ export default function DocumentRequest() {
                       </>
                     ) : '—'}
                   </td>
-                  <td className="px-5 py-3 text-slate-600 dark:text-slate-400 text-xs">{doc.origin_office || '—'}</td>
-                  <td className="px-5 py-3">
+                  <td data-label="Releasing Office" className="px-5 py-3 text-slate-600 dark:text-slate-400 text-xs">{doc.origin_office || '—'}</td>
+                  <td className="rt-actions px-5 py-3">
                     {canDeleteDocument(doc, user) && (
                       <button
                         onClick={(e) => { e.stopPropagation(); setDeleteTarget(doc); }}
@@ -220,9 +220,9 @@ export default function DocumentRequest() {
           <p className="text-slate-500 dark:text-slate-400">Page {page} of {totalPages}</p>
           <div className="flex gap-2">
             <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40">Previous</button>
+              className="px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40">Previous</button>
             <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40">Next</button>
+              className="px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40">Next</button>
           </div>
         </div>
       )}

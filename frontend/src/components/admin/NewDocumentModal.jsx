@@ -3,6 +3,7 @@ import { fetchDocumentTypes, createDocument } from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { extractErrorMessage } from '../../utils/apiError';
+import { hasInvalidContactNumber } from '../../utils/contactNumber';
 import DocumentRequestFields from '../documents/DocumentRequestFields';
 import CitizenPicker from '../documents/CitizenPicker';
 import PrintableQRSlip from './PrintableQRSlip';
@@ -79,9 +80,14 @@ export default function NewDocumentModal({ onClose, onCreated }) {
 
   const selectedType = types.find((t) => String(t.id) === String(documentTypeId));
   const limitReached = selectedType?.daily_limit != null && selectedType.requests_today >= selectedType.daily_limit;
+  const contactNumberInvalid = Boolean(documentTypeId) && hasInvalidContactNumber(selectedType?.request_fields, form);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // The Enter key can still submit past the disabled button; the inline
+    // error is already showing under the field.
+    if (contactNumberInvalid) return;
 
     const nextFieldErrors = {};
     if (!purpose) nextFieldErrors.purpose = 'Please select Internal or External Documents.';
@@ -270,7 +276,7 @@ export default function NewDocumentModal({ onClose, onCreated }) {
           </div>
 
           <div className="shrink-0 px-7 py-5 mt-2 border-t border-slate-100 dark:border-slate-800">
-            <button type="submit" disabled={loading || limitReached}
+            <button type="submit" disabled={loading || limitReached || contactNumberInvalid}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-medium rounded-lg py-2.5 transition-colors">
               {loading ? 'Creating…' : limitReached ? 'Daily limit reached' : 'Create document request'}
             </button>

@@ -1,7 +1,17 @@
+from zoneinfo import ZoneInfo
+
 from django.conf import settings
 from django.core.mail import send_mail
+from django.utils import timezone
 
 from .models import EmailNotificationLog
+
+# settings.TIME_ZONE is UTC, but email readers need the wall-clock time here.
+_MANILA = ZoneInfo('Asia/Manila')
+
+
+def _format_local(value):
+    return timezone.localtime(value, _MANILA).strftime('%Y-%m-%d %H:%M')
 
 
 def _send_and_log(*, document, recipient_user, recipient_email, notification_type, subject, body):
@@ -94,10 +104,10 @@ def send_overdue_warning_email(document, staff_user, sla_hours, dwell_hours, due
         f"Document: {document.document_type.name}\n"
         f"Reference No.: {document.tracking_number}\n"
         f"Citizen/Requester: {_requester_display_name(document)}\n"
-        f"Date Submitted: {document.created_at:%Y-%m-%d %H:%M}\n"
+        f"Date Submitted: {_format_local(document.created_at)}\n"
         f"Current Office: {document.current_office}\n"
-        f"Received by Office: {document.entered_current_office_at:%Y-%m-%d %H:%M}\n"
-        f"Due Date: {due_at:%Y-%m-%d %H:%M}\n"
+        f"Received by Office: {_format_local(document.entered_current_office_at)}\n"
+        f"Due Date: {_format_local(due_at)}\n"
         f"Applicable SLA: {sla_hours} hour(s)\n"
         f"Elapsed Processing Time: {_format_duration(dwell_hours)}\n"
         f"Status: Overdue by {_format_duration(overdue_by_hours)}\n\n"
@@ -127,10 +137,10 @@ def send_due_soon_email(document, staff_user, sla_hours, dwell_hours, due_at):
         f"Document: {document.document_type.name}\n"
         f"Reference No.: {document.tracking_number}\n"
         f"Citizen/Requester: {_requester_display_name(document)}\n"
-        f"Date Submitted: {document.created_at:%Y-%m-%d %H:%M}\n"
+        f"Date Submitted: {_format_local(document.created_at)}\n"
         f"Current Office: {document.current_office}\n"
-        f"Received by Office: {document.entered_current_office_at:%Y-%m-%d %H:%M}\n"
-        f"Due Date: {due_at:%Y-%m-%d %H:%M}\n"
+        f"Received by Office: {_format_local(document.entered_current_office_at)}\n"
+        f"Due Date: {_format_local(due_at)}\n"
         f"Applicable SLA: {sla_hours} hour(s)\n"
         f"Time Remaining: {_format_duration(remaining_hours)}\n\n"
         f"Required Action: Please log in to the system to review and process this request "
@@ -146,18 +156,41 @@ def send_due_soon_email(document, staff_user, sla_hours, dwell_hours, due_at):
     )
 
 
+def send_ready_for_release_staff_email(document, staff_user):
+    """
+    Staff-facing counterpart of send_ready_for_release_email() below: tells
+    the office now holding the finished document to expect the citizen — see
+    services.py::_notify_office_ready(), the only caller.
+    """
+    subject = f"Document Ready for Release — {document.tracking_number}"
+    body = (
+        f"A document at your office has completed its route and is ready for pickup by the citizen.\n\n"
+        f"Document: {document.document_type.name}\n"
+        f"Reference No.: {document.tracking_number}\n"
+        f"Citizen/Requester: {_requester_display_name(document)}\n"
+        f"Date Submitted: {_format_local(document.created_at)}\n"
+        f"Current Office: {document.current_office}\n\n"
+        f"Required Action: Please keep this document ready, and mark it \"Release to Citizen\" "
+        f"in the system once it is handed over.\n"
+    )
+    return _send_and_log(
+        document=document,
+        recipient_user=staff_user,
+        recipient_email=staff_user.email,
+        notification_type=EmailNotificationLog.NotificationType.READY_FOR_RELEASE_STAFF,
+        subject=subject,
+        body=body,
+    )
+
+
 def send_ready_for_release_email(document):
     """
-    Citizen-facing pickup notice. Two call sites (see services.py):
-    advance_processing_stage() fires this automatically for soft-copy
-    documents the moment they reach ProcessingStage.READY_FOR_RELEASE
-    (their only notification point, since there's no later physical
-    hand-off); release_to_citizen() fires it for hard-copy documents at the
-    actual "Release to Citizen" button click — the moment staff confirms
-    the document is ready, rather than the earlier moment it merely arrived
-    back at the origin office. Both routes go through
-    services.py::_maybe_notify_citizen_ready(), which guards against ever
-    sending this more than once for the same document.
+    Citizen-facing pickup notice, sent when the document arrives back at its
+    final office (services.py::receive_document()), so the citizen has time
+    to come in before staff hand it over. release_to_citizen() also tries
+    again in case that attempt failed. Both go through
+    services.py::_maybe_notify_citizen_ready(), which guards against sending
+    this twice for the same ready-for-pickup round.
 
     Returns EmailNotificationLog.Status.SENT/.FAILED, or the string
     'skipped' if there's nowhere valid to send it (no send attempted, no

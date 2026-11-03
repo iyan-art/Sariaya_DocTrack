@@ -1,3 +1,5 @@
+import { CONTACT_NUMBER_ERROR, isInvalidContactNumber } from '../../utils/contactNumber';
+
 // Fallback for a document type with no request_fields configured yet
 // (e.g. one an admin just created) — better than showing nothing.
 const GENERIC_FALLBACK_FIELDS = [
@@ -56,9 +58,18 @@ export default function DocumentRequestFields({ fields, value, onChange }) {
               required={f.required}
               value={value[f.key] || ''}
               onChange={(e) => onChange(f.key, e.target.value)}
-              placeholder={f.placeholder}
-              className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder={f.placeholder || (f.type === 'tel' ? '09XXXXXXXXX' : undefined)}
+              aria-invalid={f.type === 'tel' && isInvalidContactNumber(value[f.key])}
+              className={`w-full border bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 ${
+                f.type === 'tel' && isInvalidContactNumber(value[f.key])
+                  ? 'border-red-400 dark:border-red-500 focus:ring-red-500'
+                  : 'border-slate-200 dark:border-slate-700 focus:ring-blue-500'
+              }`}
             />
+          )}
+
+          {f.type === 'tel' && isInvalidContactNumber(value[f.key]) && (
+            <p role="alert" className="text-xs text-red-600 dark:text-red-400 mt-1">{CONTACT_NUMBER_ERROR}</p>
           )}
 
           {f.help_text && <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{f.help_text}</p>}

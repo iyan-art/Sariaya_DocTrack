@@ -219,7 +219,7 @@ function RegisterForm({ onSwitch }) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4 mt-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
         <div>
           <label className="block text-sm font-semibold text-slate-700">First name</label>
           <input
@@ -245,7 +245,7 @@ function RegisterForm({ onSwitch }) {
         className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
 
-      <div className="grid grid-cols-2 gap-4 mt-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
         <div>
           <label className="block text-sm font-semibold text-slate-700">Password</label>
           <PasswordInput

@@ -54,7 +54,7 @@ function FieldControl({ field, value, onChange, error }) {
     const update = (part, partValue) => onChange({ ...nameValue, [part]: partValue });
 
     return (
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">First Name</label>
           <input value={nameValue.first || ''} onChange={(e) => update('first', e.target.value)}

@@ -90,7 +90,8 @@ export default function LandingNavbar() {
         <button
           onClick={() => setMobileOpen((v) => !v)}
           aria-label="Toggle menu"
-          className={`xl:hidden p-2 rounded-lg ${textColor}`}
+          aria-expanded={mobileOpen}
+          className={`xl:hidden w-11 h-11 flex items-center justify-center rounded-lg ${textColor}`}
         >
           <MenuIcon className="w-6 h-6" />
         </button>
@@ -102,7 +103,7 @@ export default function LandingNavbar() {
             <button
               key={link.href}
               onClick={() => handleNavClick(link.href)}
-              className="block w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="block w-full text-left px-3 py-3 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               {link.label}
             </button>

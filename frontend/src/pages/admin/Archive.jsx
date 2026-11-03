@@ -62,7 +62,7 @@ export default function Archive() {
           <button
             key={tab}
             onClick={() => handleTabChange(tab)}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium capitalize transition-colors ${
+            className={`px-4 py-2.5 sm:py-1.5 rounded-md text-sm font-medium capitalize transition-colors ${
               roleTab === tab ? 'bg-white dark:bg-slate-700 shadow text-blue-700 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'
             }`}
           >
@@ -71,8 +71,8 @@ export default function Archive() {
         ))}
       </div>
 
-      <div className="mt-5 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="mt-5 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-x-auto">
+        <table className="responsive-table w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 text-xs uppercase">
             <tr>
               <th className="text-left px-5 py-3">Name</th>
@@ -92,19 +92,19 @@ export default function Archive() {
             ) : (
               users.map((u) => (
                 <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td className="px-5 py-3 font-medium text-slate-800 dark:text-slate-200">{u.full_name}</td>
-                  <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{u.email}</td>
-                  <td className="px-5 py-3">
+                  <td data-label="Name" className="px-5 py-3 font-medium text-slate-800 dark:text-slate-200">{u.full_name}</td>
+                  <td data-label="Email" className="px-5 py-3 text-slate-500 dark:text-slate-400">{u.email}</td>
+                  <td data-label="Role" className="px-5 py-3">
                     <span className="bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 text-xs font-medium px-2 py-1 rounded-md capitalize">
                       {u.role}
                     </span>
                   </td>
-                  {roleTab === 'employee' && <td className="px-5 py-3 text-slate-600 dark:text-slate-400">{u.office || '—'}</td>}
-                  {roleTab === 'employee' && <td className="px-5 py-3 text-slate-600 dark:text-slate-400">{u.position || '—'}</td>}
-                  <td className="px-5 py-3">
+                  {roleTab === 'employee' && <td data-label="Office" className="px-5 py-3 text-slate-600 dark:text-slate-400">{u.office || '—'}</td>}
+                  {roleTab === 'employee' && <td data-label="Position" className="px-5 py-3 text-slate-600 dark:text-slate-400">{u.position || '—'}</td>}
+                  <td data-label="Status" className="px-5 py-3">
                     <span className="text-xs font-medium text-slate-400 dark:text-slate-500">● Inactive</span>
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="rt-actions px-5 py-3">
                     <button
                       onClick={() => handleReactivateClick(u)}
                       className="text-xs font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 hover:bg-green-100 dark:hover:bg-green-500/20 rounded-lg px-3 py-1.5 transition-colors"
@@ -126,14 +126,14 @@ export default function Archive() {
             <button
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40"
+              className="px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40"
             >
               Previous
             </button>
             <button
               disabled={page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40"
+              className="px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40"
             >
               Next
             </button>

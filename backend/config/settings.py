@@ -13,8 +13,8 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 from datetime import timedelta
-import dj_database_url
 
+import dj_database_url
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -30,6 +30,8 @@ load_dotenv(BASE_DIR / '.env')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
+# All environment-specific values come from the environment: Render's settings
+# in production, backend/.env on a dev machine (see .env.example).
 SECRET_KEY = os.environ.get("SECRET_KEY")
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
@@ -75,8 +77,6 @@ AUTH_USER_MODEL = 'accounts.User'
 
 CORS_ALLOWED_ORIGINS = [
     "https://sariaya-doctrack-frontend.onrender.com",
-    "https://sariaya-doctrack-backend.onrender.com",
-    "https://*.onrender.com",
     "http://localhost:5173",  # Vite default port
     "http://127.0.0.1:5173",
 ]
@@ -87,9 +87,14 @@ CORS_ALLOW_CREDENTIALS = True
 # Base URL embedded in generated document QR codes (documents/qr_services.py).
 # A phone's stock camera app opens this directly, so it must be reachable
 # from the device doing the scanning — not just from this server.
-FRONTEND_BASE_URL = "https://sariaya-doctrack-frontend.onrender.com"
+FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "https://sariaya-doctrack-frontend.onrender.com")
 
 REST_FRAMEWORK = {
+    # JSON only: the API takes no file uploads, so multipart/form-encoded
+    # requests get a 415 rather than DRF's default of parsing them.
+    'DEFAULT_PARSER_CLASSES': (
+        'rest_framework.parsers.JSONParser',
+    ),
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
@@ -140,12 +145,23 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    "default": dj_database_url.config(
-        conn_max_age=600,
-        conn_health_checks=True,
-    )
-}
+# Postgres on Render (which sets DATABASE_URL), SQLite on a dev machine. A
+# SQLite file on Render would be wiped by each deploy unless a persistent disk
+# is attached.
+if os.environ.get("DATABASE_URL"):
+    DATABASES = {
+        "default": dj_database_url.config(
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -178,22 +194,50 @@ USE_I18N = True
 
 USE_TZ = True
 
-STATIC_URL = "static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-# EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
-# EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-# if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
-#     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-#     EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
-#     EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
-#     EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'true').lower() == 'true'
-#     DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
-# else:
-#     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-#     DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@sariaya-doctrack.local')
+# Mahalaga ito para mabasa ng Whitenoise ang static files sa Render
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# SLA_SCAN_INTERVAL_SECONDS = 900
+# System-generated files only (QR codes, official PDFs, landing page images).
+# Both must stay set: left unset, Django's default of '' makes urls.py's DEBUG
+# static() route serve the whole backend folder, .env and db.sqlite3 included.
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Email (SLA overdue/due-soon warnings, citizen ready-for-pickup notices —
+# see apps.documents.notifications). Real SMTP credentials come from
+# backend/.env (gitignored — see .env.example for the exact keys), never
+# hardcoded here. EMAIL_HOST_USER is unset by default, so a fresh checkout
+# with no .env safely falls back to the console backend (every "sent" email
+# just prints to the runserver terminal) instead of crashing or silently
+# pretending to send real mail with no credentials configured — swap in
+# real Gmail (or any SMTP provider's) values in .env to actually deliver.
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+
+if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+    EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'true').lower() == 'true'
+    DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
+    # Emails go out during the scan request itself, so an unreachable mail
+    # server must fail fast (logged as FAILED) instead of hanging the scan.
+    # One scan can send several emails, and they must all give up well before
+    # Gunicorn's default 30-second worker timeout.
+    EMAIL_TIMEOUT = 5
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@sariaya-doctrack.local')
+
+# How often (in seconds) the in-process background scheduler
+# (apps/documents/scheduler.py) re-runs the overdue/missing SLA scans while
+# `runserver` is up. 900s = 15 minutes; lower this during a live demo to see
+# an overdue warning email fire sooner without waiting.
+SLA_SCAN_INTERVAL_SECONDS = 900

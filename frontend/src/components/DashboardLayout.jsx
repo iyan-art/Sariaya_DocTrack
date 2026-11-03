@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import NotificationBell from './NotificationBell';
@@ -67,9 +67,28 @@ export default function DashboardLayout() {
   const { theme, toggleTheme } = useTheme();
   const [profileOpen, setProfileOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile toggle
-  const [openSubmenu, setOpenSubmenu] = useState(null);
+  const { pathname } = useLocation();
 
   const menu = MENUS[user.role] || [];
+
+  // Starts with the current page's submenu expanded, so the drawer always
+  // opens showing where you are.
+  const [openSubmenu, setOpenSubmenu] = useState(
+    () => menu.find((item) => item.children?.some((child) => child.path === pathname))?.label ?? null
+  );
+
+  // While the drawer is open: Escape closes it, and the page behind it can't
+  // scroll. The drawer only ever opens below `lg`, so desktop is unaffected.
+  useEffect(() => {
+    if (!sidebarOpen) return undefined;
+    const onKeyDown = (e) => { if (e.key === 'Escape') setSidebarOpen(false); };
+    document.addEventListener('keydown', onKeyDown);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [sidebarOpen]);
 
   // logout() itself now clears storage and navigates to "/" — see
   // AuthContext.jsx — so there's nothing left for this handler to do beyond
@@ -81,28 +100,38 @@ export default function DashboardLayout() {
   return (
     <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950">
 
-      {/* Mobile overlay when sidebar open */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/30 z-20 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      {/* Mobile overlay — always mounted so it can fade out, not just in */}
+      <div
+        className={`fixed inset-0 bg-black/40 z-20 lg:hidden transition-opacity duration-300 ${sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={() => setSidebarOpen(false)}
+      />
 
-      {/* SIDEBAR */}
-      <aside className={`fixed lg:static z-30 inset-y-0 left-0 w-64 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 flex flex-col transition-transform duration-200
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+      {/* SIDEBAR — an off-canvas drawer below `lg`. `invisible` while closed
+          keeps its links out of the keyboard tab order; it's in the transition
+          so the drawer stays visible for the whole slide-out. */}
+      <aside
+        id="dashboard-sidebar"
+        className={`fixed lg:static z-30 inset-y-0 left-0 w-72 max-w-[85vw] lg:w-64 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 flex flex-col transition-[transform,visibility] duration-300 ease-out lg:visible
+        ${sidebarOpen ? 'translate-x-0 visible shadow-2xl lg:shadow-none' : '-translate-x-full invisible lg:translate-x-0'}`}
+      >
 
         {/* Logo */}
-        <div className="h-20 flex items-center gap-3 px-6 border-b border-slate-100 dark:border-slate-800">
+        <div className="h-16 sm:h-20 shrink-0 flex items-center gap-3 px-4 sm:px-6 border-b border-slate-100 dark:border-slate-800">
           {/* Swap this for the Sariaya seal: <img src="/seal.png" className="h-10 w-10" /> */}
           <div className="h-10 w-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold shrink-0">
             S
           </div>
-          <div className="leading-tight">
+          <div className="leading-tight flex-1 min-w-0">
             <p className="font-bold text-slate-900 dark:text-white text-sm">QR-Track</p>
             <p className="text-xs text-slate-400 dark:text-slate-500">Sariaya LGU</p>
           </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Close menu"
+            className="lg:hidden w-11 h-11 -mr-2 flex items-center justify-center rounded-lg text-2xl text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            ×
+          </button>
         </div>
 
         {/* Menu */}
@@ -112,7 +141,8 @@ export default function DashboardLayout() {
               <div key={item.label}>
                 <button
                   onClick={() => setOpenSubmenu(openSubmenu === item.label ? null : item.label)}
-                  className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  aria-expanded={openSubmenu === item.label}
+                  className="w-full flex items-center justify-between gap-3 px-3 py-3 lg:py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
                   <span className="flex items-center gap-3">
                     <item.icon className="w-4 h-4" />
@@ -130,7 +160,7 @@ export default function DashboardLayout() {
                         to={child.path}
                         onClick={() => setSidebarOpen(false)}
                         className={({ isActive }) =>
-                          `block px-3 py-2 rounded-lg text-sm ${isActive ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 font-medium' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`
+                          `block px-3 py-3 lg:py-2 rounded-lg text-sm ${isActive ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 font-medium' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`
                         }
                       >
                         {child.label}
@@ -145,7 +175,7 @@ export default function DashboardLayout() {
                 to={item.path}
                 onClick={() => setSidebarOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium ${isActive ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`
+                  `flex items-center gap-3 px-3 py-3 lg:py-2.5 rounded-lg text-sm font-medium ${isActive ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`
                 }
               >
                 <item.icon className="w-4 h-4" />
@@ -160,18 +190,24 @@ export default function DashboardLayout() {
       <div className="flex-1 flex flex-col min-w-0">
 
         {/* TOPBAR */}
-        <header className="h-20 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between px-4 sm:px-8 sticky top-0 z-10">
-          <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+        <header className="h-16 sm:h-20 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between px-2 sm:px-8 sticky top-0 z-10">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
+            aria-expanded={sidebarOpen}
+            aria-controls="dashboard-sidebar"
+            className="lg:hidden w-11 h-11 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
             <MenuIcon className="w-6 h-6" />
           </button>
           <div className="hidden lg:block" />
 
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-1 sm:gap-3">
             <button
               onClick={toggleTheme}
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               aria-label="Toggle dark mode"
-              className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+              className="w-11 h-11 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             >
               {theme === 'dark' ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
             </button>
@@ -186,16 +222,18 @@ export default function DashboardLayout() {
             {(user.role === 'admin' || user.role === 'employee') ? (
               <NotificationBell />
             ) : (
-              <button className="relative text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+              <button aria-label="Notifications" className="relative w-11 h-11 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800">
                 <BellIcon className="w-5 h-5" />
-                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500" />
+                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500" />
               </button>
             )}
 
             <div className="relative">
               <button
                 onClick={() => setProfileOpen(!profileOpen)}
-                className="flex items-center gap-2"
+                aria-label="Account menu"
+                aria-expanded={profileOpen}
+                className="flex items-center gap-2 min-h-11 min-w-11 justify-center"
               >
                 <div className="h-9 w-9 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-semibold text-slate-600 dark:text-slate-200">
                   {user.first_name?.[0]}{user.last_name?.[0]}
@@ -210,7 +248,7 @@ export default function DashboardLayout() {
                 <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-100 dark:border-slate-700 py-2 z-20">
                     <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-700">
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{user.full_name}</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">{user.email}</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 break-all">{user.email}</p>
                     </div>
                     <button
                     onClick={() => setProfileOpen(false)}
@@ -239,7 +277,7 @@ export default function DashboardLayout() {
         </header>
 
         {/* PAGE CONTENT */}
-        <main className="flex-1 p-4 sm:p-8">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>

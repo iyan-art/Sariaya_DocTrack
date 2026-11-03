@@ -131,7 +131,7 @@ export default function AddEmployeeModal({ onClose, onCreated }) {
         )}
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">First name</label>
               <input name="first_name" required value={form.first_name} onChange={handleChange}

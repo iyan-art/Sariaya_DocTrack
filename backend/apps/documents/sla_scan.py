@@ -13,10 +13,9 @@ from datetime import timedelta
 
 from django.utils import timezone
 
-from apps.accounts.models import User
 from .models import Document, EmailNotificationLog, MissingDocumentAlert, Notification
 from .notifications import send_overdue_warning_email, send_due_soon_email
-from .services import _same_office, flag_missing, notify_admins
+from .services import flag_missing, notify_admins, responsible_employees
 
 # Only used if a document's route_position has somehow drifted out of range
 # for its DocumentType's WorkflowStep rows — a data-integrity edge case, not
@@ -36,28 +35,6 @@ DEFAULT_MISSING_SLA_HOURS = 48
 DUE_SOON_THRESHOLD_RATIO = 0.8
 
 
-def _sla_recipients(document):
-    """
-    Who gets a staff-facing SLA email for one document: every active
-    Employee at its current office (so the whole team stays aware even if
-    the one who scanned it in is out that day), PLUS the employee actually
-    holding it right now (document.current_handler) even if their
-    User.office string happens to have drifted out of sync with the
-    office's canonical code — the person who scanned it in should never be
-    the one left out of "the employee responsible for this document".
-    Deduplicated by user id so current_handler is never emailed twice.
-    """
-    recipients = {
-        staff.id: staff
-        for staff in User.objects.filter(role=User.Role.EMPLOYEE, is_active=True)
-        if _same_office(staff.office, document.current_office)
-    }
-    handler = document.current_handler
-    if handler and handler.role == User.Role.EMPLOYEE and handler.is_active:
-        recipients[handler.id] = handler
-    return list(recipients.values())
-
-
 def run_overdue_scan():
     """
     Scans every Active (In Progress) document, compares its elapsed dwell
@@ -66,7 +43,8 @@ def run_overdue_scan():
     hours"), and for each one either:
 
     - past its SLA: emails every responsible Employee (see
-      _sla_recipients()) an Overdue Warning, once per overdue episode; or
+      services.py::responsible_employees()) an Overdue Warning, once per
+      overdue episode; or
     - within DUE_SOON_THRESHOLD_RATIO of its SLA but not past it yet: sends
       a milder Approaching Due Date heads-up instead, also once per episode.
 
@@ -108,7 +86,7 @@ def run_overdue_scan():
             ).exists()
             if already_warned:
                 continue
-            for staff in _sla_recipients(document):
+            for staff in responsible_employees(document):
                 send_overdue_warning_email(document, staff, sla_hours, dwell_hours, due_at)
                 overdue_emails_sent += 1
 
@@ -135,7 +113,7 @@ def run_overdue_scan():
             ).exists()
             if already_notified:
                 continue
-            for staff in _sla_recipients(document):
+            for staff in responsible_employees(document):
                 send_due_soon_email(document, staff, sla_hours, dwell_hours, due_at)
                 due_soon_emails_sent += 1
 

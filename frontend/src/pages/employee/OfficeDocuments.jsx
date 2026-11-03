@@ -152,7 +152,7 @@ export default function OfficeDocuments() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${
+              className={`flex-1 md:flex-none px-2 sm:px-4 py-2.5 md:py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${
                 activeTab === tab ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
               }`}
             >
@@ -197,7 +197,7 @@ export default function OfficeDocuments() {
                     <button
                       onClick={(e) => { e.stopPropagation(); setDeleteTarget(doc); }}
                       title="Delete document request"
-                      className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 p-1 rounded-lg transition-colors"
+                      className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 p-3 -m-2 sm:p-1 sm:m-0 rounded-lg transition-colors"
                     >
                       <TrashIcon className="w-3.5 h-3.5" />
                     </button>

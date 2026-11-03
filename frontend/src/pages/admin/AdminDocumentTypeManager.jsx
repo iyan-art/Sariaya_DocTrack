@@ -131,7 +131,7 @@ export default function AdminDocumentTypeManager() {
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="responsive-table w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 text-xs uppercase">
             <tr>
               <th className="text-left px-5 py-3">Name</th>
@@ -151,22 +151,22 @@ export default function AdminDocumentTypeManager() {
             ) : (
               filteredTypes.map((t) => (
                 <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td className="px-5 py-3 font-semibold text-slate-800 dark:text-slate-200">{t.name}</td>
-                  <td className="px-5 py-3 text-slate-500 dark:text-slate-400 max-w-xs truncate">{t.description || '—'}</td>
-                  <td className="px-5 py-3">
+                  <td data-label="Name" className="px-5 py-3 font-semibold text-slate-800 dark:text-slate-200">{t.name}</td>
+                  <td data-label="Description" className="px-5 py-3 text-slate-500 dark:text-slate-400 max-w-xs truncate">{t.description || '—'}</td>
+                  <td data-label="Scope" className="px-5 py-3">
                     <span className={`inline-flex text-[10px] font-bold px-2.5 py-1 rounded-full border capitalize ${SCOPE_STYLES[t.scope]}`}>
                       {t.scope_label || t.scope}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{t.steps.length || 0}</td>
-                  <td className="px-5 py-3 text-slate-500 dark:text-slate-400">
+                  <td data-label="Steps" className="px-5 py-3 text-slate-500 dark:text-slate-400">{t.steps.length || 0}</td>
+                  <td data-label="Daily Cap" className="px-5 py-3 text-slate-500 dark:text-slate-400">
                     {t.daily_limit ? (
                       <span className={t.requests_today >= t.daily_limit ? 'text-red-600 dark:text-red-400 font-bold' : ''}>
                         {t.requests_today}/{t.daily_limit}
                       </span>
                     ) : '—'}
                   </td>
-                  <td className="px-5 py-3">
+                  <td data-label="Status" className="px-5 py-3">
                     <span className={`inline-flex text-[10px] font-bold px-2.5 py-1 rounded-full border ${
                       t.is_active
                         ? 'bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/30'
@@ -175,7 +175,7 @@ export default function AdminDocumentTypeManager() {
                       {t.is_active ? 'Active' : 'Archived'}
                     </span>
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="rt-actions px-5 py-3">
                     <div className="flex justify-end gap-1">
                       <button onClick={() => openEditModal(t)} title="Edit" className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 p-1.5 rounded-lg transition-colors">
                         <PencilIcon className="w-4 h-4" />

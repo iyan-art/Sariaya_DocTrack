@@ -405,14 +405,14 @@ class MissingDocumentAlert(models.Model):
 
 class EmailNotificationLog(models.Model):
     """
-    Audit trail of every automated email the system has sent — the three SLA
-    notification flows (see notifications.py): a staff 'Overdue Warning' when
-    a document blows its current step's SLA, a milder staff 'Approaching Due
-    Date' heads-up before that happens (both raised by
-    sla_scan.run_overdue_scan(), shared by the check_overdue_documents
-    management command, the background scheduler, and the admin 'Run Scan
-    Now' action), and a citizen 'Ready for Release' notice (raised from
-    services.py::advance_processing_stage()). One row per recipient per
+    Audit trail of every automated email the system has sent (see
+    notifications.py): a staff 'Overdue Warning' when a document blows its
+    current step's SLA, a milder staff 'Approaching Due Date' heads-up before
+    that happens (both raised by sla_scan.run_overdue_scan(), shared by the
+    check_overdue_documents management command, the background scheduler, and
+    the admin 'Run Scan Now' action), and the 'Ready for Release' notices to
+    the citizen and to the office's staff (both raised from
+    services.py::receive_document()). One row per recipient per
     email actually attempted, success or failure, so a bad address never
     silently loses the audit trail. Also what powers the admin notification
     bell (see EmailNotificationLogListView).
@@ -422,6 +422,7 @@ class EmailNotificationLog(models.Model):
         OVERDUE_WARNING = 'overdue_warning', 'Overdue Warning'
         DUE_SOON = 'due_soon', 'Approaching Due Date'
         READY_FOR_RELEASE = 'ready_for_release', 'Ready for Release'
+        READY_FOR_RELEASE_STAFF = 'ready_release_staff', 'Ready for Release (Staff)'
 
     class Status(models.TextChoices):
         SENT = 'sent', 'Sent'

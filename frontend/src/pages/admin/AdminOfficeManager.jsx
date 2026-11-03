@@ -122,7 +122,7 @@ export default function AdminOfficeManager() {
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="responsive-table w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 text-xs uppercase">
             <tr>
               <th className="text-left px-5 py-3">Code</th>
@@ -142,12 +142,12 @@ export default function AdminOfficeManager() {
             ) : (
               filteredOffices.map((o) => (
                 <tr key={o.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td className="px-5 py-3 font-mono text-xs font-bold text-blue-600 dark:text-blue-400">{o.code}</td>
-                  <td className="px-5 py-3 font-semibold text-slate-800 dark:text-slate-200">{o.name}</td>
-                  <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{o.location || '—'}</td>
-                  <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{o.floor || '—'}</td>
-                  <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{o.contact_person || '—'}</td>
-                  <td className="px-5 py-3">
+                  <td data-label="Code" className="px-5 py-3 font-mono text-xs font-bold text-blue-600 dark:text-blue-400">{o.code}</td>
+                  <td data-label="Office Name" className="px-5 py-3 font-semibold text-slate-800 dark:text-slate-200">{o.name}</td>
+                  <td data-label="Location" className="px-5 py-3 text-slate-500 dark:text-slate-400">{o.location || '—'}</td>
+                  <td data-label="Floor" className="px-5 py-3 text-slate-500 dark:text-slate-400">{o.floor || '—'}</td>
+                  <td data-label="Department Head" className="px-5 py-3 text-slate-500 dark:text-slate-400">{o.contact_person || '—'}</td>
+                  <td data-label="Status" className="px-5 py-3">
                     <span className={`inline-flex text-[10px] font-bold px-2.5 py-1 rounded-full border ${
                       o.is_active
                         ? 'bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/30'
@@ -156,7 +156,7 @@ export default function AdminOfficeManager() {
                       {o.is_active ? 'Active' : 'Archived'}
                     </span>
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="rt-actions px-5 py-3">
                     <div className="flex justify-end gap-1">
                       <button onClick={() => openEditModal(o)} title="Edit" className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 p-1.5 rounded-lg transition-colors">
                         <PencilIcon className="w-4 h-4" />

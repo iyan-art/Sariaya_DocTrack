@@ -14,8 +14,7 @@ import { PrinterIcon } from '../Icons';
 // different action value from 'return' below (kept as the internal action
 // value for backward compatibility — only the label changed), which calls
 // release_to_citizen() and means "hand the completed document to the
-// citizen, and notify them by email." They never appear together since
-// they live on different statuses.
+// citizen." They never appear together since they live on different statuses.
 const NEXT_ACTIONS = {
   in_progress: [
     { action: 'release', label: 'Release to Next Office' },
@@ -39,6 +38,14 @@ const EMAIL_STATUS_TOAST = {
   already_sent: { message: 'Document released. The citizen was already notified by email earlier.', type: 'success' },
   skipped: { message: 'Document released, but no email is on file for this citizen — notification not sent.', type: 'error' },
   failed: { message: 'Document released, but the notification email failed to send. Please follow up with the citizen directly.', type: 'error' },
+};
+
+// Same idea for the receive that completes a document's route — the moment
+// the citizen's "ready for pickup" email goes out (services.py::receive_document()).
+const READY_EMAIL_STATUS_TOAST = {
+  sent: { message: 'Document received. The citizen was emailed that it is ready for pickup.', type: 'success' },
+  skipped: { message: 'Document received, but no email is on file for this citizen. Please contact them directly.', type: 'error' },
+  failed: { message: 'Document received, but the ready-for-pickup email failed to send. Please follow up with the citizen directly.', type: 'error' },
 };
 
 export default function DocumentDetailModal({ documentId, onClose, onUpdated }) {
@@ -91,10 +98,11 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
         // meaningful for 'receive' (defaults to the current staff member's
         // own office if left blank); return_to_office's destination is
         // computed automatically server-side, not chosen here.
-        await transitionDocument(documentId, { action, office, notes });
+        const res = await transitionDocument(documentId, { action, office, notes });
+        const readyOutcome = READY_EMAIL_STATUS_TOAST[res.data.email_status];
         showToast(
-          action === 'return_to_office' ? 'Document returned to the previous office.' : 'Document status updated.',
-          'success',
+          readyOutcome?.message || (action === 'return_to_office' ? 'Document returned to the previous office.' : 'Document status updated.'),
+          readyOutcome?.type || 'success',
         );
       }
       setActionForm({ action: '', office: '', notes: '' });

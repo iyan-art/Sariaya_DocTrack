@@ -109,29 +109,37 @@ export default function NotificationBell() {
 
   return (
     <div ref={boxRef} className="relative">
-      <button onClick={handleToggle} className="relative text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+      <button
+        onClick={handleToggle}
+        aria-label="Notifications"
+        aria-expanded={open}
+        className="relative w-11 h-11 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+      >
         <BellIcon className="w-5 h-5" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+          <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-96 max-w-[92vw] bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-100 dark:border-slate-700 z-20 overflow-hidden">
+        // Below `sm` this is pinned to the viewport rather than to the bell:
+        // the bell isn't at the screen's edge, so a right-aligned panel this
+        // wide would run off the left side of a phone.
+        <div className="fixed inset-x-2 top-[4.25rem] sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-96 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-100 dark:border-slate-700 z-20 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700">
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Notifications</p>
             <button
               onClick={handleMarkAllRead}
               disabled={unreadCount === 0}
-              className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="py-2 -my-2 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Mark all as read
             </button>
           </div>
 
-          <div className="max-h-96 overflow-y-auto divide-y divide-slate-50 dark:divide-slate-700">
+          <div className="max-h-[calc(100dvh-9rem)] sm:max-h-96 overflow-y-auto divide-y divide-slate-50 dark:divide-slate-700">
             {loading ? (
               <p className="text-center text-sm text-slate-400 dark:text-slate-500 py-6">Loading…</p>
             ) : notifications.length === 0 ? (
@@ -153,7 +161,7 @@ export default function NotificationBell() {
                     {!n.is_read && (
                       <button
                         onClick={(e) => handleMarkRead(e, n)}
-                        className="text-[10px] font-bold text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 shrink-0"
+                        className="p-2 -m-2 text-[10px] font-bold text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 shrink-0"
                       >
                         Mark read
                       </button>

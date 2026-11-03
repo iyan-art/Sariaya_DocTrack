@@ -12,6 +12,125 @@ body {
   @apply bg-slate-50 dark:bg-slate-950 transition-colors duration-150;
 }
 
+/* --- Responsive rules ---
+   Deliberately unlayered: Tailwind v4's utilities live in a cascade layer, so
+   these win over a component's `text-sm`/`px-5` etc. without any !important.
+   63.98rem is just under Tailwind's `lg` — the same point the dashboard
+   sidebar turns into a drawer. */
+
+/* iOS Safari zooms the whole page when focusing an input below 16px. */
+@media (max-width: 63.98rem), (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Every modal is `.overlay-fade-in > .modal-pop-in`, so this one block covers
+   them all. dvh (not vh) so a phone's collapsing URL bar can't push a modal's
+   buttons off-screen. Screen-only: the printable modals must not be clipped. */
+@media screen {
+  .overlay-fade-in {
+    overscroll-behavior: contain;
+  }
+
+  .overlay-fade-in > .modal-pop-in {
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    margin-block: 0;
+  }
+}
+
+@media screen and (max-width: 39.98rem) {
+  .overlay-fade-in > .modal-pop-in {
+    max-width: 100%;
+  }
+
+  .overlay-fade-in > .modal-pop-in.p-7,
+  .overlay-fade-in > .modal-pop-in.p-8 {
+    padding: 1.25rem;
+  }
+
+  body:has(.overlay-fade-in) {
+    overflow: hidden;
+  }
+}
+
+/* `.responsive-table`: each row becomes a card below `lg`, using the
+   td's data-label in place of the (hidden) column header. Keeps one set of
+   markup per table rather than a separate mobile render of every row. */
+@media screen and (max-width: 63.98rem) {
+  .responsive-table,
+  .responsive-table tbody,
+  .responsive-table tr,
+  .responsive-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .responsive-table thead {
+    display: none;
+  }
+
+  .responsive-table tr {
+    padding: 0.75rem 1rem;
+  }
+
+  .responsive-table td {
+    padding: 0.375rem 0;
+  }
+
+  .responsive-table td[data-label] {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    column-gap: 0.75rem;
+    align-items: baseline;
+    max-width: none;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .responsive-table td[data-label]::before {
+    content: attr(data-label);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-slate-400);
+  }
+
+  /* Cells holding several elements (name + ID, say) stay in the value column. */
+  .responsive-table td[data-label] > * {
+    grid-column: 2;
+    justify-self: start;
+    max-width: 100%;
+  }
+
+  .responsive-table td:empty {
+    display: none;
+  }
+
+  .responsive-table td.rt-actions {
+    padding-top: 0.5rem;
+    text-align: right;
+  }
+
+  .responsive-table td.rt-actions > div {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+
+  .responsive-table td.rt-actions button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+}
+
 @keyframes toast-slide-in {
   from {
     transform: translateX(120%);
@@ -107,6 +226,13 @@ body {
   border-radius: 8px !important;
   border: 1px solid #e2e8f0 !important;
   margin-bottom: 10px !important;
-  font-size: 14px !important;
+  font-size: 16px !important;
   color: #1e293b !important;
+  max-width: 100% !important;
+}
+
+/* The scanner library sizes its own elements in px — keep them in the modal. */
+#reader,
+#reader video {
+  max-width: 100% !important;
 }

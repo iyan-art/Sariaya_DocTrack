@@ -15,6 +15,12 @@ from .services import resolve_office, release_document
 from .qr_services import generate_qr_code
 from .sla_scan import DUE_SOON_THRESHOLD_RATIO
 
+# Philippine mobile numbers only: 09XXXXXXXXX or +639XXXXXXXXX. [0-9] rather
+# than \d, which in Python also accepts non-ASCII digits. Used with fullmatch()
+# since a `$` would still let a trailing newline through.
+CONTACT_NUMBER_RE = re.compile(r'(?:09|\+639)[0-9]{9}')
+CONTACT_NUMBER_ERROR = 'Invalid contact number format. Please use 09XXXXXXXXX or +639XXXXXXXXX'
+
 
 def format_duration(delta):
     """Shared by DocumentLogSerializer and DocumentSerializer — e.g. '2h 30m' / '45m'."""
@@ -593,7 +599,30 @@ class CreateDocumentSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     f"Please fill in: {', '.join(missing_labels)}."
                 )
+
+            # Contact numbers live in form_data rather than a model field:
+            # any request field of type 'tel', or `contact_no` for a type with
+            # no schema (the generic form DocumentRequestFields.jsx falls back
+            # to). Blank is left to the required check above.
+            request_fields = document_type.request_fields or []
+            contact_keys = (
+                [field.get('key') for field in request_fields if field.get('type') == 'tel']
+                if request_fields else ['contact_no']
+            )
+            for key in contact_keys:
+                value = form_data.get(key)
+                if value in (None, ''):
+                    continue
+                try:
+                    self.validate_contact_number(value)
+                except serializers.ValidationError as exc:
+                    raise serializers.ValidationError({key: exc.detail})
         return attrs
+
+    def validate_contact_number(self, value):
+        if not isinstance(value, str) or not CONTACT_NUMBER_RE.fullmatch(value):
+            raise serializers.ValidationError(CONTACT_NUMBER_ERROR)
+        return value
 
     def create(self, validated_data):
         request = self.context['request']

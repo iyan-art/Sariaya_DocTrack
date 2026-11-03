@@ -66,7 +66,7 @@ export default function AdminAccessLogs() {
           <button
             key={value}
             onClick={() => handleFilterChange(value)}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            className={`px-4 py-2.5 sm:py-1.5 rounded-md text-sm font-medium transition-colors ${
               actionFilter === value ? 'bg-white dark:bg-slate-700 shadow text-blue-700 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'
             }`}
           >
@@ -75,8 +75,8 @@ export default function AdminAccessLogs() {
         ))}
       </div>
 
-      <div className="mt-5 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="mt-5 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-x-auto">
+        <table className="responsive-table w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 text-xs uppercase">
             <tr>
               <th className="text-left px-5 py-3">Timestamp</th>
@@ -95,10 +95,10 @@ export default function AdminAccessLogs() {
             ) : (
               logs.map((log) => (
                 <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td className="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">
+                  <td data-label="Timestamp" className="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">
                     {new Date(log.timestamp).toLocaleString()}
                   </td>
-                  <td className="px-5 py-3">
+                  <td data-label="User" className="px-5 py-3">
                     {log.user_email ? (
                       <>
                         <p className="font-medium text-slate-800 dark:text-slate-200">{log.user_name}</p>
@@ -108,14 +108,14 @@ export default function AdminAccessLogs() {
                       <span className="text-slate-400 dark:text-slate-500 italic">Unknown</span>
                     )}
                   </td>
-                  <td className="px-5 py-3">
+                  <td data-label="Action" className="px-5 py-3">
                     <span className={`inline-flex text-[10px] font-bold px-2.5 py-1 rounded-full border ${ACTION_STYLES[log.action] || ACTION_STYLES.other}`}>
                       {log.action_label}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-xs text-slate-600 dark:text-slate-400">{log.detail || '—'}</td>
-                  <td className="px-5 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">{log.ip_address}</td>
-                  <td className="px-5 py-3 text-xs text-slate-400 dark:text-slate-500 max-w-xs truncate" title={log.user_agent}>
+                  <td data-label="Detail" className="px-5 py-3 text-xs text-slate-600 dark:text-slate-400">{log.detail || '—'}</td>
+                  <td data-label="IP Address" className="px-5 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">{log.ip_address}</td>
+                  <td data-label="User Agent" className="px-5 py-3 text-xs text-slate-400 dark:text-slate-500 max-w-xs truncate" title={log.user_agent}>
                     {log.user_agent || '—'}
                   </td>
                 </tr>
@@ -132,14 +132,14 @@ export default function AdminAccessLogs() {
             <button
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40"
+              className="px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40"
             >
               Previous
             </button>
             <button
               disabled={page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40"
+              className="px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40"
             >
               Next
             </button>

@@ -87,7 +87,7 @@ export default function History() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="responsive-table w-full text-sm">
               <thead className="bg-slate-50 dark:bg-slate-800/60">
                 <tr>
                   <th className="text-left px-5 py-3 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Tracking #</th>
@@ -105,17 +105,17 @@ export default function History() {
                     onClick={() => setSelectedId(doc.id)}
                     className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer transition-colors"
                   >
-                    <td className="px-5 py-3 font-mono font-bold text-blue-700 dark:text-blue-400">{doc.tracking_number}</td>
-                    <td className="px-5 py-3 font-semibold text-slate-800 dark:text-slate-200">{doc.document_type_name}</td>
-                    <td className="px-5 py-3">
+                    <td data-label="Tracking #" className="px-5 py-3 font-mono font-bold text-blue-700 dark:text-blue-400">{doc.tracking_number}</td>
+                    <td data-label="Document Type" className="px-5 py-3 font-semibold text-slate-800 dark:text-slate-200">{doc.document_type_name}</td>
+                    <td data-label="Progress" className="px-5 py-3">
                       <div className="flex items-center gap-2">
                         <StepStatusPill statuses={doc.step_statuses} />
                         <NearDueWarningBadge statuses={doc.step_statuses} />
                       </div>
                     </td>
-                    <td className="px-5 py-3"><DocumentStatusBadge doc={doc} /></td>
-                    <td className="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs">{new Date(doc.created_at).toLocaleDateString()}</td>
-                    <td className="px-5 py-3 text-right">
+                    <td data-label="Status" className="px-5 py-3"><DocumentStatusBadge doc={doc} /></td>
+                    <td data-label="Date Requested" className="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs">{new Date(doc.created_at).toLocaleDateString()}</td>
+                    <td className="rt-actions px-5 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {doc.status === 'released' && (
                           <button

@@ -117,7 +117,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Status breakdown strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mt-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mt-6">
         {[
           { label: 'Total', value: stats.total, color: 'text-slate-700 dark:text-slate-300' },
           { label: 'Pending', value: stats.pending, color: 'text-amber-600 dark:text-amber-400' },
@@ -259,7 +259,7 @@ export default function AdminDashboard() {
           <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">No overdue documents right now — nice.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="responsive-table w-full text-sm">
               <thead className="text-slate-400 dark:text-slate-500 text-xs uppercase">
                 <tr>
                   <th className="text-left py-2 pr-4">Tracking #</th>
@@ -272,11 +272,11 @@ export default function AdminDashboard() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {stats.bottlenecks.map((b) => (
                   <tr key={b.id}>
-                    <td className="py-2.5 pr-4 font-mono text-blue-600 dark:text-blue-400 text-xs">{b.tracking_number}</td>
-                    <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300 font-medium">{b.document_type_name}</td>
-                    <td className="py-2.5 pr-4 text-slate-600 dark:text-slate-400">{b.current_office}</td>
-                    <td className="py-2.5 pr-4 text-slate-600 dark:text-slate-400">{b.handler || '—'}</td>
-                    <td className="py-2.5">
+                    <td data-label="Tracking #" className="py-2.5 pr-4 font-mono text-blue-600 dark:text-blue-400 text-xs">{b.tracking_number}</td>
+                    <td data-label="Type" className="py-2.5 pr-4 text-slate-700 dark:text-slate-300 font-medium">{b.document_type_name}</td>
+                    <td data-label="Office" className="py-2.5 pr-4 text-slate-600 dark:text-slate-400">{b.current_office}</td>
+                    <td data-label="Handler" className="py-2.5 pr-4 text-slate-600 dark:text-slate-400">{b.handler || '—'}</td>
+                    <td data-label="Dwell Time" className="py-2.5">
                       <span className="inline-flex text-xs font-black text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 px-2.5 py-1 rounded-full">
                         {b.dwell_hours}h
                       </span>

@@ -976,7 +976,11 @@ class DocumentScanView(APIView):
         except ValidationError as e:
             return Response({"detail": str(e.detail[0]) if hasattr(e, 'detail') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(DocumentDetailSerializer(updated).data)
+        data = DocumentDetailSerializer(updated).data
+        # Only set when this receive is what made the document ready for pickup.
+        if hasattr(updated, 'ready_email_status'):
+            data['email_status'] = updated.ready_email_status
+        return Response(data)
 
 class DocumentTransferView(APIView):
     """
@@ -1043,6 +1047,13 @@ class DocumentTransferView(APIView):
                 )
                 verb = 'returned to origin at' if updated.status == Document.Status.COMPLETED else 'received at'
                 message = f"{updated.tracking_number} {verb} {updated.current_office}."
+                ready_email_status = getattr(updated, 'ready_email_status', None)
+                if ready_email_status == 'sent':
+                    message += " The citizen was emailed that it is ready for pickup."
+                elif ready_email_status == 'skipped':
+                    message += " No email on file for this citizen — please contact them directly."
+                elif ready_email_status == 'failed':
+                    message += " The ready-for-pickup email failed to send — please follow up."
         except ValidationError as e:
             return Response({"detail": str(e.detail[0]) if hasattr(e, 'detail') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -2032,8 +2043,8 @@ class EmailNotificationLogListView(generics.ListAPIView):
     GET /api/documents/email-notifications/?type=overdue_warning|due_soon|ready_for_release&status=sent|failed
     Admin-only audit trail of every automated email the system has sent —
     populated by notifications.py::_send_and_log() from sla_scan.py (staff
-    overdue/due-soon warnings) and services.py::advance_processing_stage()
-    (citizen ready-for-release notices). Powers the admin notification
+    overdue/due-soon warnings) and services.py::receive_document()
+    (citizen and staff ready-for-release notices). Powers the admin notification
     bell (NotificationBell.jsx) — there is no separate email-notifications
     page; this is the only access point for that activity.
     """

@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { extractErrorMessage } from '../../utils/apiError';
 import DocumentRequestFields from '../documents/DocumentRequestFields';
+import { hasInvalidContactNumber } from '../../utils/contactNumber';
 import CitizenPicker from '../documents/CitizenPicker';
 import PrintableQRSlip from '../admin/PrintableQRSlip';
 import PrintableDocumentForm from '../admin/PrintableDocumentForm';
@@ -75,9 +76,14 @@ export default function NewRequestModal({ onClose, onCreated }) {
 
   const selectedType = types.find((t) => String(t.id) === String(selectedTypeId));
   const limitReached = selectedType?.daily_limit != null && selectedType.requests_today >= selectedType.daily_limit;
+  const contactNumberInvalid = Boolean(selectedTypeId) && hasInvalidContactNumber(selectedType?.request_fields, formData);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // The Enter key can still submit past the disabled button; the inline
+    // error is already showing under the field.
+    if (contactNumberInvalid) return;
 
     const nextFieldErrors = {};
     if (!purpose) nextFieldErrors.purpose = 'Please select Internal or External Documents.';
@@ -249,7 +255,7 @@ export default function NewRequestModal({ onClose, onCreated }) {
             <button type="button" onClick={onClose} className="flex-1 py-3 text-slate-500 dark:text-slate-400 font-bold">Cancel</button>
             <button
               type="submit"
-              disabled={loading || limitReached}
+              disabled={loading || limitReached || contactNumberInvalid}
               className="flex-1 bg-blue-600 text-white rounded-xl py-3 font-bold shadow-lg shadow-blue-200 dark:shadow-none disabled:opacity-60"
             >
               {loading ? 'Processing...' : limitReached ? 'Daily limit reached' : 'Save Request'}

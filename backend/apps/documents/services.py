@@ -2,7 +2,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from apps.accounts.models import User
 from .models import Document, DocumentLog, EmailNotificationLog, Notification, Office, RequestStatusHistory
-from .notifications import send_ready_for_release_email
+from .notifications import send_ready_for_release_email, send_ready_for_release_staff_email
 
 # Mirrors sla_scan.py's DEFAULT_FALLBACK_SLA_HOURS (duplicated, not
 # imported, to avoid a circular import — sla_scan.py already imports FROM
@@ -58,29 +58,74 @@ def can_delete_document(document, user):
     return document.status == Document.Status.IN_PROGRESS and document.route_position == 0
 
 
+def _ready_notices_sent(document, notification_type):
+    """
+    Successful "ready" emails that count for this document's current round.
+    A citizen return reopens the document, so notices from before the latest
+    return don't count: the document will become ready again and everyone
+    needs telling again.
+    """
+    sent = EmailNotificationLog.objects.filter(
+        document=document,
+        notification_type=notification_type,
+        status=EmailNotificationLog.Status.SENT,
+    )
+    last_return = document.logs.filter(
+        action=DocumentLog.Action.CITIZEN_RETURN_INITIATED,
+    ).order_by('-timestamp').first()
+    if last_return:
+        sent = sent.filter(sent_at__gte=last_return.timestamp)
+    return sent
+
+
 def _maybe_notify_citizen_ready(document):
     """
     Sends the citizen "ready for pickup" email (see
-    notifications.py::send_ready_for_release_email()) at most once per
-    document, ever — this is a one-time terminal notification, not a
-    recurring SLA reminder, so unlike the overdue/due-soon emails there's no
-    time window to re-arm. Called from release_to_citizen()'s explicit
-    "Release to Citizen" button/scan action; this guard just means a
-    document can never end up double-notified even if that's somehow
-    triggered more than once for the same document.
+    notifications.py::send_ready_for_release_email()) unless it already went
+    out this round. Called when the document becomes ready
+    (receive_document()) and again at release_to_citizen(), which is what
+    retries an email that failed the first time.
 
     Returns 'sent', 'failed', 'skipped' (no valid recipient — see
     _resolve_citizen_recipient()), or 'already_sent' (a previous call
     already notified this citizen successfully).
     """
-    already_sent = EmailNotificationLog.objects.filter(
-        document=document,
-        notification_type=EmailNotificationLog.NotificationType.READY_FOR_RELEASE,
-        status=EmailNotificationLog.Status.SENT,
-    ).exists()
-    if already_sent:
+    if _ready_notices_sent(document, EmailNotificationLog.NotificationType.READY_FOR_RELEASE).exists():
         return 'already_sent'
     return send_ready_for_release_email(document)
+
+
+def responsible_employees(document):
+    """
+    Who gets a staff-facing email about one document: every active Employee
+    at its current office (so the whole team stays aware even if the one who
+    scanned it in is out that day), PLUS the employee actually holding it
+    right now (document.current_handler) even if their User.office string
+    happens to have drifted out of sync with the office's canonical code —
+    the person who scanned it in should never be the one left out of "the
+    employee responsible for this document". Deduplicated by user id so
+    current_handler is never emailed twice.
+    """
+    recipients = {
+        staff.id: staff
+        for staff in User.objects.filter(role=User.Role.EMPLOYEE, is_active=True)
+        if _same_office(staff.office, document.current_office)
+    }
+    handler = document.current_handler
+    if handler and handler.role == User.Role.EMPLOYEE and handler.is_active:
+        recipients[handler.id] = handler
+    return list(recipients.values())
+
+
+def _notify_office_ready(document):
+    """Emails the office's employees that the document is ready for release, once each per round."""
+    already_notified = set(
+        _ready_notices_sent(document, EmailNotificationLog.NotificationType.READY_FOR_RELEASE_STAFF)
+        .values_list('recipient_id', flat=True)
+    )
+    for staff in responsible_employees(document):
+        if staff.id not in already_notified:
+            send_ready_for_release_staff_email(document, staff)
 
 
 def _same_office(label_a, label_b):
@@ -124,10 +169,9 @@ def advance_processing_stage(document, stage, actor=None, note=''):
     narrative stages that have no physical-transfer equivalent at all
     (Under Review, Form Processing, For Approval, ...).
 
-    Does NOT notify the citizen — every document's "ready for pickup" email
-    fires from release_to_citizen() instead, at the moment staff actually
-    confirms the hand-off, not the earlier moment it merely arrived back at
-    the origin office and could still sit unconfirmed in a drawer for days.
+    Does NOT send email, so staff moving a document through the narrative
+    stages never notifies anyone — the "ready for pickup" emails fire from
+    receive_document(), when the document physically arrives.
     """
     previous_stage = document.processing_stage
     document.processing_stage = stage
@@ -338,6 +382,9 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
 
     if action_type == DocumentLog.Action.RETURNED:
         advance_processing_stage(document, Document.ProcessingStage.READY_FOR_RELEASE, actor=scanning_user)
+        # Not a model field: just lets the calling view tell staff the outcome.
+        document.ready_email_status = _maybe_notify_citizen_ready(document)
+        _notify_office_ready(document)
 
     return document
 
@@ -352,9 +399,10 @@ def release_to_citizen(document, releasing_user, notes='', qr_verified=False):
     call — so a document can never be handed back without having actually
     completed its full receipt chain first.
 
-    Also fires the citizen's "ready for pickup" email right here (via
-    _maybe_notify_citizen_ready(), which no-ops if one was somehow already
-    sent for this document). Returns (document, email_status) instead of a
+    The citizen normally got the "ready for pickup" email back when the
+    document became ready (receive_document()), so this usually sends
+    nothing — _maybe_notify_citizen_ready() only sends here if that email
+    failed or never happened. Returns (document, email_status) instead of a
     bare document so the caller can surface a truthful outcome to staff —
     'sent', 'failed', 'skipped', or 'already_sent' — rather than assuming
     the email always goes out.
