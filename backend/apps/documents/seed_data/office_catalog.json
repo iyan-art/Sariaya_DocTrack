@@ -1,0 +1,1519 @@
+{
+  "offices": [
+    {
+      "code": "ADMIN",
+      "name": "Admin Office",
+      "location": "3rd Floor",
+      "floor": "3rd Floor",
+      "contact_person": "Apollo Marquez",
+      "office_hours": "Mon-Fri 8:00 AM - 5:00 PM",
+      "is_active": true
+    },
+    {
+      "code": "ASSESSOR",
+      "name": "Municipal Assessors Office",
+      "location": "Municipal Hall",
+      "floor": "",
+      "contact_person": "",
+      "office_hours": "",
+      "is_active": false
+    },
+    {
+      "code": "BAC",
+      "name": "Budget and Accounting Office",
+      "location": "3rd Floor",
+      "floor": "3rd Floor",
+      "contact_person": "Mich Gonzaga",
+      "office_hours": "Mon-Fri 8:00 AM - 5:00 PM",
+      "is_active": true
+    },
+    {
+      "code": "BFP",
+      "name": "Bureau of Fire Protection",
+      "location": "Municipal Hall",
+      "floor": "1st Floor",
+      "contact_person": "Jhon Medrano",
+      "office_hours": "Mon-Fri 8:00 AM - 5:00 PM",
+      "is_active": true
+    },
+    {
+      "code": "BPLO",
+      "name": "Business Permits and Licensing Office",
+      "location": "2nd Floor",
+      "floor": "2nd Floor",
+      "contact_person": "Rc Mendez",
+      "office_hours": "Mon-Fri 8:00 AM - 5:00 PM",
+      "is_active": true
+    },
+    {
+      "code": "ENGR",
+      "name": "Engineering Office",
+      "location": "Municipal Hall",
+      "floor": "",
+      "contact_person": "",
+      "office_hours": "",
+      "is_active": false
+    },
+    {
+      "code": "GSO",
+      "name": "General Services Office",
+      "location": "Municipal Hall",
+      "floor": "1st Floor",
+      "contact_person": "Rain Almario",
+      "office_hours": "Mon-Fri 8:00 AM - 5:00 PM",
+      "is_active": true
+    },
+    {
+      "code": "HRMO",
+      "name": "Human Resource Management Office",
+      "location": "2nd floor",
+      "floor": "2nd floor",
+      "contact_person": "Mark Mendez",
+      "office_hours": "Mon-Fri 8:00 AM - 5:00 PM",
+      "is_active": true
+    },
+    {
+      "code": "MAO",
+      "name": "Municipal Accounting Office",
+      "location": "3rd Floor",
+      "floor": "3rd Floor",
+      "contact_person": "Ryan Dela Cruz",
+      "office_hours": "Mon-Fri 8:00 AM - 5:00 PM",
+      "is_active": true
+    },
+    {
+      "code": "MAYOR",
+      "name": "Mayor's Office",
+      "location": "3rd Floor",
+      "floor": "3rd Floor",
+      "contact_person": "Yula Valtazar",
+      "office_hours": "Mon-Fri 8:00 AM - 5:00 PM",
+      "is_active": true
+    },
+    {
+      "code": "MCRO",
+      "name": "Municipal Civil Registrar Office",
+      "location": "Municipal Hall",
+      "floor": "1st Floor",
+      "contact_person": "Rocky Galit",
+      "office_hours": "Mon-Fri, 8:00 AM - 5:00 PM",
+      "is_active": true
+    },
+    {
+      "code": "MHO",
+      "name": "Municipal Health Office",
+      "location": "2nd Floor",
+      "floor": "2nd Floor",
+      "contact_person": "Joshua Marquez",
+      "office_hours": "Mon-Fri 8:00 AM - 5:00 PM",
+      "is_active": true
+    },
+    {
+      "code": "MPDO",
+      "name": "Municipal Planning & Development Office",
+      "location": "2nd Floor",
+      "floor": "2nd Floor",
+      "contact_person": "Kristel Bondoc",
+      "office_hours": "Mon-Fri 8:00 AM - 5:00 PM",
+      "is_active": true
+    },
+    {
+      "code": "MTO",
+      "name": "Municipal Treasury Office",
+      "location": "3rd Floor",
+      "floor": "3rd Floor",
+      "contact_person": "Christian Alvarez",
+      "office_hours": "Mon-Fri 8:00 AM - 5:00 PM",
+      "is_active": true
+    },
+    {
+      "code": "TREAS",
+      "name": "Treasurer Office",
+      "location": "Municipal Hall",
+      "floor": "1st Floor",
+      "contact_person": "Joshua Geron",
+      "office_hours": "Mon-Fri 8:00 AM - 5:00 PM",
+      "is_active": true
+    }
+  ],
+  "document_types": [
+    {
+      "name": "Birth Certificate",
+      "scope": "external",
+      "description": "Certified true copy of a birth record",
+      "daily_limit": null,
+      "request_fields": [
+        {
+          "key": "child_full_name",
+          "label": "Full Name of Child",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "date_of_birth",
+          "label": "Date of Birth",
+          "type": "date",
+          "required": true
+        },
+        {
+          "key": "place_of_birth",
+          "label": "Place of Birth",
+          "type": "text",
+          "required": true,
+          "placeholder": "Hospital / City"
+        },
+        {
+          "key": "mother_maiden_name",
+          "label": "Mother's Maiden Name",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "father_full_name",
+          "label": "Father's Full Name",
+          "type": "text",
+          "required": false
+        },
+        {
+          "key": "requestor_relationship",
+          "label": "Relationship to the Child",
+          "type": "select",
+          "required": true,
+          "options": [
+            "Self",
+            "Parent",
+            "Sibling",
+            "Spouse",
+            "Child",
+            "Authorized Representative",
+            "Other"
+          ]
+        },
+        {
+          "key": "purpose",
+          "label": "Purpose",
+          "type": "select",
+          "required": true,
+          "options": [
+            "Employment",
+            "School / Enrollment",
+            "Passport Application",
+            "Travel",
+            "Government Transaction",
+            "Other"
+          ]
+        },
+        {
+          "key": "number_of_copies",
+          "label": "Number of Copies",
+          "type": "number",
+          "required": true,
+          "placeholder": "1"
+        },
+        {
+          "key": "contact_no",
+          "label": "Contact Number",
+          "type": "tel",
+          "required": true
+        }
+      ],
+      "is_active": true,
+      "steps": [
+        {
+          "step_number": 1,
+          "office": "MCRO",
+          "action_required": "Registration Review",
+          "max_hours_allowed": 4
+        },
+        {
+          "step_number": 2,
+          "office": "MTO",
+          "action_required": "Tax Assessment",
+          "max_hours_allowed": 4
+        },
+        {
+          "step_number": 3,
+          "office": "MCRO",
+          "action_required": "Release",
+          "max_hours_allowed": 4
+        }
+      ],
+      "template_fields": [
+        {
+          "key": "child_full_name",
+          "label": "Child's Full Name",
+          "field_type": "name",
+          "section": "Personal Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "child_full_name",
+          "page_number": 1,
+          "x": 183.6,
+          "y": 443.5,
+          "font_size": 9.0,
+          "rotation": 0.0,
+          "order": 1
+        },
+        {
+          "key": "date_of_birth",
+          "label": "Date of Birth",
+          "field_type": "date",
+          "section": "Personal Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "date_of_birth",
+          "page_number": 1,
+          "x": 208.1,
+          "y": 344.5,
+          "font_size": 9.0,
+          "rotation": 0.0,
+          "order": 2
+        },
+        {
+          "key": "place_of_birth",
+          "label": "Place of Birth",
+          "field_type": "text",
+          "section": "Personal Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "place_of_birth",
+          "page_number": 1,
+          "x": 97.9,
+          "y": 304.9,
+          "font_size": 9.0,
+          "rotation": 0.0,
+          "order": 3
+        },
+        {
+          "key": "father_full_name",
+          "label": "Father's Full Name",
+          "field_type": "name",
+          "section": "Parents' Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "father_full_name",
+          "page_number": 1,
+          "x": 183.6,
+          "y": 265.3,
+          "font_size": 9.0,
+          "rotation": 0.0,
+          "order": 4
+        },
+        {
+          "key": "mother_maiden_name",
+          "label": "Mother's Maiden Name",
+          "field_type": "name",
+          "section": "Parents' Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "mother_maiden_name",
+          "page_number": 1,
+          "x": 183.6,
+          "y": 178.2,
+          "font_size": 9.0,
+          "rotation": 0.0,
+          "order": 5
+        },
+        {
+          "key": "sex",
+          "label": "Sex",
+          "field_type": "select",
+          "section": "Personal Information",
+          "options": [
+            "Male",
+            "Female"
+          ],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 1,
+          "x": 36.7,
+          "y": 388.1,
+          "font_size": 9.0,
+          "rotation": 0.0,
+          "order": 6
+        },
+        {
+          "key": "birth_reg_no",
+          "label": "Birth Registration No.",
+          "field_type": "text",
+          "section": "Registration Details",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 1,
+          "x": 30.6,
+          "y": 495.0,
+          "font_size": 7.0,
+          "rotation": 0.0,
+          "order": 7
+        },
+        {
+          "key": "date_registered",
+          "label": "Date Registered",
+          "field_type": "date",
+          "section": "Registration Details",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 2,
+          "x": 18.4,
+          "y": 443.5,
+          "font_size": 7.0,
+          "rotation": 0.0,
+          "order": 8
+        },
+        {
+          "key": "place_registered",
+          "label": "Place Registered",
+          "field_type": "text",
+          "section": "Registration Details",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 2,
+          "x": 18.4,
+          "y": 419.8,
+          "font_size": 7.0,
+          "rotation": 0.0,
+          "order": 9
+        }
+      ]
+    },
+    {
+      "name": "Building Permit",
+      "scope": "external",
+      "description": "Application for a building/construction permit",
+      "daily_limit": null,
+      "request_fields": [
+        {
+          "key": "project_location",
+          "label": "Project Location",
+          "type": "textarea",
+          "required": true
+        },
+        {
+          "key": "owner_name",
+          "label": "Owner / Applicant Name",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "lot_area",
+          "label": "Lot Area (sqm)",
+          "type": "number",
+          "required": true
+        },
+        {
+          "key": "floor_area",
+          "label": "Floor Area (sqm)",
+          "type": "number",
+          "required": true
+        },
+        {
+          "key": "construction_type",
+          "label": "Type of Construction",
+          "type": "select",
+          "required": true,
+          "options": [
+            "New Construction",
+            "Renovation",
+            "Addition",
+            "Demolition",
+            "Repair"
+          ]
+        },
+        {
+          "key": "estimated_cost",
+          "label": "Estimated Project Cost (₱)",
+          "type": "number",
+          "required": true
+        },
+        {
+          "key": "contact_no",
+          "label": "Contact Number",
+          "type": "tel",
+          "required": true
+        }
+      ],
+      "is_active": true,
+      "steps": [
+        {
+          "step_number": 1,
+          "office": "MHO",
+          "action_required": "Apply for a Locational or Zoning Clearance.",
+          "max_hours_allowed": 2
+        },
+        {
+          "step_number": 2,
+          "office": "MPDO",
+          "action_required": "Submit your complete technical application package",
+          "max_hours_allowed": 2
+        },
+        {
+          "step_number": 3,
+          "office": "BFP",
+          "action_required": "The OBO will route your plans",
+          "max_hours_allowed": 2
+        },
+        {
+          "step_number": 4,
+          "office": "MTO",
+          "action_required": "For Payment",
+          "max_hours_allowed": 2
+        },
+        {
+          "step_number": 5,
+          "office": "MHO",
+          "action_required": "Releasing of Document",
+          "max_hours_allowed": 2
+        }
+      ],
+      "template_fields": [
+        {
+          "key": "application_no",
+          "label": "Application No.",
+          "field_type": "text",
+          "section": "Application Details",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 1,
+          "x": 131.0,
+          "y": 700.5,
+          "font_size": 8.0,
+          "rotation": 0.0,
+          "order": 1
+        },
+        {
+          "key": "permit_no",
+          "label": "Building Permit No.",
+          "field_type": "text",
+          "section": "Application Details",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 1,
+          "x": 357.2,
+          "y": 692.9,
+          "font_size": 8.0,
+          "rotation": 0.0,
+          "order": 2
+        },
+        {
+          "key": "date_of_application",
+          "label": "Date of Application",
+          "field_type": "date",
+          "section": "Application Details",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 1,
+          "x": 142.9,
+          "y": 679.4,
+          "font_size": 8.0,
+          "rotation": 0.0,
+          "order": 3
+        },
+        {
+          "key": "date_issued",
+          "label": "Date Issued",
+          "field_type": "date",
+          "section": "Application Details",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 1,
+          "x": 369.1,
+          "y": 679.4,
+          "font_size": 8.0,
+          "rotation": 0.0,
+          "order": 4
+        },
+        {
+          "key": "owner_name",
+          "label": "Owner Name",
+          "field_type": "name",
+          "section": "Owner Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "owner_name",
+          "page_number": 1,
+          "x": 113.1,
+          "y": 638.2,
+          "font_size": 9.0,
+          "rotation": 0.0,
+          "order": 5
+        },
+        {
+          "key": "project_location",
+          "label": "Project Location",
+          "field_type": "textarea",
+          "section": "Project Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "project_location",
+          "page_number": 1,
+          "x": 119.1,
+          "y": 591.0,
+          "font_size": 9.0,
+          "rotation": 0.0,
+          "order": 6
+        },
+        {
+          "key": "estimated_cost",
+          "label": "Estimated Cost",
+          "field_type": "number",
+          "section": "Project Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "estimated_cost",
+          "page_number": 1,
+          "x": 29.8,
+          "y": 383.1,
+          "font_size": 9.0,
+          "rotation": 0.0,
+          "order": 7
+        },
+        {
+          "key": "floor_area",
+          "label": "Floor Area",
+          "field_type": "number",
+          "section": "Project Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "floor_area",
+          "page_number": 1,
+          "x": 250.0,
+          "y": 383.1,
+          "font_size": 9.0,
+          "rotation": 0.0,
+          "order": 8
+        },
+        {
+          "key": "engineer_architect",
+          "label": "Engineer / Architect",
+          "field_type": "name",
+          "section": "Project Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 1,
+          "x": 119.1,
+          "y": 506.8,
+          "font_size": 8.0,
+          "rotation": 0.0,
+          "order": 9
+        }
+      ]
+    },
+    {
+      "name": "Business Permit",
+      "scope": "external",
+      "description": "Application or renewal of a business permit",
+      "daily_limit": null,
+      "request_fields": [
+        {
+          "key": "business_name",
+          "label": "Business Name",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "business_address",
+          "label": "Business Address",
+          "type": "textarea",
+          "required": true
+        },
+        {
+          "key": "nature_of_business",
+          "label": "Nature of Business",
+          "type": "text",
+          "required": true,
+          "placeholder": "e.g. Retail, Food Service"
+        },
+        {
+          "key": "owner_name",
+          "label": "Owner / Applicant Name",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "capitalization",
+          "label": "Capitalization (₱)",
+          "type": "number",
+          "required": false
+        },
+        {
+          "key": "floor_area",
+          "label": "Floor Area (sqm)",
+          "type": "number",
+          "required": false
+        },
+        {
+          "key": "contact_no",
+          "label": "Contact Number",
+          "type": "tel",
+          "required": true
+        }
+      ],
+      "is_active": true,
+      "steps": [
+        {
+          "step_number": 1,
+          "office": "BPLO",
+          "action_required": "Request Here",
+          "max_hours_allowed": 24
+        },
+        {
+          "step_number": 2,
+          "office": "MPDO",
+          "action_required": "Locational Clearance",
+          "max_hours_allowed": 24
+        },
+        {
+          "step_number": 3,
+          "office": "BFP",
+          "action_required": "Sanitation",
+          "max_hours_allowed": 24
+        },
+        {
+          "step_number": 4,
+          "office": "MTO",
+          "action_required": "For Payment",
+          "max_hours_allowed": 24
+        },
+        {
+          "step_number": 5,
+          "office": "BPLO",
+          "action_required": "Claim your Sanitary Permit",
+          "max_hours_allowed": 24
+        }
+      ],
+      "template_fields": [
+        {
+          "key": "business_name",
+          "label": "Business Name",
+          "field_type": "text",
+          "section": "Business Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "business_name",
+          "page_number": 1,
+          "x": 91.8,
+          "y": 670.3,
+          "font_size": 9.0,
+          "rotation": 0.0,
+          "order": 1
+        },
+        {
+          "key": "owner_name",
+          "label": "Owner / Applicant Name",
+          "field_type": "name",
+          "section": "Owner Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "owner_name",
+          "page_number": 1,
+          "x": 61.2,
+          "y": 705.6,
+          "font_size": 9.0,
+          "rotation": 0.0,
+          "order": 2
+        },
+        {
+          "key": "business_address",
+          "label": "Business Address",
+          "field_type": "textarea",
+          "section": "Business Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "business_address",
+          "page_number": 1,
+          "x": 91.8,
+          "y": 621.9,
+          "font_size": 9.0,
+          "rotation": 0.0,
+          "order": 3
+        },
+        {
+          "key": "nature_of_business",
+          "label": "Nature of Business",
+          "field_type": "text",
+          "section": "Business Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "nature_of_business",
+          "page_number": 1,
+          "x": 18.4,
+          "y": 239.9,
+          "font_size": 8.0,
+          "rotation": 0.0,
+          "order": 4
+        },
+        {
+          "key": "permit_no",
+          "label": "Business Permit No.",
+          "field_type": "text",
+          "section": "Permit Details",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 1,
+          "x": 367.2,
+          "y": 962.6,
+          "font_size": 8.0,
+          "rotation": 0.0,
+          "order": 5
+        },
+        {
+          "key": "date_issued",
+          "label": "Date Issued",
+          "field_type": "date",
+          "section": "Permit Details",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 1,
+          "x": 367.2,
+          "y": 947.5,
+          "font_size": 8.0,
+          "rotation": 0.0,
+          "order": 6
+        },
+        {
+          "key": "mayor_authorized_officer",
+          "label": "Mayor / Authorized Officer",
+          "field_type": "name",
+          "section": "Permit Details",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 1,
+          "x": 91.8,
+          "y": 115.9,
+          "font_size": 8.0,
+          "rotation": 0.0,
+          "order": 7
+        }
+      ]
+    },
+    {
+      "name": "Death Certificate",
+      "scope": "external",
+      "description": "Certified true copy of a death record",
+      "daily_limit": null,
+      "request_fields": [
+        {
+          "key": "deceased_full_name",
+          "label": "Full Name of Deceased",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "date_of_death",
+          "label": "Date of Death",
+          "type": "date",
+          "required": true
+        },
+        {
+          "key": "place_of_death",
+          "label": "Place of Death",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "requestor_relationship",
+          "label": "Relationship to the Deceased",
+          "type": "select",
+          "required": true,
+          "options": [
+            "Self",
+            "Parent",
+            "Sibling",
+            "Spouse",
+            "Child",
+            "Authorized Representative",
+            "Other"
+          ]
+        },
+        {
+          "key": "purpose",
+          "label": "Purpose",
+          "type": "select",
+          "required": true,
+          "options": [
+            "Insurance Claim",
+            "Estate Settlement",
+            "Burial Permit",
+            "Government Transaction",
+            "Other"
+          ]
+        },
+        {
+          "key": "number_of_copies",
+          "label": "Number of Copies",
+          "type": "number",
+          "required": true,
+          "placeholder": "1"
+        },
+        {
+          "key": "contact_no",
+          "label": "Contact Number",
+          "type": "tel",
+          "required": true
+        }
+      ],
+      "is_active": true,
+      "steps": [
+        {
+          "step_number": 1,
+          "office": "MCRO",
+          "action_required": "Submit the Requirements",
+          "max_hours_allowed": 24
+        },
+        {
+          "step_number": 2,
+          "office": "MTO",
+          "action_required": "For Payment",
+          "max_hours_allowed": 1
+        },
+        {
+          "step_number": 3,
+          "office": "MCRO",
+          "action_required": "Releasing of document",
+          "max_hours_allowed": 24
+        }
+      ],
+      "template_fields": [
+        {
+          "key": "deceased_full_name",
+          "label": "Deceased's Full Name",
+          "field_type": "name",
+          "section": "Personal Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "deceased_full_name",
+          "page_number": 1,
+          "x": 183.6,
+          "y": 483.1,
+          "font_size": 9.0,
+          "rotation": -2.0,
+          "order": 1
+        },
+        {
+          "key": "date_of_death",
+          "label": "Date of Death",
+          "field_type": "date",
+          "section": "Personal Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "date_of_death",
+          "page_number": 1,
+          "x": 208.1,
+          "y": 368.3,
+          "font_size": 9.0,
+          "rotation": -2.0,
+          "order": 2
+        },
+        {
+          "key": "place_of_death",
+          "label": "Place of Death",
+          "field_type": "text",
+          "section": "Personal Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "place_of_death",
+          "page_number": 1,
+          "x": 97.9,
+          "y": 344.5,
+          "font_size": 9.0,
+          "rotation": -2.0,
+          "order": 3
+        },
+        {
+          "key": "father_full_name",
+          "label": "Father's Full Name",
+          "field_type": "name",
+          "section": "Parents' Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 1,
+          "x": 183.6,
+          "y": 281.2,
+          "font_size": 9.0,
+          "rotation": -2.0,
+          "order": 4
+        },
+        {
+          "key": "mother_maiden_name",
+          "label": "Mother's Maiden Name",
+          "field_type": "name",
+          "section": "Parents' Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 1,
+          "x": 183.6,
+          "y": 202.0,
+          "font_size": 9.0,
+          "rotation": -2.0,
+          "order": 5
+        },
+        {
+          "key": "death_reg_no",
+          "label": "Death Registration No.",
+          "field_type": "text",
+          "section": "Registration Details",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 1,
+          "x": 30.6,
+          "y": 534.6,
+          "font_size": 7.0,
+          "rotation": 0.0,
+          "order": 6
+        },
+        {
+          "key": "date_registered",
+          "label": "Date Registered",
+          "field_type": "date",
+          "section": "Registration Details",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 2,
+          "x": 18.4,
+          "y": 459.4,
+          "font_size": 7.0,
+          "rotation": 0.0,
+          "order": 7
+        },
+        {
+          "key": "cause_of_death",
+          "label": "Cause of Death",
+          "field_type": "textarea",
+          "section": "Registration Details",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 2,
+          "x": 18.4,
+          "y": 435.6,
+          "font_size": 7.0,
+          "rotation": 0.0,
+          "order": 8
+        },
+        {
+          "key": "civil_status",
+          "label": "Civil Status",
+          "field_type": "select",
+          "section": "Personal Information",
+          "options": [
+            "Single",
+            "Married",
+            "Widowed",
+            "Separated",
+            "Divorced",
+            "Annulled"
+          ],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 2,
+          "x": 18.4,
+          "y": 411.8,
+          "font_size": 7.0,
+          "rotation": 0.0,
+          "order": 9
+        }
+      ]
+    },
+    {
+      "name": "Marriage Certificate",
+      "scope": "external",
+      "description": "Certified true copy of a marriage certificate",
+      "daily_limit": null,
+      "request_fields": [
+        {
+          "key": "husband_full_name",
+          "label": "Husband's Full Name",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "wife_full_name",
+          "label": "Wife's Full Name",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "date_of_marriage",
+          "label": "Date of Marriage",
+          "type": "date",
+          "required": true
+        },
+        {
+          "key": "place_of_marriage",
+          "label": "Place of Marriage",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "requestor_relationship",
+          "label": "Relationship to the Couple",
+          "type": "select",
+          "required": true,
+          "options": [
+            "Self",
+            "Parent",
+            "Sibling",
+            "Spouse",
+            "Child",
+            "Authorized Representative",
+            "Other"
+          ]
+        },
+        {
+          "key": "purpose",
+          "label": "Purpose",
+          "type": "select",
+          "required": true,
+          "options": [
+            "Legal Proceedings",
+            "Passport Application",
+            "Insurance Claim",
+            "Government Transaction",
+            "Other"
+          ]
+        },
+        {
+          "key": "number_of_copies",
+          "label": "Number of Copies",
+          "type": "number",
+          "required": true,
+          "placeholder": "1"
+        },
+        {
+          "key": "contact_no",
+          "label": "Contact Number",
+          "type": "tel",
+          "required": true
+        }
+      ],
+      "is_active": true,
+      "steps": [
+        {
+          "step_number": 1,
+          "office": "MCRO",
+          "action_required": "Submit the Requirements",
+          "max_hours_allowed": 24
+        },
+        {
+          "step_number": 2,
+          "office": "MTO",
+          "action_required": "For Payment",
+          "max_hours_allowed": 24
+        },
+        {
+          "step_number": 3,
+          "office": "MCRO",
+          "action_required": "Releasing of document",
+          "max_hours_allowed": 24
+        }
+      ],
+      "template_fields": [
+        {
+          "key": "husband_full_name",
+          "label": "Husband's Full Name",
+          "field_type": "name",
+          "section": "Spouses' Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "husband_full_name",
+          "page_number": 1,
+          "x": 220.3,
+          "y": 451.4,
+          "font_size": 9.0,
+          "rotation": 0.0,
+          "order": 1
+        },
+        {
+          "key": "wife_full_name",
+          "label": "Wife's Full Name",
+          "field_type": "name",
+          "section": "Spouses' Information",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "wife_full_name",
+          "page_number": 1,
+          "x": 220.3,
+          "y": 344.5,
+          "font_size": 9.0,
+          "rotation": 0.0,
+          "order": 2
+        },
+        {
+          "key": "date_of_marriage",
+          "label": "Date of Marriage",
+          "field_type": "date",
+          "section": "Marriage Details",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "date_of_marriage",
+          "page_number": 1,
+          "x": 220.3,
+          "y": 249.5,
+          "font_size": 9.0,
+          "rotation": 0.0,
+          "order": 3
+        },
+        {
+          "key": "place_of_marriage",
+          "label": "Place of Marriage",
+          "field_type": "text",
+          "section": "Marriage Details",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "place_of_marriage",
+          "page_number": 1,
+          "x": 220.3,
+          "y": 209.9,
+          "font_size": 9.0,
+          "rotation": 0.0,
+          "order": 4
+        },
+        {
+          "key": "marriage_reg_no",
+          "label": "Marriage Registration No.",
+          "field_type": "text",
+          "section": "Registration Details",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 1,
+          "x": 18.4,
+          "y": 526.7,
+          "font_size": 7.0,
+          "rotation": 0.0,
+          "order": 5
+        },
+        {
+          "key": "date_registered",
+          "label": "Date Registered",
+          "field_type": "date",
+          "section": "Registration Details",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 2,
+          "x": 18.4,
+          "y": 459.4,
+          "font_size": 7.0,
+          "rotation": 0.0,
+          "order": 6
+        },
+        {
+          "key": "officiating_officer",
+          "label": "Officiating Officer",
+          "field_type": "name",
+          "section": "Registration Details",
+          "options": [],
+          "required": true,
+          "placeholder": "",
+          "default_value": "",
+          "source_request_key": "",
+          "page_number": 2,
+          "x": 18.4,
+          "y": 435.6,
+          "font_size": 7.0,
+          "rotation": 0.0,
+          "order": 7
+        }
+      ]
+    },
+    {
+      "name": "Mayor's Permit",
+      "scope": "external",
+      "description": "Requested by a citizen; countersigned by the Mayor's Office.",
+      "daily_limit": null,
+      "request_fields": [],
+      "is_active": true,
+      "steps": [
+        {
+          "step_number": 1,
+          "office": "BPLO",
+          "action_required": "Application Received",
+          "max_hours_allowed": 2
+        },
+        {
+          "step_number": 2,
+          "office": "MTO",
+          "action_required": "Mayor's Signature",
+          "max_hours_allowed": 2
+        },
+        {
+          "step_number": 3,
+          "office": "BPLO",
+          "action_required": "Ready for Release",
+          "max_hours_allowed": 2
+        }
+      ],
+      "template_fields": []
+    },
+    {
+      "name": "Memo",
+      "scope": "internal",
+      "description": "hkhkjhkh",
+      "daily_limit": null,
+      "request_fields": [],
+      "is_active": true,
+      "steps": [
+        {
+          "step_number": 1,
+          "office": "BAC",
+          "action_required": "BVBVNBVNV",
+          "max_hours_allowed": 24
+        },
+        {
+          "step_number": 2,
+          "office": "GSO",
+          "action_required": "GGRGG",
+          "max_hours_allowed": 24
+        }
+      ],
+      "template_fields": []
+    },
+    {
+      "name": "Payroll",
+      "scope": "internal",
+      "description": "Internal payroll processing document",
+      "daily_limit": null,
+      "request_fields": [
+        {
+          "key": "pay_period",
+          "label": "Pay Period",
+          "type": "text",
+          "required": true,
+          "placeholder": "e.g. August 1-15, 2026"
+        },
+        {
+          "key": "department",
+          "label": "Department",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "remarks",
+          "label": "Remarks",
+          "type": "textarea",
+          "required": false
+        }
+      ],
+      "is_active": true,
+      "steps": [
+        {
+          "step_number": 1,
+          "office": "HRMO",
+          "action_required": "Collects all Daily Time Records (DTRs), biometric logs, approved leave forms, and official business travel orders from all departments.",
+          "max_hours_allowed": 24
+        },
+        {
+          "step_number": 2,
+          "office": "BAC",
+          "action_required": "reviews the total payroll cost against the LGU's current funds.",
+          "max_hours_allowed": 24
+        },
+        {
+          "step_number": 3,
+          "office": "MAO",
+          "action_required": "conducts a pre-audit of the payroll",
+          "max_hours_allowed": 24
+        },
+        {
+          "step_number": 4,
+          "office": "MAYOR",
+          "action_required": "The compiled payroll bundle is forwarded to the executive suite for final executive authorization.",
+          "max_hours_allowed": 24
+        },
+        {
+          "step_number": 5,
+          "office": "MTO",
+          "action_required": "checks if there is actual cash available in the municipal bank account to cover the total amount.",
+          "max_hours_allowed": 24
+        }
+      ],
+      "template_fields": []
+    },
+    {
+      "name": "Purchase Request",
+      "scope": "internal",
+      "description": "Disbursement",
+      "daily_limit": null,
+      "request_fields": [
+        {
+          "key": "items_description",
+          "label": "Items / Services Requested",
+          "type": "textarea",
+          "required": true
+        },
+        {
+          "key": "quantity",
+          "label": "Quantity",
+          "type": "text",
+          "required": false
+        },
+        {
+          "key": "estimated_cost",
+          "label": "Estimated Cost (₱)",
+          "type": "number",
+          "required": true
+        },
+        {
+          "key": "purpose",
+          "label": "Purpose",
+          "type": "textarea",
+          "required": true
+        }
+      ],
+      "is_active": true,
+      "steps": [
+        {
+          "step_number": 1,
+          "office": "BAC",
+          "action_required": "Budget Officer checks the department’s remaining balance under their specific budget line item",
+          "max_hours_allowed": 24
+        },
+        {
+          "step_number": 2,
+          "office": "GSO",
+          "action_required": "Release",
+          "max_hours_allowed": 24
+        }
+      ],
+      "template_fields": []
+    },
+    {
+      "name": "Voucher",
+      "scope": "internal",
+      "description": "Billings (Internet, Electric Bills & Subscription)",
+      "daily_limit": null,
+      "request_fields": [
+        {
+          "key": "payee_name",
+          "label": "Payee Name",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "amount",
+          "label": "Amount (₱)",
+          "type": "number",
+          "required": true
+        },
+        {
+          "key": "particulars",
+          "label": "Particulars / Purpose",
+          "type": "textarea",
+          "required": true
+        }
+      ],
+      "is_active": true,
+      "steps": [
+        {
+          "step_number": 1,
+          "office": "BAC",
+          "action_required": "Submit the DV, ORS, and the utility bill to the Budget Office.",
+          "max_hours_allowed": 24
+        },
+        {
+          "step_number": 2,
+          "office": "GSO",
+          "action_required": "The liaison returns the original Official Receipt (OR) to the Accounting Office.",
+          "max_hours_allowed": 24
+        }
+      ],
+      "template_fields": []
+    }
+  ]
+}
