@@ -3,7 +3,7 @@ import axios from 'axios';
 // VITE_API_BASE_URL (set at build time) covers a backend hosted at any other URL.
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
   import.meta.env.PROD
-    ? 'https://sariaya-doctrack-backend.onrender.com/api'
+    ? 'https://sariaya-doctrack-backend-3ab4.onrender.com/api'
     : 'http://127.0.0.1:8000/api'
 );
 
