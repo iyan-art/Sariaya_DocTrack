@@ -6,8 +6,9 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from django.core.files.storage import default_storage
 from django.db import transaction, IntegrityError
-from django.http import FileResponse
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 
 from .models import (
@@ -32,7 +33,7 @@ from .permissions import IsStaffUser
 from apps.accounts.permissions import IsAdmin
 from .services import release_document, receive_document, return_document, citizen_return_document, release_to_citizen, flag_missing, resolve_office, advance_processing_stage, can_delete_document, expedite_document
 from .sla_scan import run_overdue_scan, run_missing_scan
-from .qr_services import resolve_and_verify, enforce_scope_access, build_scan_context
+from .qr_services import resolve_and_verify, enforce_scope_access, build_scan_context, generate_qr_code
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from django.db.models import Count, Avg, F, Subquery, OuterRef, DurationField, ExpressionWrapper
@@ -433,6 +434,23 @@ class DocumentExpediteView(APIView):
             return Response({"detail": str(e.detail[0]) if hasattr(e, 'detail') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response({"detail": "Follow-up request sent to the office currently handling your document."})
+
+
+def serve_document_qr(request, filename):
+    """
+    GET /media/document_qr/<filename>
+    Serves a document's QR image in any environment, unlike the DEBUG-only
+    media route. Only a filename recorded on a Document is ever served. On
+    hosts without a persistent disk, a deploy wipes media/, so a missing image
+    is redrawn from the document instead of leaving a broken QR slip.
+    """
+    name = f'document_qr/{filename}'
+    document = Document.objects.filter(qr_code=name).first()
+    if not document:
+        raise Http404
+    if not default_storage.exists(name):
+        generate_qr_code(document)
+    return FileResponse(document.qr_code.open('rb'), content_type='image/png')
 
 
 def _resolve_official_file(document):

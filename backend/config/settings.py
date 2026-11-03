@@ -41,6 +41,15 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+# Render sets both of these on every service: its own public hostname, and
+# RENDER itself. Its proxy terminates HTTPS, so without the header setting
+# Django would see plain HTTP, reject the admin login's HTTPS Origin as a CSRF
+# failure, and build http:// URLs that browsers block on an HTTPS page.
+if os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
+    ALLOWED_HOSTS.append(os.environ["RENDER_EXTERNAL_HOSTNAME"])
+if os.environ.get("RENDER"):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -75,19 +84,19 @@ MIDDLEWARE = [
 AUTH_USER_MODEL = 'accounts.User' 
 
 
+# Base URL embedded in generated document QR codes (documents/qr_services.py).
+# A phone's stock camera app opens this directly, so it must be reachable
+# from the device doing the scanning — not just from this server.
+FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "https://sariaya-doctrack-frontend.onrender.com")
+
 CORS_ALLOWED_ORIGINS = [
-    "https://sariaya-doctrack-frontend.onrender.com",
+    FRONTEND_BASE_URL,
     "http://localhost:5173",  # Vite default port
     "http://127.0.0.1:5173",
 ]
 
 
 CORS_ALLOW_CREDENTIALS = True
-
-# Base URL embedded in generated document QR codes (documents/qr_services.py).
-# A phone's stock camera app opens this directly, so it must be reachable
-# from the device doing the scanning — not just from this server.
-FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "https://sariaya-doctrack-frontend.onrender.com")
 
 REST_FRAMEWORK = {
     # JSON only: the API takes no file uploads, so multipart/form-encoded

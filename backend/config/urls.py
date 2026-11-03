@@ -17,9 +17,11 @@ Including another URLconf
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
-from django.urls import path, include
+from django.urls import path, include, re_path
+from django.views.static import serve
 
 from apps.documents.views import (
+    serve_document_qr,
     MissingDocumentAlertListView, DocumentTypeListCreateView, DocumentTypeDetailView, DocumentTypeStepsView,
     OfficeListCreateView, OfficeDetailView, PublicOfficeListView,
     NotificationListView, NotificationUnreadCountView, NotificationMarkReadView, NotificationMarkAllReadView,
@@ -46,6 +48,14 @@ urlpatterns = [
     path('api/notifications/unread-count/', NotificationUnreadCountView.as_view(), name='notification-unread-count'),
     path('api/notifications/mark-all-read/', NotificationMarkAllReadView.as_view(), name='notification-mark-all-read'),
     path('api/notifications/<int:pk>/read/', NotificationMarkReadView.as_view(), name='notification-mark-read'),
+
+    # The media a browser needs directly, in any environment. Deliberately not
+    # all of media/: generated_documents/ holds citizens' personal data and is
+    # only served through the permission-checked official-file views. Allowing
+    # only the characters Django's storage puts in a filename keeps "../" and
+    # "..\" from reaching those folders through this route.
+    path('media/document_qr/<str:filename>', serve_document_qr, name='document-qr-image'),
+    re_path(r'^media/(?P<path>(?:announcements|events)/[\w.-]+)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]
 
 if settings.DEBUG:
