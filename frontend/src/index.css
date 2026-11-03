@@ -18,6 +18,64 @@ body {
    63.98rem is just under Tailwind's `lg` — the same point the dashboard
    sidebar turns into a drawer. */
 
+/* Installed app: fill the screen edge to edge at the device's own text size.
+   viewport-fit=cover lets the page run under a notch, so pad for it. */
+@media all and (display-mode: standalone) {
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100vw;
+    min-height: 100dvh;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+}
+
+/* Set by index.html's script. Zoom multiplies viewport units too, so a 100vh
+   element would come out zoom times taller than the screen: divide it back out
+   for each viewport height the app uses. */
+.pwa-zoomed,
+.pwa-zoomed body,
+.pwa-zoomed #root,
+.pwa-zoomed .min-h-screen {
+  min-height: calc(100dvh / var(--pwa-zoom));
+}
+
+.pwa-zoomed .h-\[100svh\] {
+  height: calc(100svh / var(--pwa-zoom));
+}
+
+.pwa-zoomed .h-\[70vh\] {
+  height: calc(70vh / var(--pwa-zoom));
+}
+
+.pwa-zoomed .min-h-\[50vh\] {
+  min-height: calc(50vh / var(--pwa-zoom));
+}
+
+.pwa-zoomed .max-h-\[60vh\] {
+  max-height: calc(60vh / var(--pwa-zoom));
+}
+
+.pwa-zoomed .max-h-\[70vh\] {
+  max-height: calc(70vh / var(--pwa-zoom));
+}
+
+/* Media queries still see the ~980px width, so sm:/md: side-by-side layouts stay
+   on in the narrow space: let their contents shrink rather than overflow. */
+.pwa-zoomed .grid > *,
+.pwa-zoomed input {
+  min-width: 0;
+}
+
 /* iOS Safari zooms the whole page when focusing an input below 16px. */
 @media (max-width: 63.98rem), (pointer: coarse) {
   input:not([type="checkbox"]):not([type="radio"]),
@@ -36,7 +94,7 @@ body {
   }
 
   .overlay-fade-in > .modal-pop-in {
-    max-height: calc(100dvh - 2rem);
+    max-height: calc(100dvh / var(--pwa-zoom, 1) - 2rem);
     overflow-y: auto;
     margin-block: 0;
   }

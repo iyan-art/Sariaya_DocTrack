@@ -1,7 +1,7 @@
 // Sariaya DocTrack service worker – basic offline app-shell caching.
 // Registered by src/serviceWorkerRegistration.js (production builds only).
 
-const CACHE_NAME = 'sariaya-doctrack-v1';
+const CACHE_NAME = 'sariaya-doctrack-v2';
 const APP_SHELL = ['/', '/manifest.json', '/favicon.svg'];
 
 self.addEventListener('install', (event) => {

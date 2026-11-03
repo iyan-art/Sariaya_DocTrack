@@ -3,7 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <!-- With Chrome's "Desktop site" on, Chrome ignores the viewport tag above
+         and lays pages out about 980px wide, which an installed app inherits.
+         No viewport value can undo that, so on a phone running installed this
+         zooms the page back up to the real screen width, before first paint so
+         the desktop scale never flashes. Desktop and tablet installs, and
+         browser tabs, are left alone. index.css's .pwa-zoomed rules go with it. -->
+    <script>
+      (function () {
+        var installed = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        var isPhone = Math.min(window.screen.width, window.screen.height) < 600;
+        if (!installed || !isPhone) return;
+
+        var root = document.documentElement;
+
+        function fitToScreen() {
+          var zoom = window.innerWidth / window.screen.width;
+          var needsZoom = zoom > 1.1;
+          root.classList.toggle('pwa-zoomed', needsZoom);
+          root.style.zoom = needsZoom ? zoom : '';
+          root.style.setProperty('--pwa-zoom', needsZoom ? zoom : 1);
+        }
+
+        fitToScreen();
+        window.addEventListener('resize', fitToScreen);
+      })();
+    </script>
     <title>Sariaya DocTrack</title>
 
     <!-- PWA: installability (manifest + icons) and iOS/Android home-screen
@@ -12,6 +38,7 @@
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#2563eb" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Sariaya DocTrack" />
