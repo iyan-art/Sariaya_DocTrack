@@ -91,6 +91,7 @@ FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "https://sariaya-doctrac
 
 CORS_ALLOWED_ORIGINS = [
     FRONTEND_BASE_URL,
+    "https://sariaya-doctrack-frontend.onrender.com",
     "http://localhost:5173",  # Vite default port
     "http://127.0.0.1:5173",
 ]
