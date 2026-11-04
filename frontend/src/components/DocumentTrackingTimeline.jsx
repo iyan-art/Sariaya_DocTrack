@@ -8,8 +8,6 @@ const STAGE_DESCRIPTIONS = {
   form_processing: 'Your document form is being processed.',
   for_approval: 'Your request is awaiting approval.',
   approved: 'Your request has been approved.',
-  document_generated: 'Your document has been generated.',
-  soft_copy_available: 'Your soft copy is available for viewing.',
   ready_for_release: 'Your document is ready for release.',
   completed: 'Your document has been completed and released.',
   rejected: 'Your request was rejected.',

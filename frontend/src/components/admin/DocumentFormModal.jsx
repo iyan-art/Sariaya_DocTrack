@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchDocumentDetail, mediaUrl } from '../../api/axios';
-import { useAuth } from '../../context/AuthContext';
 import DocumentStatusBadge from './DocumentStatusBadge';
-import OfficialDocumentPanel from '../documents/OfficialDocumentPanel';
-import DocumentGenerateModal from '../documents/DocumentGenerateModal';
 import { PrinterIcon, CheckCircle2Icon } from '../Icons';
 
 // Same "print just this one element" technique as the other printables.
@@ -38,12 +35,8 @@ function humanizeKey(key) {
  * edit access — editing stays staff-only via DocumentDetailModal.
  */
 export default function DocumentFormModal({ documentId, onClose, onManage, fetchDetail = fetchDocumentDetail }) {
-  const { user } = useAuth();
-  const isStaff = user?.role === 'admin' || user?.role === 'employee';
   const [doc, setDoc] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showGenerate, setShowGenerate] = useState(false);
-  const [officialFileVersion, setOfficialFileVersion] = useState(0);
 
   const load = () => {
     setLoading(true);
@@ -68,8 +61,7 @@ export default function DocumentFormModal({ documentId, onClose, onManage, fetch
       {/* max-h + flex-col caps the modal's total height and puts scrolling
           on the body only — the header stays put, and staff never has to
           zoom the browser out to reach the header/actions on a normal
-          laptop screen no matter how long the routing history or how tall
-          the embedded PDF preview gets. */}
+          laptop screen no matter how long the routing history gets. */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] modal-pop-in flex flex-col overflow-hidden">
         <div className="doc-view-no-print flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
           <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Official Document Record</h2>
@@ -216,32 +208,6 @@ export default function DocumentFormModal({ documentId, onClose, onManage, fetch
                       </div>
                     )}
                   </div>
-
-                  {/* The REAL official document file. Only once Released
-                      for citizens/guests; staff can preview/fill it anytime. */}
-                  {(isStaff || doc.status === 'released') && doc.has_official_file && (
-                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 sm:p-5 min-w-0">
-                      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                          Official Document
-                        </p>
-                        {isStaff && (
-                          <button
-                            onClick={() => setShowGenerate(true)}
-                            className="doc-view-no-print text-xs font-bold text-blue-600 hover:text-blue-800"
-                          >
-                            Fill / Generate Document
-                          </button>
-                        )}
-                      </div>
-                      <OfficialDocumentPanel key={officialFileVersion} documentId={doc.id} />
-                      {isStaff && doc.status !== 'released' && (
-                        <p className="text-[10px] text-amber-600 font-bold uppercase tracking-widest mt-2">
-                          Preview only — not visible to the citizen until this document is Released.
-                        </p>
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 {/* Quick-glance summary — screen only, everything here is
@@ -307,15 +273,6 @@ export default function DocumentFormModal({ documentId, onClose, onManage, fetch
           </>
         )}
       </div>
-
-      {showGenerate && doc && (
-        <DocumentGenerateModal
-          documentId={doc.id}
-          documentTypeId={doc.document_type}
-          onClose={() => setShowGenerate(false)}
-          onGenerated={() => setOfficialFileVersion((v) => v + 1)}
-        />
-      )}
     </div>
   );
 }

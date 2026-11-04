@@ -53,10 +53,6 @@ body {
   height: calc(100svh / var(--pwa-zoom));
 }
 
-.pwa-zoomed .h-\[70vh\] {
-  height: calc(70vh / var(--pwa-zoom));
-}
-
 .pwa-zoomed .min-h-\[50vh\] {
   min-height: calc(50vh / var(--pwa-zoom));
 }

@@ -89,14 +89,6 @@ class DocumentType(models.Model):
     # configured yet" — the frontend falls back to a generic field set
     # rather than showing nothing.
     request_fields = models.JSONField(default=list, blank=True)
-    # The actual official file for this document type (a flat, non-fillable
-    # PDF — Birth/Marriage/Death Certificate application forms, Business/
-    # Building Permit forms). Every Document of this type shares the same
-    # file, since there's no per-citizen field data to merge into it.
-    # Served by DocumentOfficialFileView / PublicDocumentOfficialFileView,
-    # gated to a document's owner or guest only once that document is
-    # Released. Blank means "no file uploaded yet" for this type.
-    template_file = models.FileField(upload_to='document_templates/', blank=True, null=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -165,8 +157,6 @@ class Document(models.Model):
         FORM_PROCESSING = 'form_processing', 'Form Processing'
         FOR_APPROVAL = 'for_approval', 'For Approval'
         APPROVED = 'approved', 'Approved'
-        DOCUMENT_GENERATED = 'document_generated', 'Document Generated'
-        SOFT_COPY_AVAILABLE = 'soft_copy_available', 'Soft Copy Available'
         READY_FOR_RELEASE = 'ready_for_release', 'Ready for Release'
         COMPLETED = 'completed', 'Completed'
         REJECTED = 'rejected', 'Rejected'
@@ -680,122 +670,11 @@ class CitizenSuggestion(models.Model):
         return f"[{self.get_category_display()}] {self.subject[:50]}"
 
 
-class DocumentTemplateField(models.Model):
-    """
-    One positioned field on a DocumentType's template_file — the schema
-    Staff/Admin fill from in DocumentGenerateModal.jsx. Admin-authored,
-    shared by every Document of this type, the same way WorkflowStep is
-    shared schema behind every Document's route. `x`/`y` are PDF points
-    (bottom-left origin) on the given page, calibrated by inspecting each
-    template directly; `rotation` (degrees) lets a field's text roughly
-    match a scanned template's tilt. See document_generation.py for how
-    these get drawn.
-    """
-    class FieldType(models.TextChoices):
-        TEXT = 'text', 'Text'
-        TEXTAREA = 'textarea', 'Textarea'
-        DATE = 'date', 'Date'
-        NUMBER = 'number', 'Number'
-        SELECT = 'select', 'Select'
-        CHECKBOX = 'checkbox', 'Checkbox'
-        # A person's name, entered by staff as separate First/Middle/Last/
-        # Suffix inputs (see DocumentGenerateModal.jsx) but still rendered
-        # onto the template as ONE joined line at this single (x, y) — real
-        # PSA/permit templates have one blank line for a name, not four, so
-        # splitting the INPUT doesn't require splitting the render position.
-        # See document_generation.py::_resolve_field_text() for the join
-        # logic, and its docstring for how legacy plain-string values (from
-        # before this field became composite) still render correctly.
-        NAME = 'name', 'Full Name (First/Middle/Last/Suffix)'
-
-    document_type = models.ForeignKey(DocumentType, on_delete=models.CASCADE, related_name='template_fields')
-    key = models.CharField(max_length=60)
-    label = models.CharField(max_length=150)
-    field_type = models.CharField(max_length=10, choices=FieldType.choices, default=FieldType.TEXT)
-    # Groups fields on the fill-out form (e.g. "Personal Information",
-    # "Address Information") — purely a display concern, doesn't affect
-    # rendering. Blank falls back to a generic "Document Information"
-    # section in the UI rather than being left ungrouped.
-    section = models.CharField(max_length=100, blank=True)
-    # Plain option strings for FieldType.SELECT — e.g. ["Male", "Female"].
-    # Mirrors DocumentType.request_fields' existing `options` convention
-    # (see DocumentRequestFields.jsx) rather than inventing a new shape.
-    options = models.JSONField(default=list, blank=True)
-    required = models.BooleanField(
-        default=True,
-        help_text='Whether GenerateDocumentView blocks generation (not draft-saving) until this has a value. '
-                   'Official documents rarely have a genuinely optional field — default reflects that.',
-    )
-    placeholder = models.CharField(max_length=150, blank=True)
-    default_value = models.CharField(
-        max_length=150, blank=True,
-        help_text='Used only when nothing else provides a value (no saved draft, no matching source_request_key).',
-    )
-    # Matches a key in this same DocumentType's request_fields, if the
-    # value already exists on the citizen's original request — read by
-    # GeneratedDocumentView to auto-populate instead of making staff
-    # retype data that's already in Document.form_data. Blank means
-    # staff-only (e.g. a registration number assigned during processing).
-    # Deliberately never used to pre-fill a NAME field: the original
-    # request typically stores one combined string (e.g. "child_full_name"),
-    # and splitting that reliably into first/middle/last/suffix isn't
-    # possible in general — see GeneratedDocumentView's handling.
-    source_request_key = models.CharField(max_length=60, blank=True)
-    page_number = models.PositiveIntegerField(default=1)
-    x = models.FloatField()
-    y = models.FloatField()
-    font_size = models.FloatField(default=10)
-    rotation = models.FloatField(default=0)
-    order = models.PositiveIntegerField(default=1)
-
-    class Meta:
-        ordering = ['order']
-        constraints = [
-            models.UniqueConstraint(fields=['document_type', 'key'], name='unique_template_field_key_per_type'),
-        ]
-
-    def __str__(self):
-        return f"{self.document_type.name} — {self.label}"
-
-
-class GeneratedDocument(models.Model):
-    """
-    The Staff/Admin-filled official document for ONE request — OneToOne
-    with Document, so "Update Document" always regenerates the same row's
-    file in place rather than accumulating duplicates. `field_values` is
-    the editable draft (Save Draft writes here without touching
-    generated_file); `generated_file` is only written by the Generate/
-    Update action, via document_generation.py's overlay renderer.
-    DocumentType.template_file is never modified by this — generated_file
-    is always a separate file, so re-generating one request's document
-    can't affect any other request of the same type.
-    """
-    class Status(models.TextChoices):
-        DRAFT = 'draft', 'Draft'
-        GENERATED = 'generated', 'Generated'
-
-    document = models.OneToOneField(Document, on_delete=models.CASCADE, related_name='generated_document')
-    field_values = models.JSONField(default=dict, blank=True)
-    status = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT)
-    generated_file = models.FileField(upload_to='generated_documents/', blank=True, null=True)
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
-    )
-    updated_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"{self.document.tracking_number} — {self.status}"
-
-
 class Announcement(models.Model):
     """
     A municipal announcement/news item shown on the public Landing page —
-    admin-authored via Django Admin (no dedicated frontend authoring UI yet,
-    same as DocumentTemplateField). Deliberately has no seed data: an empty
+    admin-authored via Django Admin (no dedicated frontend authoring UI yet).
+    Deliberately has no seed data: an empty
     table means the Landing page's Announcements section shows a genuine
     "nothing posted yet" state rather than fabricated municipal news.
     """

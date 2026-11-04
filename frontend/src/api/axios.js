@@ -232,35 +232,6 @@ export const searchCitizens = (query) => {
   return api.get('/accounts/citizens/search/', { params: { q: query } });
 };
 
-// The REAL official file for a document (not a generated summary) —
-// fetched as a blob because it's behind the JWT-authenticated endpoint, so
-// a plain <a href> wouldn't carry the Authorization header.
-export const fetchOfficialDocumentFile = (documentId) => {
-  return api.get(`/documents/${documentId}/official-file/`, { responseType: 'blob' });
-};
-
-// Staff/Admin-only document fill/generate workflow — DocumentGenerateModal.jsx.
-export const fetchGeneratedDocument = (documentId) => {
-  return api.get(`/documents/${documentId}/generated-document/`);
-};
-
-export const saveGeneratedDocumentDraft = (documentId, fieldValues) => {
-  return api.put(`/documents/${documentId}/generated-document/`, { field_values: fieldValues });
-};
-
-export const generateDocument = (documentId, fieldValues) => {
-  return api.post(`/documents/${documentId}/generated-document/generate/`, { field_values: fieldValues });
-};
-
-// Renders without persisting — a blob fetch since it streams a PDF directly.
-export const previewGeneratedDocument = (documentId, fieldValues) => {
-  return api.post(
-    `/documents/${documentId}/generated-document/generate/?preview=true`,
-    { field_values: fieldValues },
-    { responseType: 'blob' },
-  );
-};
-
 // Manual (non-QR) override. data: { action: 'release' | 'receive', office, notes }
 export const transitionDocument = (id, data) => {
   return api.patch(`/documents/${id}/scan/`, data);

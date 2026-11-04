@@ -8,7 +8,7 @@ from .models import (
     DocumentType, WorkflowStep, Office, Document, DocumentLog, MissingDocumentAlert,
     Survey, SurveyQuestion, SurveyQuestionOption, SurveyAnswer, SurveyResponse,
     CitizenSuggestion, RequestStatusHistory,
-    DocumentTemplateField, GeneratedDocument, EmailNotificationLog, Announcement, Event,
+    EmailNotificationLog, Announcement, Event,
     Notification,
 )
 from .services import resolve_office, release_document
@@ -94,21 +94,6 @@ class WorkflowStepSerializer(serializers.ModelSerializer):
         fields = ['id', 'step_number', 'office', 'action_required', 'max_hours_allowed']
 
 
-class DocumentTemplateFieldSerializer(serializers.ModelSerializer):
-    """
-    One positioned field on a DocumentType's template — the schema
-    DocumentGenerateModal.jsx renders as an editable form. Coordinates are
-    admin-authored data, not exposed for editing here (no write path yet);
-    this is a read-only view of what staff need to know to fill a document.
-    """
-    class Meta:
-        model = DocumentTemplateField
-        fields = [
-            'id', 'key', 'label', 'field_type', 'section', 'options', 'required',
-            'placeholder', 'default_value', 'source_request_key', 'order',
-        ]
-
-
 class DocumentTypeSerializer(serializers.ModelSerializer):
     """
     Full read representation — includes the admin-authored step list, not
@@ -119,19 +104,13 @@ class DocumentTypeSerializer(serializers.ModelSerializer):
     scope_label = serializers.CharField(source='get_scope_display', read_only=True)
     requests_today = serializers.SerializerMethodField()
 
-    has_template_file = serializers.SerializerMethodField()
-    template_fields = DocumentTemplateFieldSerializer(many=True, read_only=True)
-
     class Meta:
         model = DocumentType
         fields = [
             'id', 'name', 'description', 'scope', 'scope_label', 'route', 'is_active', 'created_at', 'steps',
-            'daily_limit', 'requests_today', 'request_fields', 'has_template_file', 'template_fields',
+            'daily_limit', 'requests_today', 'request_fields',
         ]
         read_only_fields = ['route', 'created_at']
-
-    def get_has_template_file(self, obj):
-        return bool(obj.template_file)
 
     def get_requests_today(self, obj):
         # How many requests this type has already received today — paired
@@ -239,7 +218,6 @@ class DocumentSerializer(serializers.ModelSerializer):
     requested_by_name = serializers.SerializerMethodField()
     status_label = serializers.SerializerMethodField()
     processing_stage_label = serializers.CharField(source='get_processing_stage_display', read_only=True)
-    has_official_file = serializers.SerializerMethodField()
     dwell_display = serializers.SerializerMethodField()
     step_statuses = serializers.SerializerMethodField()
     released_at = serializers.SerializerMethodField()
@@ -254,14 +232,10 @@ class DocumentSerializer(serializers.ModelSerializer):
             'form_data', 'requested_by', 'requested_by_name', 'guest_name', 'guest_email', 'origin_office',
             'route_position', 'current_step_number', 'current_office', 'current_office_detail',
             'status', 'status_label', 'is_returning', 'was_returned', 'processing_stage', 'processing_stage_label',
-            'has_official_file',
             'step_statuses', 'current_handler',
             'created_at', 'updated_at', 'entered_current_office_at', 'dwell_display', 'qr_code',
             'released_at', 'released_by_name',
         ]
-
-    def get_has_official_file(self, obj):
-        return bool(obj.document_type.template_file)
 
     def _released_log(self, obj):
         # obj.logs is ordered by timestamp (Meta.ordering on DocumentLog) —
@@ -434,7 +408,6 @@ class PublicDocumentTrackingSerializer(serializers.ModelSerializer):
     document_type_name = serializers.CharField(source='document_type.name', read_only=True)
     status_label = serializers.SerializerMethodField()
     processing_stage_label = serializers.CharField(source='get_processing_stage_display', read_only=True)
-    has_official_file = serializers.SerializerMethodField()
     current_step_number = serializers.IntegerField(read_only=True)
     total_steps = serializers.SerializerMethodField()
     stage_history = RequestStatusHistorySerializer(many=True, read_only=True)
@@ -446,7 +419,6 @@ class PublicDocumentTrackingSerializer(serializers.ModelSerializer):
         fields = [
             'tracking_number', 'document_type_name', 'status_label',
             'processing_stage', 'processing_stage_label', 'is_returning',
-            'has_official_file',
             'current_office', 'current_step_number', 'total_steps',
             'created_at', 'stage_history', 'activity_log', 'current_location',
         ]
@@ -459,9 +431,6 @@ class PublicDocumentTrackingSerializer(serializers.ModelSerializer):
             'office_floor': office.floor if office else None,
             'handled_by': obj.current_handler.full_name if obj.current_handler else None,
         }
-
-    def get_has_official_file(self, obj):
-        return bool(obj.document_type.template_file)
 
     def get_status_label(self, obj):
         if obj.status == 'in_progress':
@@ -481,20 +450,6 @@ class PublicDocumentTrackingSerializer(serializers.ModelSerializer):
 
     def get_total_steps(self, obj):
         return len(obj.document_type.route)
-
-
-class GeneratedDocumentSerializer(serializers.ModelSerializer):
-    """
-    The Staff/Admin-filled state for one request's official document —
-    read/write via GeneratedDocumentView (Save Draft) and returned by
-    GenerateDocumentView after a Generate/Update Document action.
-    """
-    status_label = serializers.CharField(source='get_status_display', read_only=True)
-
-    class Meta:
-        model = GeneratedDocument
-        fields = ['field_values', 'status', 'status_label', 'updated_at']
-        read_only_fields = ['status', 'status_label', 'updated_at']
 
 
 class CreateDocumentSerializer(serializers.ModelSerializer):

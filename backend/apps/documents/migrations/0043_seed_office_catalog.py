@@ -11,13 +11,10 @@ def seed_office_catalog(apps, schema_editor):
     Sets up offices, document types, and their workflows on a brand-new
     database, such as a fresh production deploy. An existing Office row means
     this database has already been set up, so it is left completely untouched.
-    The blank PDF templates aren't included: they're uploaded through Django
-    Admin.
     """
     Office = apps.get_model('documents', 'Office')
     DocumentType = apps.get_model('documents', 'DocumentType')
     WorkflowStep = apps.get_model('documents', 'WorkflowStep')
-    DocumentTemplateField = apps.get_model('documents', 'DocumentTemplateField')
 
     if Office.objects.exists():
         return
@@ -36,7 +33,6 @@ def seed_office_catalog(apps, schema_editor):
 
     for row in catalog['document_types']:
         steps = row.pop('steps')
-        template_fields = row.pop('template_fields')
         # Earlier migrations already seed some of these types by name.
         document_type, _ = DocumentType.objects.update_or_create(
             name=row.pop('name'), scope=row.pop('scope'), defaults=row,
@@ -50,10 +46,6 @@ def seed_office_catalog(apps, schema_editor):
         # Historical models lack DocumentType.sync_route_from_steps().
         document_type.route = [step['office'] for step in steps]
         document_type.save(update_fields=['route'])
-
-        document_type.template_fields.all().delete()
-        for field in template_fields:
-            DocumentTemplateField.objects.create(document_type=document_type, **field)
 
 
 class Migration(migrations.Migration):

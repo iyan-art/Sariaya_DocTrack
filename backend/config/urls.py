@@ -49,11 +49,9 @@ urlpatterns = [
     path('api/notifications/mark-all-read/', NotificationMarkAllReadView.as_view(), name='notification-mark-all-read'),
     path('api/notifications/<int:pk>/read/', NotificationMarkReadView.as_view(), name='notification-mark-read'),
 
-    # The media a browser needs directly, in any environment. Deliberately not
-    # all of media/: generated_documents/ holds citizens' personal data and is
-    # only served through the permission-checked official-file views. Allowing
-    # only the characters Django's storage puts in a filename keeps "../" and
-    # "..\" from reaching those folders through this route.
+    # The media a browser needs directly, in any environment. Allowing only the
+    # characters Django's storage puts in a filename keeps "../" and "..\" from
+    # reaching the rest of media/ through this route.
     path('media/document_qr/<str:filename>', serve_document_qr, name='document-qr-image'),
     re_path(r'^media/(?P<path>(?:announcements|events)/[\w.-]+)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]

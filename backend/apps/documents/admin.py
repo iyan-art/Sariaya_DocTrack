@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     Document, DocumentType, WorkflowStep, Office, DocumentLog, MissingDocumentAlert,
-    EmailNotificationLog, DocumentTemplateField, Announcement, Event,
+    EmailNotificationLog, Announcement, Event,
 )
 
 @admin.register(Announcement)
@@ -21,15 +21,6 @@ class WorkflowStepInline(admin.TabularInline):
     extra = 1
     ordering = ('step_number',)
 
-class DocumentTemplateFieldInline(admin.TabularInline):
-    model = DocumentTemplateField
-    extra = 1
-    ordering = ('order',)
-    fields = (
-        'order', 'key', 'label', 'field_type', 'section', 'options', 'required',
-        'placeholder', 'default_value', 'source_request_key', 'page_number', 'x', 'y', 'font_size', 'rotation',
-    )
-
 @admin.register(Office)
 class OfficeAdmin(admin.ModelAdmin):
     list_display = ('code', 'name', 'location', 'contact_person', 'office_hours', 'is_active', 'created_at')
@@ -40,7 +31,7 @@ class OfficeAdmin(admin.ModelAdmin):
 class DocumentTypeAdmin(admin.ModelAdmin):
     list_display = ('name', 'scope', 'route', 'is_active', 'created_at')
     list_filter = ('scope', 'is_active')
-    inlines = [WorkflowStepInline, DocumentTemplateFieldInline]
+    inlines = [WorkflowStepInline]
     # `route` is a cache DERIVED from the WorkflowStep inline below (see
     # DocumentType.sync_route_from_steps(), called by save_formset() here) —
     # it must never be hand-edited. Left as an ordinary editable field, this

@@ -9,8 +9,7 @@ from .views import (
     CitizenSuggestionListCreateView, AdminSuggestionListView, AdminSuggestionDetailView,
     MySurveyCommentsView,
     MyDocumentListView, MyDocumentDetailView, DocumentEvaluationView, PublicDocumentEvaluationView,
-    DocumentStageUpdateView, DocumentOfficialFileView, PublicDocumentOfficialFileView,
-    GeneratedDocumentView, GenerateDocumentView, DocumentCitizenReturnView, DocumentExpediteView,
+    DocumentStageUpdateView, DocumentCitizenReturnView, DocumentExpediteView,
     EmailNotificationLogListView, RunSlaScanView,
     AnnouncementListView, EventListView, PublicDocumentTypeListView,
 )
@@ -51,12 +50,8 @@ urlpatterns = [
     path('<int:pk>/post-scan-survey/', PostScanSurveyView.as_view(), name='post-scan-survey'),
     path('<int:pk>/citizen-return/', DocumentCitizenReturnView.as_view(), name='document-citizen-return'),
     path('<int:pk>/expedite/', DocumentExpediteView.as_view(), name='document-expedite'),
-    path('<int:pk>/official-file/', DocumentOfficialFileView.as_view(), name='document-official-file'),
-    path('<int:pk>/generated-document/', GeneratedDocumentView.as_view(), name='generated-document'),
-    path('<int:pk>/generated-document/generate/', GenerateDocumentView.as_view(), name='generate-document'),
     path('track/<str:tracking_number>/', DocumentTrackingLookupView.as_view(), name='document-track'),
     path('track/<str:tracking_number>/evaluation/', PublicDocumentEvaluationView.as_view(), name='public-document-evaluation'),
-    path('track/<str:tracking_number>/official-file/', PublicDocumentOfficialFileView.as_view(), name='public-document-official-file'),
 
     path('dashboard-stats/', AdminDashboardStatsView.as_view(), name='admin-stats'),
     path('heatmap/', HeatmapDataView.as_view(), name='heatmap-data'),

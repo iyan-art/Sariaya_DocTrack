@@ -1,5 +1,3 @@
-import io
-
 from rest_framework import generics, status
 from rest_framework.exceptions import ValidationError, NotFound
 from rest_framework.pagination import PageNumberPagination
@@ -14,21 +12,18 @@ from django.shortcuts import get_object_or_404
 from .models import (
     Document, DocumentType, WorkflowStep, Office, DocumentLog, MissingDocumentAlert,
     Survey, SurveyQuestion, SurveyQuestionOption, SurveyAnswer, SurveyResponse,
-    CitizenSuggestion, GeneratedDocument, EmailNotificationLog,
-    DocumentTemplateField, Announcement, Event, Notification,
+    CitizenSuggestion, EmailNotificationLog, Announcement, Event, Notification,
 )
 from .serializers import (
     DocumentSerializer, DocumentDetailSerializer, CreateDocumentSerializer, DocumentTypeSerializer,
     DocumentTypeWriteSerializer, WorkflowStepsReplaceSerializer, OfficeSerializer,
     DocumentTransferSerializer, MissingDocumentAlertSerializer, PublicDocumentTrackingSerializer,
-    SurveySerializer, SurveyWriteSerializer, SurveyQuestionsReplaceSerializer, GeneratedDocumentSerializer,
+    SurveySerializer, SurveyWriteSerializer, SurveyQuestionsReplaceSerializer,
     SurveyCommentSerializer, CitizenSuggestionSerializer, CitizenSuggestionAdminSerializer,
     EmailNotificationLogSerializer, PublicOfficeSerializer,
     AnnouncementSerializer, EventSerializer, PublicDocumentTypeSerializer,
     NotificationSerializer,
 )
-from .document_generation import render_generated_document
-from django.core.files.base import ContentFile
 from .permissions import IsStaffUser
 from apps.accounts.permissions import IsAdmin
 from .services import release_document, receive_document, return_document, citizen_return_document, release_to_citizen, flag_missing, resolve_office, advance_processing_stage, can_delete_document, expedite_document
@@ -451,244 +446,6 @@ def serve_document_qr(request, filename):
     if not default_storage.exists(name):
         generate_qr_code(document)
     return FileResponse(document.qr_code.open('rb'), content_type='image/png')
-
-
-def _resolve_official_file(document):
-    """
-    The file DocumentOfficialFileView/PublicDocumentOfficialFileView should
-    serve: the Staff/Admin-filled GeneratedDocument if one has actually been
-    generated for this specific request, otherwise the blank
-    DocumentType.template_file exactly as before. Never touches
-    DocumentType.template_file itself, so other requests of the same type
-    are unaffected either way.
-    """
-    generated = getattr(document, 'generated_document', None)
-    if generated and generated.status == GeneratedDocument.Status.GENERATED and generated.generated_file:
-        return generated.generated_file
-    return document.document_type.template_file
-
-
-class DocumentOfficialFileView(APIView):
-    """
-    GET /api/documents/<id>/official-file/
-    Streams the REAL official file for this document — the Staff/Admin-
-    filled version if one exists, else the blank DocumentType.template_file.
-    Staff can preview it anytime (QA / prep before release); the requesting
-    citizen can only reach it once the document has actually been Released,
-    matching the "documents can ONLY be accessed when status = Released"
-    access rule.
-    """
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, pk):
-        document = get_object_or_404(Document, pk=pk)
-        user = request.user
-        is_staff = user.role in ('admin', 'employee')
-        is_owner = document.requested_by_id == user.id
-
-        if not (is_staff or is_owner):
-            return Response({"detail": "You don't have access to this document."}, status=status.HTTP_403_FORBIDDEN)
-
-        if not is_staff and document.status != Document.Status.RELEASED:
-            return Response({"detail": "This document hasn't been released yet."}, status=status.HTTP_403_FORBIDDEN)
-
-        official_file = _resolve_official_file(document)
-        if not official_file:
-            return Response(
-                {"detail": "No official file has been uploaded for this document type yet."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        return FileResponse(official_file.open('rb'), content_type='application/pdf', as_attachment=False, filename=official_file.name.rsplit('/', 1)[-1])
-
-
-class PublicDocumentOfficialFileView(APIView):
-    """
-    GET /api/documents/track/<tracking_number>/official-file/
-    Same file, reachable with no account — matches the guest tracking tier.
-    No Authorization header involved (unlike DocumentOfficialFileView), so
-    this is the one safe to link/embed directly from the public Track page.
-    """
-    permission_classes = [AllowAny]
-    throttle_scope = 'public-track'
-
-    def get(self, request, tracking_number):
-        document = get_object_or_404(Document, tracking_number=tracking_number)
-        enforce_scope_access(document, request.user)
-
-        if document.status != Document.Status.RELEASED:
-            return Response({"detail": "This document hasn't been released yet."}, status=status.HTTP_403_FORBIDDEN)
-
-        official_file = _resolve_official_file(document)
-        if not official_file:
-            return Response(
-                {"detail": "No official file has been uploaded for this document type yet."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        return FileResponse(official_file.open('rb'), content_type='application/pdf', as_attachment=False, filename=official_file.name.rsplit('/', 1)[-1])
-
-
-def _effective_field_values(document):
-    """
-    The values GeneratedDocumentView / DocumentGenerateModal.jsx should show
-    when a Staff/Admin user opens a request's fill form: whatever's already
-    been saved as a draft, with any still-unset field auto-populated from
-    the citizen's original request (Document.form_data) via
-    DocumentTemplateField.source_request_key — so staff are never asked to
-    retype data that's already on file. A NAME field is deliberately never
-    auto-populated this way even if source_request_key is set: the original
-    request typically stores one combined string, and there's no reliable
-    way to split that into first/middle/last/suffix — see
-    _name_reference_values() below for how staff still get to see it.
-    """
-    generated = getattr(document, 'generated_document', None)
-    saved_values = generated.field_values if generated else {}
-
-    values = {}
-    for field in document.document_type.template_fields.all():
-        if field.key in saved_values:
-            values[field.key] = saved_values[field.key]
-        elif field.field_type == DocumentTemplateField.FieldType.NAME:
-            values[field.key] = {}
-        elif field.source_request_key:
-            values[field.key] = document.form_data.get(field.source_request_key) or field.default_value
-        else:
-            values[field.key] = field.default_value
-    return values
-
-
-def _name_reference_values(document):
-    """
-    For every NAME-type template field with a source_request_key, the
-    citizen's original combined-name string (if any) on their request —
-    shown by DocumentGenerateModal.jsx as a read-only reference next to the
-    blank First/Middle/Last/Suffix inputs so staff can copy the right
-    pieces across, without the system guessing how to split it.
-    """
-    result = {}
-    for field in document.document_type.template_fields.all():
-        if field.field_type == DocumentTemplateField.FieldType.NAME and field.source_request_key:
-            original = document.form_data.get(field.source_request_key)
-            if original:
-                result[field.key] = original
-    return result
-
-
-def _field_has_value(field, value):
-    """
-    Whether `value` counts as "filled in" for this field's required-ness
-    check — a NAME field needs at least a first and last name (suffix is
-    always optional); everything else just needs a non-blank value. A
-    legacy plain-string value on a NAME field (from before it became
-    composite — see the model's docstring) counts as filled if non-blank,
-    consistent with document_generation.py rendering it as-is.
-    """
-    if field.field_type == DocumentTemplateField.FieldType.NAME:
-        if not isinstance(value, dict):
-            return bool(value and str(value).strip())
-        return bool((value.get('first') or '').strip()) and bool((value.get('last') or '').strip())
-    return value is not None and str(value).strip() != ''
-
-
-class GeneratedDocumentView(APIView):
-    """
-    GET  /api/documents/<id>/generated-document/   current fill-form state
-    PUT  /api/documents/<id>/generated-document/    save as a draft (no
-                                                     file render — that's
-                                                     GenerateDocumentView)
-    Staff/Admin only. Citizens never reach this — they only ever see the
-    read-only final result via DocumentOfficialFileView once it's Generated
-    and the request is Released.
-    """
-    permission_classes = [IsStaffUser]
-
-    def get(self, request, pk):
-        document = get_object_or_404(Document, pk=pk)
-        generated = getattr(document, 'generated_document', None)
-        return Response({
-            'field_values': _effective_field_values(document),
-            'name_reference_values': _name_reference_values(document),
-            'status': generated.status if generated else GeneratedDocument.Status.DRAFT,
-            'status_label': generated.get_status_display() if generated else 'Draft',
-            'updated_at': generated.updated_at if generated else None,
-        })
-
-    def put(self, request, pk):
-        document = get_object_or_404(Document, pk=pk)
-        generated, _ = GeneratedDocument.objects.get_or_create(
-            document=document, defaults={'created_by': request.user},
-        )
-        generated.field_values = request.data.get('field_values', {})
-        generated.updated_by = request.user
-        generated.save(update_fields=['field_values', 'updated_by', 'updated_at'])
-        return Response(GeneratedDocumentSerializer(generated).data)
-
-
-class GenerateDocumentView(APIView):
-    """
-    POST /api/documents/<id>/generated-document/generate/
-    Body: { "field_values": {...} }
-    Renders the official document with the given values overlaid onto
-    DocumentType.template_file (see document_generation.py) and, unless
-    ?preview=true, saves it as this request's GeneratedDocument — the
-    "Generate Document" / "Update Document" action (same endpoint; the
-    button just relabels itself based on current status). Staff/Admin only.
-    """
-    permission_classes = [IsStaffUser]
-
-    def post(self, request, pk):
-        document = get_object_or_404(Document, pk=pk)
-        if not document.document_type.template_file:
-            return Response(
-                {"detail": "No official file has been uploaded for this document type yet."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        field_values = request.data.get('field_values', {})
-        is_preview = request.query_params.get('preview') == 'true'
-
-        # Required-field validation gates the real Generate/Update action
-        # only — a preview stays available with partial data so staff can
-        # check positioning/formatting before everything is filled in.
-        if not is_preview:
-            missing_labels = [
-                f.label for f in document.document_type.template_fields.all()
-                if f.required and not _field_has_value(f, field_values.get(f.key))
-            ]
-            if missing_labels:
-                return Response(
-                    {"detail": f"Please fill in: {', '.join(missing_labels)}."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-        try:
-            pdf_bytes = render_generated_document(document, field_values)
-        except Exception:
-            return Response(
-                {"detail": "We couldn't generate the document. Please try again."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-        if is_preview:
-            return FileResponse(io.BytesIO(pdf_bytes), content_type='application/pdf', as_attachment=False, filename='preview.pdf')
-
-        generated, _ = GeneratedDocument.objects.get_or_create(
-            document=document, defaults={'created_by': request.user},
-        )
-        # Storage never overwrites a same-named file (it appends a random
-        # suffix instead), so without this, every "Update Document" leaves
-        # the previous render orphaned on disk forever. Delete it first.
-        if generated.generated_file:
-            generated.generated_file.delete(save=False)
-        generated.field_values = field_values
-        generated.status = GeneratedDocument.Status.GENERATED
-        generated.updated_by = request.user
-        generated.generated_file.save(
-            f"{document.tracking_number}.pdf", ContentFile(pdf_bytes), save=False,
-        )
-        generated.save()
-        return Response(GeneratedDocumentSerializer(generated).data)
 
 
 def _document_route_offices(document):
@@ -1153,8 +910,6 @@ class DocumentStageUpdateView(APIView):
         Document.ProcessingStage.FORM_PROCESSING,
         Document.ProcessingStage.FOR_APPROVAL,
         Document.ProcessingStage.APPROVED,
-        Document.ProcessingStage.DOCUMENT_GENERATED,
-        Document.ProcessingStage.SOFT_COPY_AVAILABLE,
         Document.ProcessingStage.READY_FOR_RELEASE,
         Document.ProcessingStage.COMPLETED,
     ]

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api, { API_BASE_URL, fetchPublicDocumentEvaluation, submitPublicDocumentEvaluation } from '../api/axios';
+import api, { fetchPublicDocumentEvaluation, submitPublicDocumentEvaluation } from '../api/axios';
 import DocumentEvaluationModal from '../components/citizen/DocumentEvaluationModal';
 import DocumentTrackingTimeline from '../components/DocumentTrackingTimeline';
 import { MapPinIcon, PrinterIcon, StarIcon } from '../components/Icons';
@@ -179,26 +179,6 @@ export default function PublicTrack() {
               <h2 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">Activity</h2>
               <DocumentTrackingTimeline stageHistory={doc.stage_history} activityLog={doc.activity_log} />
            </div>
-
-           {/* The REAL official document file — no login needed, only once Released */}
-           {doc.processing_stage === 'completed' && doc.has_official_file && (
-             <div className="track-no-print mt-10 pt-8 border-t border-slate-100 dark:border-slate-800">
-                <h2 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">Official Document</h2>
-                <iframe
-                  src={`${API_BASE_URL}/documents/track/${doc.tracking_number}/official-file/`}
-                  title="Official Document"
-                  className="w-full h-[70vh] rounded-xl border border-slate-200 dark:border-slate-700"
-                />
-                <a
-                  href={`${API_BASE_URL}/documents/track/${doc.tracking_number}/official-file/`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                >
-                  <PrinterIcon className="w-4 h-4" /> Open in new tab to print / save
-                </a>
-             </div>
-           )}
 
            {/* Rate your experience — no account needed, works straight off the tracking number */}
            {doc.processing_stage === 'completed' && (

@@ -19,7 +19,3 @@ tzdata==2025.2
 # QR codes (Pillow also backs the models' ImageFields)
 qrcode==8.2
 Pillow==12.2.0
-
-# Official document PDFs (apps/documents/document_generation.py)
-pypdf==6.16.2
-reportlab==4.2.2
