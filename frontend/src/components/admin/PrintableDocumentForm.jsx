@@ -1,3 +1,4 @@
+import { mediaUrl } from '../../api/axios';
 import { PrinterIcon } from '../Icons';
 
 // Same "print just this one element" technique as PrintableQRSlip.jsx, tuned
@@ -23,9 +24,7 @@ function humanizeKey(key) {
 export default function PrintableDocumentForm({ document, onClose }) {
   if (!document) return null;
 
-  const qrSrc = document.qr_code
-    ? (document.qr_code.startsWith('http') ? document.qr_code : `http://127.0.0.1:8000${document.qr_code}`)
-    : null;
+  const qrSrc = mediaUrl(document.qr_code);
 
   const scopeLabel = document.document_type_scope === 'internal' ? 'INTERNAL' : 'EXTERNAL';
   const formEntries = Object.entries(document.form_data || {}).filter(

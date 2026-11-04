@@ -23,7 +23,10 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     const { request } = event;
     if (request.method !== 'GET') return;
-    if (new URL(request.url).origin !== self.location.origin) return;
+    // API data always goes straight to the network and is never stored, so an
+    // admin's change shows up everywhere and no citizen data stays on a shared PC.
+    const url = new URL(request.url);
+    if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
 
     // Page navigations: network-first, so a citizen always gets the latest
     // deployed build while online – falling back to whatever app shell is

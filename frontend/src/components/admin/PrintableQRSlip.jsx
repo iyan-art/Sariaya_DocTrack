@@ -1,3 +1,4 @@
+import { mediaUrl } from '../../api/axios';
 import { PrinterIcon } from '../Icons';
 
 // Everything outside .qr-slip-printable is hidden at print time, and the
@@ -16,9 +17,7 @@ const PRINT_STYLES = `
 export default function PrintableQRSlip({ document, onClose }) {
   if (!document) return null;
 
-  const qrSrc = document.qr_code
-    ? (document.qr_code.startsWith('http') ? document.qr_code : `http://127.0.0.1:8000${document.qr_code}`)
-    : null;
+  const qrSrc = mediaUrl(document.qr_code);
 
   const firstDestination = document.route?.[0] || document.current_office || '—';
   const scopeLabel = document.document_type_scope === 'internal' ? 'INTERNAL' : 'EXTERNAL';

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchDocumentDetail } from '../../api/axios';
+import { fetchDocumentDetail, mediaUrl } from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import DocumentStatusBadge from './DocumentStatusBadge';
 import OfficialDocumentPanel from '../documents/OfficialDocumentPanel';
@@ -54,9 +54,7 @@ export default function DocumentFormModal({ documentId, onClose, onManage, fetch
 
   useEffect(() => { load(); }, [documentId, fetchDetail]);
 
-  const qrSrc = doc?.qr_code
-    ? (doc.qr_code.startsWith('http') ? doc.qr_code : `http://127.0.0.1:8000${doc.qr_code}`)
-    : null;
+  const qrSrc = mediaUrl(doc?.qr_code);
 
   const scopeLabel = doc?.document_type_scope === 'internal' ? 'INTERNAL' : 'EXTERNAL';
   const formEntries = Object.entries(doc?.form_data || {}).filter(

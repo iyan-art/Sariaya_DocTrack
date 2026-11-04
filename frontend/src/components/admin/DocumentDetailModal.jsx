@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchDocumentDetail, transitionDocument, releaseToCitizen, flagDocumentMissing } from '../../api/axios';
+import { fetchDocumentDetail, transitionDocument, releaseToCitizen, flagDocumentMissing, mediaUrl } from '../../api/axios';
 import { useToast } from '../../context/ToastContext';
 import DocumentStatusBadge from './DocumentStatusBadge';
 import PrintableQRSlip from './PrintableQRSlip';
@@ -213,8 +213,7 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
             <div className="mt-6 flex flex-col items-center bg-slate-50 dark:bg-slate-800/60 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl p-6">
                 {doc.qr_code ? (
                     <img
-                        /* If the backend gave a full URL, use it. If not, add the domain. */
-                        src={doc.qr_code.startsWith('http') ? doc.qr_code : `http://127.0.0.1:8000${doc.qr_code}`}
+                        src={mediaUrl(doc.qr_code)}
                         alt="QR Code"
                         className="w-44 h-44 shadow-md rounded-lg mb-3 bg-white p-2"
                         onError={(e) => {

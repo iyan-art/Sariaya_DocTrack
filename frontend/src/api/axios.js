@@ -7,6 +7,12 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
     : 'http://127.0.0.1:8000/api'
 );
 
+// Some API responses give media files as a path rather than a full URL.
+export const mediaUrl = (path) => {
+  if (!path) return null;
+  return path.startsWith('http') ? path : `${new URL(API_BASE_URL).origin}${path}`;
+};
+
 const api = axios.create({
   baseURL: API_BASE_URL,
 });
@@ -19,6 +25,28 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// The backend rotates refresh tokens and blacklists the old one, so each can be
+// used only once. Requests failing together, in this tab or another, must
+// therefore take turns: whoever goes first refreshes, and the rest find a newer
+// access token waiting and reuse it.
+function withRefreshLock(task) {
+  return navigator.locks ? navigator.locks.request('token-refresh', task) : task();
+}
+
+function getFreshAccessToken(expiredAuthHeader) {
+  return withRefreshLock(async () => {
+    const currentToken = localStorage.getItem('access_token');
+    if (currentToken && `Bearer ${currentToken}` !== expiredAuthHeader) return currentToken;
+
+    const res = await axios.post(`${API_BASE_URL}/accounts/login/refresh/`, {
+      refresh: localStorage.getItem('refresh_token'),
+    });
+    localStorage.setItem('access_token', res.data.access);
+    if (res.data.refresh) localStorage.setItem('refresh_token', res.data.refresh);
+    return res.data.access;
+  });
+}
 
 // If a request fails because the access token expired (401),
 // try to refresh it once, then retry the original request.
@@ -33,11 +61,8 @@ api.interceptors.response.use(
 
       if (refreshToken) {
         try {
-          const res = await axios.post(`${API_BASE_URL}/accounts/login/refresh/`, {
-            refresh: refreshToken,
-          });
-          localStorage.setItem('access_token', res.data.access);
-          originalRequest.headers.Authorization = `Bearer ${res.data.access}`;
+          const accessToken = await getFreshAccessToken(originalRequest.headers.Authorization);
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
           return api(originalRequest); // retry the original failed request
         } catch (refreshError) {
           // refresh token itself is invalid/expired -> force logout
