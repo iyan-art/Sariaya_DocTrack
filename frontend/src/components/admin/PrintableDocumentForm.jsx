@@ -13,7 +13,8 @@ const PRINT_STYLES = `
   }
 `;
 
-const HIDDEN_FORM_KEYS = new Set(['date']); // shown separately as "Date Submitted"
+// 'date' is shown separately as "Date Submitted"; seed_batch marks test data.
+const HIDDEN_FORM_KEYS = new Set(['date', 'seed_batch']);
 
 function humanizeKey(key) {
   return key

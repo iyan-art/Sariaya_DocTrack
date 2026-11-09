@@ -1,4 +1,3 @@
-import re
 from urllib.parse import urlparse
 
 from django.db.models import Avg, Count
@@ -11,7 +10,7 @@ from .models import (
     EmailNotificationLog, Announcement, Event,
     Notification,
 )
-from .services import resolve_office, release_document
+from .services import EMPLOYEE_ID_RE, can_originate, originating_office, resolve_office, release_document
 from .qr_services import generate_qr_code
 from .sla_scan import DUE_SOON_THRESHOLD_RATIO
 from apps.accounts.validators import CONTACT_NUMBER_ERROR, is_valid_contact_number
@@ -98,14 +97,26 @@ class DocumentTypeSerializer(serializers.ModelSerializer):
     steps = WorkflowStepSerializer(many=True, read_only=True)
     scope_label = serializers.CharField(source='get_scope_display', read_only=True)
     requests_today = serializers.SerializerMethodField()
+    origin_office = serializers.SerializerMethodField()
+    can_create = serializers.SerializerMethodField()
 
     class Meta:
         model = DocumentType
         fields = [
             'id', 'name', 'description', 'scope', 'scope_label', 'route', 'is_active', 'created_at', 'steps',
-            'daily_limit', 'requests_today', 'request_fields',
+            'daily_limit', 'requests_today', 'request_fields', 'origin_office', 'can_create',
         ]
         read_only_fields = ['route', 'created_at']
+
+    def get_origin_office(self, obj):
+        office = originating_office(obj)
+        return {'code': office.code, 'name': office.name} if office else None
+
+    def get_can_create(self, obj):
+        # Whether the requesting user may start a request of this type, so the
+        # creation forms only offer what CreateDocumentSerializer will accept.
+        request = self.context.get('request')
+        return bool(request and request.user.is_authenticated and can_originate(request.user, obj))
 
     def get_requests_today(self, obj):
         # How many requests this type has already received today — paired
@@ -350,9 +361,6 @@ class RequestStatusHistorySerializer(serializers.ModelSerializer):
         fields = ['stage', 'stage_label', 'timestamp']
 
 
-_EMPLOYEE_ID_RE = re.compile(r'\(?EMP-\d{4}-\d+\)?\.?')
-
-
 class PublicDocumentLogSerializer(serializers.ModelSerializer):
     """
     A single physical hand-off (DocumentLog row), narrowed to exactly what's
@@ -384,7 +392,7 @@ class PublicDocumentLogSerializer(serializers.ModelSerializer):
         # Employee ID inside it must not reach an anonymous guest here.
         if not obj.notes:
             return obj.notes
-        return _EMPLOYEE_ID_RE.sub('', obj.notes).strip()
+        return EMPLOYEE_ID_RE.sub('', obj.notes).strip()
 
 
 class PublicDocumentTrackingSerializer(serializers.ModelSerializer):
@@ -491,6 +499,13 @@ class CreateDocumentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 f"'{value.name}' has no workflow steps configured yet. "
                 f"An admin must build its workflow before it can be requested."
+            )
+
+        # No-bypass rule: a request may only be started by its Step 1 office.
+        if not can_originate(self.context['request'].user, value):
+            raise serializers.ValidationError(
+                f"Only the originating office ({originating_office(value).name}) can create "
+                f"{value.name} requests."
             )
 
         # Daily submission cap, configured per type by an admin to manage
@@ -603,13 +618,9 @@ class CreateDocumentSerializer(serializers.ModelSerializer):
         # the audit trail shows it was auto-forwarded rather than scanned.
         # Every office AFTER this one still has to perform its own receive
         # action to confirm physical arrival — this only automates the
-        # first hand-off, and only once nothing ambiguous is involved.
-        # Silently left alone (document just stays at origin, un-released,
-        # same as before this feature existed) for anyone creating on
-        # behalf of a different office — e.g. an admin entering a walk-in
-        # citizen's request — since there's no one to attribute an
-        # auto-forward hand-off to in that case; it goes through the
-        # ordinary manual release flow instead.
+        # first hand-off. validate_document_type() already guarantees the
+        # creator belongs to the origin office; a release that still fails
+        # just leaves the document at origin for the ordinary manual flow.
         route = document.document_type.route
         if len(route) > 1:
             next_office = resolve_office(route[1])

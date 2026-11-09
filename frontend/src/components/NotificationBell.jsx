@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   fetchNotifications, fetchUnreadNotificationCount, markNotificationRead, markAllNotificationsRead,
 } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import {
+  DEFAULT_TYPE_STYLE, NOTIFICATIONS_CHANGED, TYPE_STYLES, announceNotificationsChanged, notificationTarget, timeAgo,
+} from '../utils/notifications';
 import { BellIcon } from './Icons';
 
 const VISIBLE_COUNT = 10;
@@ -13,32 +17,17 @@ const VISIBLE_COUNT = 10;
 // adding new real-time infrastructure for one feature.
 const POLL_MS = 30000;
 
-const TYPE_STYLES = {
-  document_forwarded: 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/30',
-  document_returned: 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/30',
-  expedite_request: 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/30',
-  bottleneck_alert: 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/30',
-  system_alert: 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-500/30',
-};
-
-function timeAgo(iso) {
-  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (seconds < 60) return 'just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
-
 /**
- * The general in-app notification inbox — used by both Admin and Employee
- * (DashboardLayout mounts it for both roles). Distinct from
+ * The in-app notification inbox for every role: staff alerts, and citizens'
+ * updates on their own requests. Distinct from
  * EmailNotificationBell (admin-only SLA-email activity log).
  */
 export default function NotificationBell() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
+  const lastCount = useRef(null);
+  const [pulse, setPulse] = useState(false);
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -46,8 +35,17 @@ export default function NotificationBell() {
   const boxRef = useRef(null);
 
   const loadCount = useCallback(() => {
-    fetchUnreadNotificationCount().then((res) => setUnreadCount(res.data.count)).catch(() => {});
-  }, []);
+    fetchUnreadNotificationCount().then((res) => {
+      const count = res.data.count;
+      // A citizen gets a visible nudge the moment a new update arrives.
+      if (user?.role === 'citizen' && lastCount.current !== null && count > lastCount.current) {
+        showToast('You have a new update on your document request.', 'success');
+        setPulse(true);
+      }
+      lastCount.current = count;
+      setUnreadCount(count);
+    }).catch(() => {});
+  }, [user?.role, showToast]);
 
   const loadList = useCallback(() => {
     setLoading(true);
@@ -58,8 +56,17 @@ export default function NotificationBell() {
 
   useEffect(() => {
     loadCount();
-    const interval = setInterval(loadCount, POLL_MS);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => { if (document.visibilityState === 'visible') loadCount(); }, POLL_MS);
+    // Catch up immediately when the user returns to the app, and when another
+    // view (the Notifications page) marks something read.
+    const onVisible = () => { if (document.visibilityState === 'visible') loadCount(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener(NOTIFICATIONS_CHANGED, loadCount);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener(NOTIFICATIONS_CHANGED, loadCount);
+    };
   }, [loadCount]);
 
   useEffect(() => {
@@ -73,6 +80,7 @@ export default function NotificationBell() {
   const handleToggle = () => {
     const next = !open;
     setOpen(next);
+    setPulse(false);
     if (next) loadList();
   };
 
@@ -81,6 +89,7 @@ export default function NotificationBell() {
     markNotificationRead(notification.id, true).then(() => {
       setNotifications((list) => list.map((n) => (n.id === notification.id ? { ...n, is_read: true } : n)));
       setUnreadCount((c) => Math.max(0, c - 1));
+      announceNotificationsChanged();
     });
   };
 
@@ -88,23 +97,19 @@ export default function NotificationBell() {
     markAllNotificationsRead().then(() => {
       setNotifications((list) => list.map((n) => ({ ...n, is_read: true })));
       setUnreadCount(0);
+      announceNotificationsChanged();
     });
   };
 
   const handleNotificationClick = (notification) => {
     if (!notification.is_read) {
-      markNotificationRead(notification.id, true).catch(() => {});
+      markNotificationRead(notification.id, true).then(announceNotificationsChanged).catch(() => {});
       setNotifications((list) => list.map((n) => (n.id === notification.id ? { ...n, is_read: true } : n)));
       setUnreadCount((c) => Math.max(0, c - 1));
     }
     setOpen(false);
 
-    if (notification.related_document) {
-      const base = user?.role === 'employee' ? '/employee/documents' : '/admin/document-request';
-      navigate(`${base}?doc=${notification.related_document}`);
-    } else {
-      navigate('/admin/dashboard');
-    }
+    navigate(notificationTarget(user.role, notification));
   };
 
   return (
@@ -117,7 +122,7 @@ export default function NotificationBell() {
       >
         <BellIcon className="w-5 h-5" />
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+          <span className={`absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center ${pulse ? 'animate-bounce' : ''}`}>
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -154,7 +159,7 @@ export default function NotificationBell() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-1.5 min-w-0">
                       {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" />}
-                      <span className={`inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${TYPE_STYLES[n.notification_type] || 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600'}`}>
+                      <span className={`inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${TYPE_STYLES[n.notification_type] || DEFAULT_TYPE_STYLE}`}>
                         {n.notification_type_label}
                       </span>
                     </div>
@@ -179,6 +184,13 @@ export default function NotificationBell() {
               ))
             )}
           </div>
+          <Link
+            to={`/${user.role}/notifications`}
+            onClick={() => setOpen(false)}
+            className="block text-center text-sm font-semibold text-blue-600 dark:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-700/60 py-3 border-t border-slate-100 dark:border-slate-700"
+          >
+            View all notifications
+          </Link>
         </div>
       )}
     </div>

@@ -15,7 +15,7 @@ from django.utils import timezone
 
 from .models import Document, EmailNotificationLog, MissingDocumentAlert, Notification
 from .notifications import send_overdue_warning_email, send_due_soon_email
-from .services import flag_missing, notify_admins, responsible_employees
+from .services import _office_name, flag_missing, notify_admins, notify_citizen, responsible_employees
 
 # Only used if a document's route_position has somehow drifted out of range
 # for its DocumentType's WorkflowStep rows — a data-integrity edge case, not
@@ -104,6 +104,15 @@ def run_overdue_scan():
                 ),
                 notification_type=Notification.NotificationType.BOTTLENECK_ALERT,
                 related_document=document,
+            )
+            notify_citizen(
+                document,
+                title="Taking longer than expected",
+                message=(
+                    f"Your {document.document_type.name} request ({document.tracking_number}) is taking longer "
+                    f"than expected at {_office_name(document.current_office)}. The office has been reminded. You can also "
+                    f"send a follow-up from your request history."
+                ),
             )
 
         elif dwell_hours >= sla_hours * DUE_SOON_THRESHOLD_RATIO:

@@ -16,7 +16,11 @@ export default function LandingFooter() {
       <div className="max-w-7xl mx-auto px-6 lg:px-10 py-14 grid sm:grid-cols-3 gap-10">
         <div>
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold shrink-0">S</div>
+            <img
+              src="/sariaya-logo.jpg"
+              alt="Municipality of Sariaya Official Seal"
+              className="h-10 w-10 shrink-0 rounded-full object-contain bg-white"
+            />
             <div>
               <p className="font-bold text-white">Municipality of Sariaya</p>
               <p className="text-xs text-slate-400">Quezon, Philippines</p>

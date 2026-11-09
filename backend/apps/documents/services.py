@@ -1,3 +1,5 @@
+import re
+
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from apps.accounts.models import User
@@ -46,6 +48,30 @@ def notify_office(office_label, title, message, notification_type, sender=None, 
         )
         for user in recipients if _wants(user, notification_type)
     ])
+
+
+# Matches an Employee ID (with its parentheses) inside free-text notes, so it
+# can be removed before notes reach citizens or the public.
+EMPLOYEE_ID_RE = re.compile(r'\(?EMP-\d{4}-\d+\)?\.?')
+
+
+def _office_name(code):
+    office = resolve_office(code)
+    return office.name if office else code
+
+
+def notify_citizen(document, title, message):
+    """
+    In-app update for the registered citizen who owns this request. Walk-in
+    requests have no account to notify; their updates arrive by email and on
+    the public tracking page instead.
+    """
+    citizen = document.requested_by
+    if citizen and citizen.role == User.Role.CITIZEN and citizen.is_active:
+        Notification.objects.create(
+            recipient=citizen, title=title, message=message,
+            notification_type=Notification.NotificationType.DOCUMENT_UPDATE, related_document=document,
+        )
 
 
 def notify_admins(title, message, notification_type, sender=None, related_document=None):
@@ -170,6 +196,23 @@ def resolve_office(label):
     )
 
 
+def originating_office(document_type):
+    """The Office at Step 1 of this type's workflow, or None if it has no steps."""
+    first_step = document_type.steps.select_related('office').order_by('step_number').first()
+    return first_step.office if first_step else None
+
+
+def can_originate(user, document_type):
+    """
+    No-bypass rule: only staff assigned to a type's Step 1 office may create a
+    request of that type, admins included. Compared as Office rows, so an
+    office typed by name or by code on the user both resolve the same way.
+    """
+    origin = originating_office(document_type)
+    user_office = resolve_office(user.office)
+    return bool(origin and user_office and origin.pk == user_office.pk)
+
+
 def advance_processing_stage(document, stage, actor=None, note=''):
     """
     Advances the citizen-facing processing-stage narrative (Document.
@@ -237,6 +280,14 @@ def release_document(document, releasing_user, notes='', qr_verified=False):
         notification_type=Notification.NotificationType.DOCUMENT_FORWARDED,
         sender=releasing_user, related_document=document, exclude_user=releasing_user,
     )
+    notify_citizen(
+        document,
+        title=f"On its way to {_office_name(next_office)}",
+        message=(
+            f"Your {document.document_type.name} request ({document.tracking_number}) has been forwarded "
+            f"from {_office_name(document.current_office)} to {_office_name(next_office)}."
+        ),
+    )
 
     return document
 
@@ -291,6 +342,16 @@ def return_document(document, returning_user, notes=''):
         ),
         notification_type=Notification.NotificationType.DOCUMENT_RETURNED,
         sender=returning_user, related_document=document, exclude_user=returning_user,
+    )
+    # The same reason already appears on the public tracking page.
+    notify_citizen(
+        document,
+        title="Sent back for review",
+        message=(
+            f"Your {document.document_type.name} request ({document.tracking_number}) was sent back from "
+            f"{_office_name(document.current_office)} to {_office_name(previous_office)} for review. "
+            f"Remarks: {EMPLOYEE_ID_RE.sub('', notes).strip()}"
+        ),
     )
 
     return document
@@ -399,6 +460,23 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
         # Not a model field: just lets the calling view tell staff the outcome.
         document.ready_email_status = _maybe_notify_citizen_ready(document)
         _notify_office_ready(document)
+        notify_citizen(
+            document,
+            title="Ready for pickup",
+            message=(
+                f"Your {document.document_type.name} request ({document.tracking_number}) is ready for pickup "
+                f"at {_office_name(document.current_office)}. Please bring a valid ID."
+            ),
+        )
+    else:
+        notify_citizen(
+            document,
+            title=f"Received at {_office_name(scanning_office)}",
+            message=(
+                f"Your {document.document_type.name} request ({document.tracking_number}) is now being "
+                f"processed at {_office_name(scanning_office)}."
+            ),
+        )
 
     return document
 
@@ -443,6 +521,14 @@ def release_to_citizen(document, releasing_user, notes='', qr_verified=False):
     )
     advance_processing_stage(document, Document.ProcessingStage.COMPLETED, actor=releasing_user)
     email_status = _maybe_notify_citizen_ready(document)
+    notify_citizen(
+        document,
+        title="Released to you",
+        message=(
+            f"Your {document.document_type.name} request ({document.tracking_number}) has been released. "
+            f"You can now rate each office that handled it from the tracking page."
+        ),
+    )
     return document, email_status
 
 

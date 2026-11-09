@@ -58,6 +58,7 @@ const MENUS = {
     { label: 'Home', path: '/citizen/home', icon: HomeIcon },
     { label: 'History', path: '/citizen/history', icon: Clock3Icon },
     { label: 'Scan Document', path: '/citizen/scan', icon: ScanLineIcon },
+    { label: 'Notifications', path: '/citizen/notifications', icon: BellIcon },
     { label: 'Suggestion Box', path: '/citizen/suggestions', icon: HandshakeIcon },
   ],
 };
@@ -117,12 +118,14 @@ export default function DashboardLayout() {
 
         {/* Logo */}
         <div className="h-16 sm:h-20 shrink-0 flex items-center gap-3 px-4 sm:px-6 border-b border-slate-100 dark:border-slate-800">
-          {/* Swap this for the Sariaya seal: <img src="/seal.png" className="h-10 w-10" /> */}
-          <div className="h-10 w-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold shrink-0">
-            S
-          </div>
+          {/* The seal's white corners are clipped to its circle so it sits cleanly on the dark sidebar too. */}
+          <img
+            src="/sariaya-logo.jpg"
+            alt="Municipality of Sariaya Official Seal"
+            className="h-10 w-10 shrink-0 rounded-full object-contain bg-white"
+          />
           <div className="leading-tight flex-1 min-w-0">
-            <p className="font-bold text-slate-900 dark:text-white text-sm">QR-Track</p>
+            <p className="font-bold text-slate-900 dark:text-white text-sm">Sariaya DocTrack</p>
             <p className="text-xs text-slate-400 dark:text-slate-500">Sariaya LGU</p>
           </div>
           <button
@@ -212,21 +215,7 @@ export default function DashboardLayout() {
               {theme === 'dark' ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
             </button>
 
-            {/* NotificationBell (the general in-app inbox — incoming/returned
-                documents, expedite requests, bottleneck/feedback alerts) shows for
-                both Admin and Employee. The separate SLA-email activity log
-                (EmailNotificationBell) was removed from the admin header per
-                request — still exists as a component if it's ever wanted back,
-                just not rendered anywhere now. Citizen keeps the plain,
-                decorative bell (nothing wired up for that role yet). */}
-            {(user.role === 'admin' || user.role === 'employee') ? (
-              <NotificationBell />
-            ) : (
-              <button aria-label="Notifications" className="relative w-11 h-11 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800">
-                <BellIcon className="w-5 h-5" />
-                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500" />
-              </button>
-            )}
+            <NotificationBell />
 
             <div className="relative">
               <button

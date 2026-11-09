@@ -26,7 +26,7 @@ from .serializers import (
 )
 from .permissions import IsStaffUser
 from apps.accounts.permissions import IsAdmin
-from .services import release_document, receive_document, return_document, citizen_return_document, release_to_citizen, flag_missing, resolve_office, advance_processing_stage, can_delete_document, expedite_document
+from .services import release_document, receive_document, return_document, citizen_return_document, release_to_citizen, flag_missing, resolve_office, advance_processing_stage, can_delete_document, expedite_document, notify_citizen
 from .sla_scan import run_overdue_scan, run_missing_scan
 from .qr_services import resolve_and_verify, enforce_scope_access, build_scan_context, generate_qr_code
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -940,6 +940,17 @@ class DocumentStageUpdateView(APIView):
                 return Response({"detail": "Stage can only move forward."}, status=status.HTTP_400_BAD_REQUEST)
 
         advance_processing_stage(document, stage, actor=request.user, note=note)
+        notify_citizen(
+            document,
+            title=document.get_processing_stage_display(),
+            message=(
+                f"Your {document.document_type.name} request ({document.tracking_number}) was rejected. "
+                f"Please contact {document.current_office} for details."
+                if stage == Document.ProcessingStage.REJECTED else
+                f"Your {document.document_type.name} request ({document.tracking_number}) is now at the "
+                f"\"{document.get_processing_stage_display()}\" stage."
+            ),
+        )
         return Response(DocumentDetailSerializer(document).data)
 
 

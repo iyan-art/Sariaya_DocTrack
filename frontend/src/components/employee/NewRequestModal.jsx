@@ -45,7 +45,9 @@ export default function NewRequestModal({ onClose, onCreated }) {
   // Document Purpose (DocumentType.scope) gates which types are even
   // selectable — the same type name (e.g. "Mayor's Permit") can exist as
   // both an internal and an external row, each its own independent entry.
-  const typesForPurpose = types.filter((t) => t.scope === purpose);
+  // Only types whose workflow starts at this user's office (see can_create).
+  const typesForPurpose = types.filter((t) => t.scope === purpose && t.can_create);
+  const notAllowedCount = types.filter((t) => t.scope === purpose && !t.can_create).length;
 
   // If the purpose changes and the previously-selected type no longer
   // belongs to it, drop the selection rather than silently submitting a
@@ -111,6 +113,8 @@ export default function NewRequestModal({ onClose, onCreated }) {
       onCreated(); // tell parent to refresh in the background; modal stays open to offer the QR slip
     } catch (err) {
       showToast(extractErrorMessage(err, "We couldn't save your document request. Please try again."), 'error');
+      const typeError = err.response?.data?.document_type;
+      if (typeError) setFieldErrors({ document_type: Array.isArray(typeError) ? typeError[0] : typeError });
     } finally {
       setLoading(false);
     }
@@ -228,7 +232,14 @@ export default function NewRequestModal({ onClose, onCreated }) {
               {fieldErrors.document_type && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{fieldErrors.document_type}</p>}
               {purpose && typesForPurpose.length === 0 && (
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                  No {purpose} document types yet — an admin needs to create one in Workflow Builder first.
+                  {notAllowedCount > 0
+                    ? `None of the ${purpose} document types start at your office (${user?.office || 'none assigned'}). Only the office at Step 1 of a workflow can create its requests.`
+                    : `No ${purpose} document types yet — an admin needs to create one in Workflow Builder first.`}
+                </p>
+              )}
+              {purpose && typesForPurpose.length > 0 && notAllowedCount > 0 && (
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                  Showing only the document types that start at your office.
                 </p>
               )}
               {selectedType?.daily_limit != null && (

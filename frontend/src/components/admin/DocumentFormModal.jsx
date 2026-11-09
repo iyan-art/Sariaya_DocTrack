@@ -14,7 +14,8 @@ const PRINT_STYLES = `
   }
 `;
 
-const HIDDEN_FORM_KEYS = new Set(['date']);
+// seed_batch marks test data from the seed_documents command.
+const HIDDEN_FORM_KEYS = new Set(['date', 'seed_batch']);
 
 function humanizeKey(key) {
   return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());

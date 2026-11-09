@@ -25,6 +25,7 @@ import CitizenHome from './pages/citizen/Home';
 import CitizenScanDocument from './pages/citizen/ScanDocument';
 import CitizenSuggestionBox from './pages/citizen/SuggestionBox';
 import AccountSettings from './pages/AccountSettings';
+import Notifications from './pages/Notifications';
 
 
 function App() {
@@ -60,6 +61,7 @@ function App() {
           <Route path="/admin/suggestions" element={<AdminSuggestions />} />
           <Route path="/admin/qr-scan" element={<QRScan />} />
           <Route path="/admin/settings" element={<AccountSettings />} />
+          <Route path="/admin/notifications" element={<Notifications />} />
         </Route>
       </Route>
 
@@ -70,6 +72,7 @@ function App() {
            <Route path="/employee/documents" element={<OfficeDocuments />} />
           <Route path="/employee/qr-scan" element={<QRScan />} />
           <Route path="/employee/settings" element={<AccountSettings />} />
+          <Route path="/employee/notifications" element={<Notifications />} />
         </Route>
       </Route>
 
@@ -81,6 +84,7 @@ function App() {
           <Route path="/citizen/scan" element={<CitizenScanDocument />} />
           <Route path="/citizen/suggestions" element={<CitizenSuggestionBox />} />
           <Route path="/citizen/settings" element={<AccountSettings />} />
+          <Route path="/citizen/notifications" element={<Notifications />} />
         </Route>
       </Route>
 

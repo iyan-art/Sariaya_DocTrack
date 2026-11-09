@@ -729,6 +729,8 @@ class Notification(models.Model):
         EXPEDITE_REQUEST = 'expedite_request', 'Expedite Request'
         BOTTLENECK_ALERT = 'bottleneck_alert', 'Bottleneck Alert'
         SYSTEM_ALERT = 'system_alert', 'System Alert'
+        # Progress on a citizen's own request — see services.py::notify_citizen().
+        DOCUMENT_UPDATE = 'document_update', 'Document Update'
 
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications',

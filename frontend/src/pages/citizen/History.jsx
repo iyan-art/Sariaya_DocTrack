@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { fetchMyDocuments, fetchMyDocumentDetail, deleteMyDocument, expediteDocument } from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -24,6 +25,7 @@ export default function History() {
   const { showToast } = useToast();
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedId, setSelectedId] = useState(null);
   const [returningDoc, setReturningDoc] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
@@ -54,6 +56,17 @@ export default function History() {
   };
 
   useEffect(() => { loadDocs(); }, []);
+
+  // Opened from a notification ("?doc=123").
+  useEffect(() => {
+    const docParam = searchParams.get('doc');
+    if (docParam) {
+      // Has to react to the URL: a notification can be clicked while this page is already open.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedId(Number(docParam));
+      setSearchParams((params) => { params.delete('doc'); return params; }, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const handleExpedite = async (e, doc) => {
     e.stopPropagation();
