@@ -69,10 +69,13 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
   // Only 'return_to_office' has a required Notes field — the reason a
   // returning office attaches so the receiving office understands what
   // needs correcting. Every other action's Notes stays optional, unchanged.
+  const isInternal = doc?.document_type_scope === 'internal';
   const availableActions = doc
     ? (NEXT_ACTIONS[doc.status] || [])
         .filter((a) => a.action !== 'return_to_office' || doc.route_position > 0)
         .map((a) => (a.action === 'receive' && doc.is_returning) ? { ...a, label: 'Confirm Return Received' } : a)
+        // Internal documents never go to a citizen — they finish back at the office that started them.
+        .map((a) => (a.action === 'return' && isInternal) ? { ...a, label: 'Release to Originating Office' } : a)
     : [];
 
   const handleTransition = async (e) => {
@@ -88,8 +91,12 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
     try {
       if (action === 'return') {
         const res = await releaseToCitizen(documentId, { notes });
-        const outcome = EMAIL_STATUS_TOAST[res.data.email_status];
-        showToast(outcome?.message || 'Document released to citizen.', outcome?.type || 'success');
+        if (res.data.released_to === 'origin_office') {
+          showToast('Document released to its originating office.', 'success');
+        } else {
+          const outcome = EMAIL_STATUS_TOAST[res.data.email_status];
+          showToast(outcome?.message || 'Document released to citizen.', outcome?.type || 'success');
+        }
       } else if (action === 'flagged_missing') {
         await flagDocumentMissing(documentId, { notes });
         showToast('Document status updated.', 'success');

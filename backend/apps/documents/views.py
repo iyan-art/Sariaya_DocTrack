@@ -26,7 +26,7 @@ from .serializers import (
 )
 from .permissions import IsStaffUser
 from apps.accounts.permissions import IsAdmin
-from .services import release_document, receive_document, return_document, citizen_return_document, release_to_citizen, flag_missing, resolve_office, advance_processing_stage, can_delete_document, expedite_document, notify_citizen
+from .services import release_document, receive_document, return_document, citizen_return_document, release_final, flag_missing, resolve_office, advance_processing_stage, can_delete_document, expedite_document, notify_citizen
 from .sla_scan import run_overdue_scan, run_missing_scan
 from .qr_services import resolve_and_verify, enforce_scope_access, build_scan_context, generate_qr_code
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -336,6 +336,7 @@ class MyDocumentListView(generics.ListAPIView):
         return (
             Document.objects
             .filter(requested_by=self.request.user)
+            .exclude(document_type__scope=DocumentType.Scope.INTERNAL)
             .select_related('document_type', 'current_handler')
             .prefetch_related('document_type__steps__office')
             .order_by('-created_at')
@@ -360,7 +361,7 @@ class MyDocumentDetailView(generics.RetrieveDestroyAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Document.objects.filter(requested_by=self.request.user)
+        return Document.objects.filter(requested_by=self.request.user).exclude(document_type__scope=DocumentType.Scope.INTERNAL)
 
     def destroy(self, request, *args, **kwargs):
         document = self.get_object()
@@ -805,8 +806,11 @@ class DocumentTransferView(APIView):
                 next_office = document.document_type.route[document.route_position + 1]
                 message = f"{updated.tracking_number} released — awaiting receipt at {next_office}."
             elif action == 'return':
-                updated, email_status = release_to_citizen(document, releasing_user=request.user, notes=notes, qr_verified=True)
-                message = f"{updated.tracking_number} released to the citizen."
+                updated, email_status = release_final(document, releasing_user=request.user, notes=notes, qr_verified=True)
+                message = (
+                    f"{updated.tracking_number} released to its originating office." if updated.is_internal
+                    else f"{updated.tracking_number} released to the citizen."
+                )
                 if email_status == 'sent':
                     message += " Notification email sent."
                 elif email_status == 'already_sent':
@@ -857,12 +861,13 @@ class DocumentReleaseView(APIView):
         notes = request.data.get('notes', '')
 
         try:
-            updated, email_status = release_to_citizen(document, releasing_user=request.user, notes=notes)
+            updated, email_status = release_final(document, releasing_user=request.user, notes=notes)
         except ValidationError as e:
             return Response({"detail": str(e.detail[0]) if hasattr(e, 'detail') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         data = DocumentDetailSerializer(updated).data
         data['email_status'] = email_status
+        data['released_to'] = 'origin_office' if updated.is_internal else 'citizen'
         return Response(data)
 
 
@@ -1078,12 +1083,13 @@ class AdminDashboardStatsView(APIView):
 
         # Average resolution time: creation -> the log that actually finished
         # the route (RETURNED, the "back at origin" completion action) or
-        # handed the document to the citizen (RELEASED_TO_CITIZEN) —
+        # handed the document over (RELEASED_TO_CITIZEN, or RELEASED_TO_ORIGIN
+        # for internal documents) —
         # whichever happened for that document. NOT based on `updated_at`,
         # which just reflects whenever the row was last touched.
         completion_log = DocumentLog.objects.filter(
             document=OuterRef('pk'),
-            action__in=[DocumentLog.Action.RETURNED, DocumentLog.Action.RELEASED_TO_CITIZEN],
+            action__in=[DocumentLog.Action.RETURNED, DocumentLog.Action.RELEASED_TO_CITIZEN, DocumentLog.Action.RELEASED_TO_ORIGIN],
         ).order_by('-timestamp')
         resolved_docs = (
             Document.objects.filter(status__in=['completed', 'released'])

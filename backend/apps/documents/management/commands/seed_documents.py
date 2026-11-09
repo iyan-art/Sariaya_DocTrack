@@ -377,7 +377,8 @@ class Command(BaseCommand):
         elif kind == 'stage':
             stage(data['stage'], data['by'])
         elif kind == 'released_to_citizen':
-            log(DocumentLog.Action.RELEASED_TO_CITIZEN, office=office, acted_by=data['by'], qr_verified=random.random() < 0.7)
+            action = DocumentLog.Action.RELEASED_TO_ORIGIN if document.is_internal else DocumentLog.Action.RELEASED_TO_CITIZEN
+            log(action, office=office, acted_by=data['by'], qr_verified=random.random() < 0.7)
             if citizen:
                 notify(citizen, 'Released to you', f"Your {name} request ({document.tracking_number}) has been released.",
                        Notification.NotificationType.DOCUMENT_UPDATE)

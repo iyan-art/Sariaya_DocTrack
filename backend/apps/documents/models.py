@@ -256,6 +256,17 @@ class Document(models.Model):
         return route[-1]
 
     @property
+    def is_internal(self):
+        return self.document_type.scope == DocumentType.Scope.INTERNAL
+
+    @property
+    def status_display(self):
+        """Like get_status_display(), but an internal document is released to its office, not a citizen."""
+        if self.status == self.Status.RELEASED and self.is_internal:
+            return 'Released to Originating Office'
+        return self.get_status_display()
+
+    @property
     def is_final_step(self):
         """True if the document's current position is the LAST step in its route."""
         return self.route_position == len(self.document_type.route) - 1
@@ -302,6 +313,9 @@ class DocumentLog(models.Model):
         RECEIVED = 'received', 'Received'  # receiving office scans in, mid-route
         RETURNED = 'returned', 'Returned'  # receiving office scans in on the FINAL leg — back at the origin office
         RELEASED_TO_CITIZEN = 'released_to_citizen', 'Released to Citizen'
+        # The terminal step for an INTERNAL document: handed back to the office
+        # that started it. Internal documents never reach a citizen.
+        RELEASED_TO_ORIGIN = 'released_to_origin', 'Released to Originating Office'
         FLAGGED_MISSING = 'flagged_missing', 'Flagged Missing'
         # Controlled Return to a previous office (services.py::return_document()
         # / receive_document()'s is_returning branch) — distinct from RETURNED

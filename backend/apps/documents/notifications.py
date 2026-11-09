@@ -163,14 +163,18 @@ def send_ready_for_release_staff_email(document, staff_user):
     services.py::_notify_office_ready(), the only caller.
     """
     subject = f"Document Ready for Release — {document.tracking_number}"
+    if document.document_type.scope == 'internal':
+        who, action, requester_label = 'its originating office', 'Release to Originating Office', 'Requested by'
+    else:
+        who, action, requester_label = 'the citizen', 'Release to Citizen', 'Citizen/Requester'
     body = (
-        f"A document at your office has completed its route and is ready for pickup by the citizen.\n\n"
+        f"A document at your office has completed its route and is ready for pickup by {who}.\n\n"
         f"Document: {document.document_type.name}\n"
         f"Reference No.: {document.tracking_number}\n"
-        f"Citizen/Requester: {_requester_display_name(document)}\n"
+        f"{requester_label}: {_requester_display_name(document)}\n"
         f"Date Submitted: {_format_local(document.created_at)}\n"
         f"Current Office: {document.current_office}\n\n"
-        f"Required Action: Please keep this document ready, and mark it \"Release to Citizen\" "
+        f"Required Action: Please keep this document ready, and mark it \"{action}\" "
         f"in the system once it is handed over.\n"
     )
     return _send_and_log(

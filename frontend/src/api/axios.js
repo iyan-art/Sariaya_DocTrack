@@ -246,7 +246,9 @@ export const transitionDocument = (id, data) => {
 // "Release to Citizen" — hands a Completed document back to the citizen and
 // triggers their "ready for pickup" email; separate from the release/receive
 // chain. Response includes `email_status` ('sent'/'failed'/'skipped'/
-// 'already_sent') alongside the document payload.
+// 'already_sent') alongside the document payload. For an internal document
+// the server releases it to its originating office instead: `released_to`
+// is 'origin_office' and no citizen email is sent (`email_status` null).
 export const releaseToCitizen = (id, data = {}) => {
   return api.patch(`/documents/${id}/release/`, data);
 };

@@ -269,11 +269,14 @@ class Command(BaseCommand):
 
         if final_status == 'released':
             clock += timedelta(hours=random.uniform(1, 24))
-            # "Released" is reserved strictly for this final citizen hand-off step.
+            # "Released" is reserved strictly for the final hand-off: to the citizen,
+            # or back to the originating office for an internal document.
+            internal = document.is_internal
             release_citizen_log = DocumentLog.objects.create(
-                document=document, action=DocumentLog.Action.RELEASED_TO_CITIZEN,
-                office=offices[route[-1]], sender=handler, acted_by=handler,
-                qr_verified=True, notes='Physically handed to the citizen.',
+                document=document,
+                action=DocumentLog.Action.RELEASED_TO_ORIGIN if internal else DocumentLog.Action.RELEASED_TO_CITIZEN,
+                office=offices[route[-1]], sender=handler, acted_by=handler, qr_verified=True,
+                notes='Handed back to the originating office.' if internal else 'Physically handed to the citizen.',
             )
             DocumentLog.objects.filter(pk=release_citizen_log.pk).update(timestamp=clock)
             document.status = Document.Status.RELEASED

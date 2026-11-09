@@ -80,6 +80,8 @@ def notify_citizen(document, title, message):
     the public tracking page instead.
     """
     citizen = document.requested_by
+    if document.is_internal:
+        return
     if citizen and citizen.role == User.Role.CITIZEN and citizen.is_active:
         Notification.objects.create(
             recipient=citizen, title=title, message=message,
@@ -143,6 +145,8 @@ def _maybe_notify_citizen_ready(document):
     _resolve_citizen_recipient()), or 'already_sent' (a previous call
     already notified this citizen successfully).
     """
+    if document.is_internal:
+        return None  # no citizen to notify
     if _ready_notices_sent(document, EmailNotificationLog.NotificationType.READY_FOR_RELEASE).exists():
         return 'already_sent'
     return send_ready_for_release_email(document)
@@ -504,6 +508,66 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
     return document
 
 
+def release_final(document, releasing_user, notes='', qr_verified=False):
+    """
+    The last step of any request, from the "Release" button or the QR scan:
+    to the citizen for an external document, back to the originating office
+    for an internal one. Returns (document, email_status); email_status is
+    None for internal documents, which have no citizen to email.
+    """
+    if document.is_internal:
+        return release_to_origin_office(document, releasing_user, notes, qr_verified), None
+    return release_to_citizen(document, releasing_user, notes, qr_verified)
+
+
+def release_to_origin_office(document, releasing_user, notes='', qr_verified=False):
+    """
+    Terminal step for an INTERNAL document: the completed document is handed
+    back to the office that started it. Only staff of the office holding it
+    or of the originating office may record this, and no citizen-facing
+    email or notification is ever sent.
+    """
+    if document.status != Document.Status.COMPLETED:
+        raise ValidationError(
+            f"Only a 'completed' document can be released to its originating office. "
+            f"This document is currently '{document.status}'."
+        )
+    origin_code = document.document_type.route[0]
+    if not (_same_office(releasing_user.office, document.current_office) or _same_office(releasing_user.office, origin_code)):
+        raise ValidationError(
+            f"Only {_office_name(document.current_office)} or the originating office "
+            f"({_office_name(origin_code)}) can release this internal document."
+        )
+
+    previous_handler = document.current_handler
+    document.status = Document.Status.RELEASED
+    document.current_handler = releasing_user
+    document.save()
+
+    DocumentLog.objects.create(
+        document=document,
+        action=DocumentLog.Action.RELEASED_TO_ORIGIN,
+        office=resolve_office(document.current_office),
+        sender=previous_handler,
+        acted_by=releasing_user,
+        qr_verified=qr_verified,
+        notes=notes,
+    )
+    advance_processing_stage(document, Document.ProcessingStage.COMPLETED, actor=releasing_user)
+    # Tell the originating office, unless it is the one recording the pickup.
+    if not _same_office(origin_code, releasing_user.office):
+        notify_origin_office(
+            document,
+            title=f"Released: {document.tracking_number}",
+            message=(
+                f"The {document.document_type.name} request ({document.tracking_number}) that your office "
+                f"started was released back to your office by {_office_name(document.current_office)}."
+            ),
+            acting_user=releasing_user,
+        )
+    return document
+
+
 def release_to_citizen(document, releasing_user, notes='', qr_verified=False):
     """
     Called by the origin office (e.g. BPLO) once the document is Completed,
@@ -522,6 +586,8 @@ def release_to_citizen(document, releasing_user, notes='', qr_verified=False):
     'sent', 'failed', 'skipped', or 'already_sent' — rather than assuming
     the email always goes out.
     """
+    if document.is_internal:
+        raise ValidationError("Internal documents are released to their originating office, never to a citizen.")
     if document.status != Document.Status.COMPLETED:
         raise ValidationError(
             f"Only a 'completed' document can be released to the citizen. "

@@ -220,10 +220,11 @@ class OfficeHistorySerializer(serializers.ModelSerializer):
         DocumentLog.Action.RELEASED: 'Forwarded',
         DocumentLog.Action.RETURN_INITIATED: 'Returned to previous office',
         DocumentLog.Action.RELEASED_TO_CITIZEN: 'Released to requester',
+        DocumentLog.Action.RELEASED_TO_ORIGIN: 'Released to originating office',
     }
 
     document_type_name = serializers.CharField(source='document_type.name', read_only=True)
-    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    status_label = serializers.CharField(source='status_display', read_only=True)
     requested_by_name = serializers.SerializerMethodField()
     visits = serializers.SerializerMethodField()
     in_custody = serializers.SerializerMethodField()
@@ -318,7 +319,9 @@ class DocumentSerializer(serializers.ModelSerializer):
         # obj.logs is ordered by timestamp (Meta.ordering on DocumentLog) —
         # last() gets the most recent release in case of a return-then-
         # re-release cycle, not just the first one ever.
-        return obj.logs.filter(action=DocumentLog.Action.RELEASED_TO_CITIZEN).order_by('-timestamp').first()
+        return obj.logs.filter(
+            action__in=[DocumentLog.Action.RELEASED_TO_CITIZEN, DocumentLog.Action.RELEASED_TO_ORIGIN]
+        ).order_by('-timestamp').first()
 
     def get_released_at(self, obj):
         log = self._released_log(obj)
@@ -360,7 +363,7 @@ class DocumentSerializer(serializers.ModelSerializer):
         if obj.status == 'completed':
             return f"Ready at {obj.origin_office}"
         if obj.status == 'released':
-            return "Released to Citizen"
+            return obj.status_display
         return obj.get_status_display()
 
     def get_dwell_display(self, obj):
@@ -519,7 +522,7 @@ class PublicDocumentTrackingSerializer(serializers.ModelSerializer):
         if obj.status == 'completed':
             return f"Ready at {obj.origin_office}"
         if obj.status == 'released':
-            return "Released to Citizen"
+            return obj.status_display
         return obj.get_status_display()
 
     def get_total_steps(self, obj):
@@ -601,7 +604,17 @@ class CreateDocumentSerializer(serializers.ModelSerializer):
         # _requester_display_name()). Dropped here rather than left
         # stored-but-unused, so they never silently disagree with the
         # account's own values for this request.
-        if attrs.get('requested_by') is not None:
+        document_type = attrs.get('document_type')
+        if document_type and document_type.scope == DocumentType.Scope.INTERNAL:
+            # Internal documents belong to an office, never to a citizen.
+            if attrs.get('requested_by') is not None:
+                raise serializers.ValidationError(
+                    {'requested_by': "Internal documents can't be linked to a citizen account."}
+                )
+            user = self.context['request'].user
+            attrs['guest_name'] = user.full_name
+            attrs['guest_email'] = user.email
+        elif attrs.get('requested_by') is not None:
             attrs['guest_name'] = ''
             attrs['guest_email'] = ''
         else:

@@ -143,6 +143,8 @@ def build_scan_context(document):
 
     return {
         'suggested_action': suggested_action,
+        # Internal documents finish at their originating office, not a citizen.
+        'is_internal': document.is_internal,
         'current_step_number': document.current_step_number,
         'total_steps': len(route),
         'current_office': document.current_office,

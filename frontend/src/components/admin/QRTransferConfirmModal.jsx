@@ -11,6 +11,9 @@ const ACTION_META = {
   return: { label: 'Release to Citizen', verb: 'Released to citizen', icon: HandshakeIcon, color: 'bg-indigo-600 hover:bg-indigo-700' },
 };
 
+// The final hand-over of an internal document goes back to the office that started it.
+const INTERNAL_RETURN = { ...ACTION_META.return, label: 'Release to Originating Office', verb: 'Released to originating office' };
+
 /**
  * Opened immediately after EmployeeQRScanner resolves a physical QR tag.
  * Pre-filled from the scan — current step, dwell time, time spent at the
@@ -27,7 +30,7 @@ export default function QRTransferConfirmModal({ document, scanContext, rawPaylo
   const [submitting, setSubmitting] = useState(false);
 
   const action = scanContext?.suggested_action;
-  const meta = action ? ACTION_META[action] : null;
+  const meta = action === 'return' && scanContext?.is_internal ? INTERNAL_RETURN : (action ? ACTION_META[action] : null);
   const Icon = meta?.icon;
 
   const handleConfirm = async () => {

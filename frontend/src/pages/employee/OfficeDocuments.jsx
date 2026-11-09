@@ -25,7 +25,7 @@ export default function OfficeDocuments() {
   const [showModal, setShowModal] = useState(false);
   const [selectedId, setSelectedId] = useState(null); // read-only form viewer
   const [manageId, setManageId] = useState(null); // interactive status-transition modal
-  const [confirmReleaseId, setConfirmReleaseId] = useState(null);
+  const [confirmRelease, setConfirmRelease] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -108,9 +108,12 @@ export default function OfficeDocuments() {
 
   const executeRelease = async () => {
     try {
-      await api.patch(`/documents/${confirmReleaseId}/release/`);
-      showToast("Document Released successfully!", "success");
-      setConfirmReleaseId(null);
+      const res = await api.patch(`/documents/${confirmRelease.id}/release/`);
+      showToast(
+        res.data.released_to === 'origin_office' ? 'Document released to its originating office.' : 'Document Released successfully!',
+        'success',
+      );
+      setConfirmRelease(null);
       loadDocs();
     } catch (err) {
       showToast("Error releasing document", "error");
@@ -234,10 +237,10 @@ export default function OfficeDocuments() {
 
                   {activeTab === 'my-requests' && doc.status === 'completed' && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); setConfirmReleaseId(doc.id); }}
+                      onClick={(e) => { e.stopPropagation(); setConfirmRelease(doc); }}
                       className="bg-green-600 hover:bg-green-700 text-white text-[10px] font-black px-4 py-2 rounded-xl shadow-lg shadow-green-100 dark:shadow-none transition-all uppercase"
                     >
-                      Release to Citizen
+                      {doc.document_type_scope === 'internal' ? 'Release to Originating Office' : 'Release to Citizen'}
                     </button>
                   )}
                   {activeTab === 'to-scan' && (
@@ -265,13 +268,15 @@ export default function OfficeDocuments() {
         <DocumentDetailModal documentId={manageId} onClose={() => setManageId(null)} onUpdated={loadDocs} />
       )}
       {showModal && <NewRequestModal onClose={() => setShowModal(false)} onCreated={loadDocs} />}
-      {confirmReleaseId && (
+      {confirmRelease && (
         <ConfirmModal
           title="Confirm Release"
-          message="Is the physical document ready and the citizen present for collection?"
+          message={confirmRelease.document_type_scope === 'internal'
+            ? 'Is the physical document ready to hand back to its originating office for pickup or filing?'
+            : 'Is the physical document ready and the citizen present for collection?'}
           confirmLabel="Yes, Release Now"
           confirmColor="bg-green-600 hover:bg-green-700"
-          onCancel={() => setConfirmReleaseId(null)}
+          onCancel={() => setConfirmRelease(null)}
           onConfirm={executeRelease}
         />
       )}
