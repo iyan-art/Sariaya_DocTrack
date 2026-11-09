@@ -250,18 +250,20 @@ export default function DashboardLayout() {
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{user.full_name}</p>
                     <p className="text-xs text-slate-400 dark:text-slate-500 break-all">{user.email}</p>
                     </div>
-                    <button
+                    <NavLink
+                    to={`/${user.role}/settings`}
                     onClick={() => setProfileOpen(false)}
                     className="w-full flex items-center gap-2 text-left px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                     >
                     <UserCircleIcon className="w-4 h-4" /> Profile
-                    </button>
-                    <button
+                    </NavLink>
+                    <NavLink
+                    to={`/${user.role}/settings#security`}
                     onClick={() => setProfileOpen(false)}
                     className="w-full flex items-center gap-2 text-left px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                     >
                     <SettingsIcon className="w-4 h-4" /> Settings
-                    </button>
+                    </NavLink>
                     <div className="border-t border-slate-100 dark:border-slate-700 mt-1">
                     <button
                         onClick={handleLogout}

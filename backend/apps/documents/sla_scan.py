@@ -87,6 +87,8 @@ def run_overdue_scan():
             if already_warned:
                 continue
             for staff in responsible_employees(document):
+                if not staff.wants_notification('overdue_alerts'):
+                    continue
                 send_overdue_warning_email(document, staff, sla_hours, dwell_hours, due_at)
                 overdue_emails_sent += 1
 
@@ -114,6 +116,8 @@ def run_overdue_scan():
             if already_notified:
                 continue
             for staff in responsible_employees(document):
+                if not staff.wants_notification('overdue_alerts'):
+                    continue
                 send_due_soon_email(document, staff, sla_hours, dwell_hours, due_at)
                 due_soon_emails_sent += 1
 

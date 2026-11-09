@@ -115,6 +115,12 @@ export const updateUser = (userId, data) => {
   return api.patch(`/accounts/users/${userId}/update/`, data);
 };
 
+// --- The signed-in user's own Profile & Settings ---
+export const fetchMyProfile = () => api.get('/accounts/me/');
+export const updateMyProfile = (data) => api.patch('/accounts/me/', data);
+export const changeMyPassword = (data) => api.post('/accounts/me/password/', data);
+export const fetchMyLinkedRequests = () => api.get('/accounts/me/linked-requests/');
+
 // Admin-only system-wide audit trail (logins, etc.) — powers AdminAccessLogs.
 export const fetchAccessLogs = (page = 1, action = '') => {
   const params = new URLSearchParams({ page });

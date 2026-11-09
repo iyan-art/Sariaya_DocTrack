@@ -14,12 +14,7 @@ from .models import (
 from .services import resolve_office, release_document
 from .qr_services import generate_qr_code
 from .sla_scan import DUE_SOON_THRESHOLD_RATIO
-
-# Philippine mobile numbers only: 09XXXXXXXXX or +639XXXXXXXXX. [0-9] rather
-# than \d, which in Python also accepts non-ASCII digits. Used with fullmatch()
-# since a `$` would still let a trailing newline through.
-CONTACT_NUMBER_RE = re.compile(r'(?:09|\+639)[0-9]{9}')
-CONTACT_NUMBER_ERROR = 'Invalid contact number format. Please use 09XXXXXXXXX or +639XXXXXXXXX'
+from apps.accounts.validators import CONTACT_NUMBER_ERROR, is_valid_contact_number
 
 
 def format_duration(delta):
@@ -575,7 +570,7 @@ class CreateDocumentSerializer(serializers.ModelSerializer):
         return attrs
 
     def validate_contact_number(self, value):
-        if not isinstance(value, str) or not CONTACT_NUMBER_RE.fullmatch(value):
+        if not is_valid_contact_number(value):
             raise serializers.ValidationError(CONTACT_NUMBER_ERROR)
         return value
 

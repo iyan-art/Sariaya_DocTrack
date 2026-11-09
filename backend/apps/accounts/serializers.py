@@ -3,7 +3,8 @@ import string
 
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
-from .models import User, AccessLog
+from .models import NOTIFICATION_PREFERENCES, User, AccessLog
+from .validators import CONTACT_NUMBER_ERROR, is_valid_contact_number
 
 
 def generate_temp_password(length=None):
@@ -78,6 +79,85 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'email', 'first_name', 'last_name', 'full_name', 'role', 'employee_id',
                   'office', 'position', 'is_active', 'date_joined']
+
+class ProfileSerializer(serializers.ModelSerializer):
+    """
+    The signed-in user's own account, for the Profile & Settings page. Only
+    names, email, contact number, and notification preferences are editable;
+    role, office, and position stay under the admin's control.
+    """
+    full_name = serializers.ReadOnlyField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'first_name', 'last_name', 'full_name', 'role', 'employee_id',
+                  'office', 'position', 'contact_number', 'notification_preferences', 'date_joined']
+        read_only_fields = ['id', 'role', 'employee_id', 'office', 'position', 'date_joined']
+
+    def validate_first_name(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("First name is required.")
+        return value.strip()
+
+    def validate_last_name(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Last name is required.")
+        return value.strip()
+
+    def validate_email(self, value):
+        email = User.objects.normalize_email(value.strip())
+        if User.objects.filter(email__iexact=email).exclude(pk=self.instance.pk).exists():
+            raise serializers.ValidationError("Another account already uses this email address.")
+        return email
+
+    def validate_contact_number(self, value):
+        if value and not is_valid_contact_number(value):
+            raise serializers.ValidationError(CONTACT_NUMBER_ERROR)
+        return value
+
+    def validate_notification_preferences(self, value):
+        allowed = NOTIFICATION_PREFERENCES[self.instance.role]
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Expected an object of on/off settings.")
+        unknown = [key for key in value if key not in allowed]
+        if unknown:
+            raise serializers.ValidationError(f"Unknown setting: {', '.join(unknown)}.")
+        if any(not isinstance(on, bool) for on in value.values()):
+            raise serializers.ValidationError("Each setting must be true or false.")
+        # A partial update: merge into the saved settings.
+        return {**self.instance.notification_preferences, **value}
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['notification_preferences'] = [
+            {'key': key, 'label': label, 'enabled': instance.wants_notification(key)}
+            for key, label in NOTIFICATION_PREFERENCES[instance.role].items()
+        ]
+        return data
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True, trim_whitespace=False)
+    new_password = serializers.CharField(write_only=True, trim_whitespace=False)
+    confirm_password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate_current_password(self, value):
+        if not self.context['request'].user.check_password(value):
+            raise serializers.ValidationError("Your current password is incorrect.")
+        return value
+
+    def validate(self, attrs):
+        user = self.context['request'].user
+        if attrs['new_password'] != attrs['confirm_password']:
+            raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
+        if attrs['new_password'] == attrs['current_password']:
+            raise serializers.ValidationError({"new_password": "Choose a password different from your current one."})
+        try:
+            validate_password(attrs['new_password'], user)
+        except Exception as exc:
+            raise serializers.ValidationError({"new_password": list(getattr(exc, 'messages', [str(exc)]))})
+        return attrs
+
 
 class CreateEmployeeSerializer(serializers.ModelSerializer):
     """

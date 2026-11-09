@@ -64,6 +64,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Citizens never get one; it stays null for them.
     employee_id = models.CharField(max_length=20, unique=True, null=True, blank=True, db_index=True)
 
+    # Optional; validated as a Philippine mobile number by ProfileSerializer.
+    contact_number = models.CharField(max_length=13, blank=True)
+
+    # Which optional alerts this user has switched off, e.g.
+    # {"incoming_documents": false}. Anything not listed is on — see
+    # NOTIFICATION_PREFERENCES for the keys each role can set.
+    notification_preferences = models.JSONField(default=dict, blank=True)
+
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
 
@@ -107,6 +115,27 @@ class User(AbstractBaseUser, PermissionsMixin):
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
 
+    def wants_notification(self, key):
+        return self.notification_preferences.get(key, True) is not False
+
+
+# The alerts each role may switch off. Everything else (expedite requests,
+# ready-for-pickup emails, password and account notices) always goes out.
+NOTIFICATION_PREFERENCES = {
+    User.Role.EMPLOYEE: {
+        'incoming_documents': 'Documents forwarded to my office',
+        'returned_documents': 'Documents returned to my office',
+        'overdue_alerts': 'Approaching-due and overdue email warnings',
+    },
+    User.Role.ADMIN: {
+        'incoming_documents': 'Documents forwarded to my office',
+        'returned_documents': 'Documents returned to my office',
+        'bottleneck_alerts': 'Bottleneck alerts for overdue documents',
+        'feedback_alerts': 'Urgent low-rating citizen feedback',
+    },
+    User.Role.CITIZEN: {},
+}
+
 
 class AccessLog(models.Model):
     """
@@ -126,6 +155,8 @@ class AccessLog(models.Model):
         # accounts/services.py::link_guest_documents(), run on both
         # registration and login.
         GUEST_DOCUMENTS_LINKED = 'guest_documents_linked', 'Guest Documents Linked'
+        PROFILE_UPDATED = 'profile_updated', 'Profile Updated'
+        PASSWORD_CHANGED = 'password_changed', 'Password Changed'
         OTHER = 'other', 'Other'
 
     # SET_NULL (not CASCADE) so deleting a user doesn't erase the audit trail,

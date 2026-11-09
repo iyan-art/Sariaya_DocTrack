@@ -9,7 +9,13 @@ from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
 
 from .models import User, AccessLog
-from .serializers import RegisterSerializer, UserSerializer, CreateEmployeeSerializer, AccessLogSerializer, generate_temp_password
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from .serializers import (
+    RegisterSerializer, UserSerializer, CreateEmployeeSerializer, AccessLogSerializer, generate_temp_password,
+    ProfileSerializer, ChangePasswordSerializer,
+)
 from .permissions import IsAdmin
 from .services import link_guest_documents
 from apps.documents.permissions import IsStaffUser
@@ -116,15 +122,83 @@ class RegisterView(generics.CreateAPIView):
 
 class MeView(APIView):
     """
-    GET /api/accounts/me/
-    Returns the currently logged-in user's info.
-    Frontend calls this after refresh to know who's logged in and their role.
+    GET   /api/accounts/me/  the signed-in user's own account. Frontend calls
+                             this after refresh to know who's logged in.
+    PATCH /api/accounts/me/  update names, email, contact number, or
+                             notification preferences (see ProfileSerializer).
     """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response(UserSerializer(request.user).data)
-    
+        return Response(ProfileSerializer(request.user).data)
+
+    def patch(self, request):
+        serializer = ProfileSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        changed = [
+            field for field, value in serializer.validated_data.items()
+            if getattr(request.user, field) != value
+        ]
+        user = serializer.save()
+        if changed:
+            AccessLog.objects.create(
+                user=user, action=AccessLog.Action.PROFILE_UPDATED,
+                detail=f"Updated {', '.join(changed)}.",
+                ip_address=_client_ip(request), user_agent=request.META.get('HTTP_USER_AGENT', '')[:255],
+            )
+        return Response(ProfileSerializer(user).data)
+
+
+class ChangePasswordView(APIView):
+    """
+    POST /api/accounts/me/password/
+    Body: { current_password, new_password, confirm_password }
+    Signs out every other device by blacklisting the account's refresh
+    tokens, then returns a fresh pair so this device stays signed in.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        user = request.user
+        user.set_password(serializer.validated_data['new_password'])
+        user.save(update_fields=['password'])
+
+        for token in OutstandingToken.objects.filter(user=user):
+            BlacklistedToken.objects.get_or_create(token=token)
+        refresh = RefreshToken.for_user(user)
+
+        AccessLog.objects.create(
+            user=user, action=AccessLog.Action.PASSWORD_CHANGED,
+            ip_address=_client_ip(request), user_agent=request.META.get('HTTP_USER_AGENT', '')[:255],
+        )
+        return Response({
+            "message": "Password changed. Other devices have been signed out.",
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+        })
+
+
+class LinkedRequestsView(APIView):
+    """
+    GET /api/accounts/me/linked-requests/
+    Citizen only: when walk-in requests made under this account's email were
+    attached to it (see services.py::link_guest_documents()).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != User.Role.CITIZEN:
+            return Response({"detail": "Only citizen accounts have linked requests."}, status=status.HTTP_403_FORBIDDEN)
+        events = AccessLog.objects.filter(user=request.user, action=AccessLog.Action.GUEST_DOCUMENTS_LINKED)
+        return Response({
+            "email": request.user.email,
+            "requests_on_account": request.user.requested_documents.count(),
+            "events": [{"timestamp": e.timestamp, "detail": e.detail} for e in events],
+        })
+
+
 class UserPagination(PageNumberPagination):
     page_size = 10  # matches your "maximum 10" pagination spec
 

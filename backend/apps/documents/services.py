@@ -10,6 +10,20 @@ from .notifications import send_ready_for_release_email, send_ready_for_release_
 # route_position has somehow drifted out of range for its WorkflowStep rows.
 DEFAULT_FALLBACK_SLA_HOURS = 48
 
+# In-app alert types a user can switch off in Settings (see
+# accounts.models.NOTIFICATION_PREFERENCES). Types not listed always go out.
+PREFERENCE_FOR_NOTIFICATION = {
+    Notification.NotificationType.DOCUMENT_FORWARDED: 'incoming_documents',
+    Notification.NotificationType.DOCUMENT_RETURNED: 'returned_documents',
+    Notification.NotificationType.BOTTLENECK_ALERT: 'bottleneck_alerts',
+    Notification.NotificationType.SYSTEM_ALERT: 'feedback_alerts',
+}
+
+
+def _wants(user, notification_type):
+    key = PREFERENCE_FOR_NOTIFICATION.get(notification_type)
+    return key is None or user.wants_notification(key)
+
 
 def notify_office(office_label, title, message, notification_type, sender=None, related_document=None, exclude_user=None):
     """
@@ -30,7 +44,7 @@ def notify_office(office_label, title, message, notification_type, sender=None, 
             recipient=user, sender=sender, title=title, message=message,
             notification_type=notification_type, related_document=related_document,
         )
-        for user in recipients
+        for user in recipients if _wants(user, notification_type)
     ])
 
 
@@ -42,7 +56,7 @@ def notify_admins(title, message, notification_type, sender=None, related_docume
             recipient=user, sender=sender, title=title, message=message,
             notification_type=notification_type, related_document=related_document,
         )
-        for user in recipients
+        for user in recipients if _wants(user, notification_type)
     ])
 
 
