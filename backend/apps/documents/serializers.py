@@ -204,6 +204,77 @@ class DocumentLogSerializer(serializers.ModelSerializer):
         return format_duration(obj.duration_at_office)
 
 
+class OfficeHistorySerializer(serializers.ModelSerializer):
+    """
+    One document as seen from one office (context['office']): each spell it
+    spent in that office's custody — when it arrived, who took it in, and
+    when and how it left. A document returned to the office has several.
+    """
+    ARRIVALS = {
+        DocumentLog.Action.CREATED: 'Created here',
+        DocumentLog.Action.RECEIVED: 'Received',
+        DocumentLog.Action.RETURNED: 'Received (final step)',
+        DocumentLog.Action.RETURN_RECEIVED: 'Received back',
+    }
+    DEPARTURES = {
+        DocumentLog.Action.RELEASED: 'Forwarded',
+        DocumentLog.Action.RETURN_INITIATED: 'Returned to previous office',
+        DocumentLog.Action.RELEASED_TO_CITIZEN: 'Released to requester',
+    }
+
+    document_type_name = serializers.CharField(source='document_type.name', read_only=True)
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    requested_by_name = serializers.SerializerMethodField()
+    visits = serializers.SerializerMethodField()
+    in_custody = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Document
+        fields = [
+            'id', 'tracking_number', 'document_type_name', 'requested_by_name', 'status', 'status_label',
+            'current_office', 'visits', 'in_custody',
+        ]
+
+    def get_requested_by_name(self, obj):
+        if obj.requested_by:
+            return obj.requested_by.full_name
+        return obj.guest_name or 'Walk-in / Unregistered'
+
+    @staticmethod
+    def _actor(log):
+        if not log.acted_by:
+            return None
+        user = log.acted_by
+        return f"{user.full_name} ({user.employee_id})" if user.employee_id else user.full_name
+
+    def get_visits(self, obj):
+        office = self.context['office']
+        visits = []
+        for log in obj.logs.all():  # prefetched, oldest first
+            if log.office_id != office.pk:
+                continue
+            if log.action in self.ARRIVALS:
+                visits.append({
+                    'arrived_at': log.timestamp, 'arrival': self.ARRIVALS[log.action],
+                    'received_by': self._actor(log), 'qr_verified': log.qr_verified,
+                    'left_at': None, 'departure': None, 'left_by': None, 'hours_in_office': None,
+                })
+            elif log.action in self.DEPARTURES and visits and visits[-1]['left_at'] is None:
+                visit = visits[-1]
+                visit.update(left_at=log.timestamp, departure=self.DEPARTURES[log.action], left_by=self._actor(log))
+        now = timezone.now()
+        for visit in visits:
+            end = visit['left_at'] or now
+            visit['hours_in_office'] = round((end - visit['arrived_at']).total_seconds() / 3600, 1)
+        return visits
+
+    def get_in_custody(self, obj):
+        office = self.context['office']
+        return obj.current_office == office.code and obj.status in (
+            Document.Status.IN_PROGRESS, Document.Status.COMPLETED, Document.Status.MISSING,
+        )
+
+
 class DocumentSerializer(serializers.ModelSerializer):
     """
     Used for listing/retrieving documents. Shows CURRENT state at a glance —

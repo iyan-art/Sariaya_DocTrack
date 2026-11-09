@@ -731,6 +731,8 @@ class Notification(models.Model):
         SYSTEM_ALERT = 'system_alert', 'System Alert'
         # Progress on a citizen's own request — see services.py::notify_citizen().
         DOCUMENT_UPDATE = 'document_update', 'Document Update'
+        # Tells the office that started a request it has finished its route.
+        DOCUMENT_COMPLETED = 'document_completed', 'Request Completed'
 
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications',

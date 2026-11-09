@@ -290,6 +290,13 @@ export const fetchHeatmapData = () => api.get('/documents/heatmap/');
 // (avg turnaround, avg citizen rating), filtered to the requester's office.
 export const fetchMyOfficePerformance = () => api.get('/documents/my-office-performance/');
 
+// Every document that has passed through the signed-in staff member's office.
+export const fetchOfficeHistory = (page = 1, scope = 'all', search = '') => {
+  const params = new URLSearchParams({ page, scope });
+  if (search) params.append('search', search);
+  return api.get(`/documents/office-history/?${params.toString()}`);
+};
+
 // Active-only — used by document-creation dropdowns (NewRequestModal, NewDocumentModal).
 export const fetchDocumentTypes = () => {
   return api.get('/documents/types/');

@@ -19,6 +19,7 @@ PREFERENCE_FOR_NOTIFICATION = {
     Notification.NotificationType.DOCUMENT_RETURNED: 'returned_documents',
     Notification.NotificationType.BOTTLENECK_ALERT: 'bottleneck_alerts',
     Notification.NotificationType.SYSTEM_ALERT: 'feedback_alerts',
+    Notification.NotificationType.DOCUMENT_COMPLETED: 'completed_documents',
 }
 
 
@@ -58,6 +59,18 @@ EMPLOYEE_ID_RE = re.compile(r'\(?EMP-\d{4}-\d+\)?\.?')
 def _office_name(code):
     office = resolve_office(code)
     return office.name if office else code
+
+
+def notify_origin_office(document, title, message, acting_user):
+    """
+    In-app alert for the staff of the office that started this request (Step 1
+    of its workflow), who otherwise never hear what happened once it left them.
+    """
+    notify_office(
+        document.document_type.route[0], title=title, message=message,
+        notification_type=Notification.NotificationType.DOCUMENT_COMPLETED,
+        sender=acting_user, related_document=document, exclude_user=acting_user,
+    )
 
 
 def notify_citizen(document, title, message):
@@ -460,6 +473,16 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
         # Not a model field: just lets the calling view tell staff the outcome.
         document.ready_email_status = _maybe_notify_citizen_ready(document)
         _notify_office_ready(document)
+        final_office = _office_name(document.current_office)
+        notify_origin_office(
+            document,
+            title=f"Completed: {document.tracking_number}",
+            message=(
+                f"The {document.document_type.name} request ({document.tracking_number}) that your office "
+                f"started has completed every step and is ready for pickup at {final_office}."
+            ),
+            acting_user=scanning_user,
+        )
         notify_citizen(
             document,
             title="Ready for pickup",
@@ -521,6 +544,17 @@ def release_to_citizen(document, releasing_user, notes='', qr_verified=False):
     )
     advance_processing_stage(document, Document.ProcessingStage.COMPLETED, actor=releasing_user)
     email_status = _maybe_notify_citizen_ready(document)
+    # When the origin office hands it over itself, its own staff already know.
+    if not _same_office(document.document_type.route[0], document.current_office):
+        notify_origin_office(
+            document,
+            title=f"Released: {document.tracking_number}",
+            message=(
+                f"The {document.document_type.name} request ({document.tracking_number}) that your office "
+                f"started was released to the requester by {_office_name(document.current_office)}."
+            ),
+            acting_user=releasing_user,
+        )
     notify_citizen(
         document,
         title="Released to you",

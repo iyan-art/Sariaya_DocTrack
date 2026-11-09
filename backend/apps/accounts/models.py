@@ -126,12 +126,14 @@ NOTIFICATION_PREFERENCES = {
         'incoming_documents': 'Documents forwarded to my office',
         'returned_documents': 'Documents returned to my office',
         'overdue_alerts': 'Approaching-due and overdue email warnings',
+        'completed_documents': "Requests my office started that finished their route",
     },
     User.Role.ADMIN: {
         'incoming_documents': 'Documents forwarded to my office',
         'returned_documents': 'Documents returned to my office',
         'bottleneck_alerts': 'Bottleneck alerts for overdue documents',
         'feedback_alerts': 'Urgent low-rating citizen feedback',
+        'completed_documents': "Requests my office started that finished their route",
     },
     User.Role.CITIZEN: {},
 }

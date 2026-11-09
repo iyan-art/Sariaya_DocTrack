@@ -52,6 +52,7 @@ const MENUS = {
   employee: [
     { label: 'Dashboard', path: '/employee/dashboard', icon: LayoutGridIcon },
     { label: 'Documents', path: '/employee/documents', icon: FileTextIcon },
+    { label: 'Office History', path: '/employee/office-history', icon: Clock3Icon },
     { label: 'QR Code Scan', path: '/employee/qr-scan', icon: ScanLineIcon },
   ],
   citizen: [

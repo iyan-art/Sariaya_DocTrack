@@ -22,7 +22,7 @@ from .serializers import (
     SurveyCommentSerializer, CitizenSuggestionSerializer, CitizenSuggestionAdminSerializer,
     EmailNotificationLogSerializer, PublicOfficeSerializer,
     AnnouncementSerializer, EventSerializer, PublicDocumentTypeSerializer,
-    NotificationSerializer,
+    NotificationSerializer, OfficeHistorySerializer,
 )
 from .permissions import IsStaffUser
 from apps.accounts.permissions import IsAdmin
@@ -31,7 +31,7 @@ from .sla_scan import run_overdue_scan, run_missing_scan
 from .qr_services import resolve_and_verify, enforce_scope_access, build_scan_context, generate_qr_code
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
-from django.db.models import Count, Avg, F, Subquery, OuterRef, DurationField, ExpressionWrapper
+from django.db.models import Count, Avg, F, Max, Prefetch, Q, Subquery, OuterRef, DurationField, ExpressionWrapper
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 from datetime import timedelta
@@ -1168,6 +1168,67 @@ class AdminDashboardStatsView(APIView):
             "bottlenecks": bottlenecks,
             "bottleneck_hours": bottleneck_hours,
         })
+
+class OfficeHistoryPagination(PageNumberPagination):
+    page_size = 15
+
+
+class OfficeHistoryView(generics.ListAPIView):
+    """
+    GET /api/documents/office-history/?scope=all|here|passed&search=
+    Every document that has been in the requesting staff member's office —
+    including offices that only receive and pass documents on — with when it
+    arrived and left each time. Admins may pass ?office=<code> to look at any
+    office; employees always see their own.
+    """
+    serializer_class = OfficeHistorySerializer
+    permission_classes = [IsStaffUser]
+    pagination_class = OfficeHistoryPagination
+
+    def get_office(self):
+        label = self.request.user.office
+        if self.request.user.role == 'admin' and self.request.query_params.get('office'):
+            label = self.request.query_params['office']
+        office = resolve_office(label)
+        if not office:
+            raise NotFound("Your account isn't assigned to an office yet, so there is no office history to show.")
+        return office
+
+    def get_queryset(self):
+        office = self.get_office()
+        qs = (
+            Document.objects.filter(logs__office=office).distinct()
+            .select_related('document_type', 'requested_by')
+            .prefetch_related(Prefetch('logs', queryset=DocumentLog.objects.select_related('acted_by').order_by('timestamp', 'id')))
+            .annotate(last_here=Max('logs__timestamp', filter=Q(logs__office=office)))
+            .order_by('-last_here')
+        )
+        scope = self.request.query_params.get('scope')
+        in_custody = Q(current_office=office.code, status__in=[
+            Document.Status.IN_PROGRESS, Document.Status.COMPLETED, Document.Status.MISSING,
+        ])
+        if scope == 'here':
+            qs = qs.filter(in_custody)
+        elif scope == 'passed':
+            qs = qs.exclude(in_custody)
+        search = self.request.query_params.get('search', '').strip()
+        if search:
+            qs = qs.filter(
+                Q(tracking_number__icontains=search) | Q(document_type__name__icontains=search)
+                | Q(guest_name__icontains=search) | Q(requested_by__first_name__icontains=search)
+                | Q(requested_by__last_name__icontains=search)
+            )
+        return qs
+
+    def get_serializer_context(self):
+        return {**super().get_serializer_context(), 'office': self.get_office()}
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        office = self.get_office()
+        response.data['office'] = {'code': office.code, 'name': office.name}
+        return response
+
 
 class MissingDocumentAlertListView(generics.ListAPIView):
     """

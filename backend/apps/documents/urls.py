@@ -11,7 +11,7 @@ from .views import (
     MyDocumentListView, MyDocumentDetailView, DocumentEvaluationView, PublicDocumentEvaluationView,
     DocumentStageUpdateView, DocumentCitizenReturnView, DocumentExpediteView,
     EmailNotificationLogListView, RunSlaScanView,
-    AnnouncementListView, EventListView, PublicDocumentTypeListView,
+    AnnouncementListView, EventListView, PublicDocumentTypeListView, OfficeHistoryView,
 )
 
 urlpatterns = [
@@ -37,6 +37,7 @@ urlpatterns = [
     path('suggestions/admin/', AdminSuggestionListView.as_view(), name='suggestion-admin-list'),
     path('suggestions/admin/<int:pk>/', AdminSuggestionDetailView.as_view(), name='suggestion-admin-detail'),
 
+    path('office-history/', OfficeHistoryView.as_view(), name='office-history'),
     path('mine/', MyDocumentListView.as_view(), name='my-document-list'),
     path('mine/<int:pk>/', MyDocumentDetailView.as_view(), name='my-document-detail'),
 

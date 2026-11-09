@@ -14,6 +14,7 @@ import AdminDocumentTypeManager from './pages/admin/AdminDocumentTypeManager';
 import AdminOfficeManager from './pages/admin/AdminOfficeManager';
 import OfficeDocuments from './pages/employee/OfficeDocuments';
 import EmployeeDashboard from './pages/employee/Dashboard';
+import OfficeHistory from './pages/employee/OfficeHistory';
 import PublicTrack from './pages/PublicTrack';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import Heatmap from './pages/admin/Heatmap';
@@ -71,6 +72,7 @@ function App() {
           <Route path="/employee/dashboard" element={<EmployeeDashboard />} />
            <Route path="/employee/documents" element={<OfficeDocuments />} />
           <Route path="/employee/qr-scan" element={<QRScan />} />
+          <Route path="/employee/office-history" element={<OfficeHistory />} />
           <Route path="/employee/settings" element={<AccountSettings />} />
           <Route path="/employee/notifications" element={<Notifications />} />
         </Route>
