@@ -18,7 +18,7 @@ from .serializers import (
     DocumentSerializer, DocumentDetailSerializer, CreateDocumentSerializer, DocumentTypeSerializer,
     DocumentTypeWriteSerializer, WorkflowStepsReplaceSerializer, OfficeSerializer,
     DocumentTransferSerializer, MissingDocumentAlertSerializer, PublicDocumentTrackingSerializer,
-    SurveySerializer, SurveyWriteSerializer, SurveyQuestionsReplaceSerializer,
+    SurveySerializer, RespondentSurveySerializer, SurveyWriteSerializer, SurveyQuestionsReplaceSerializer,
     SurveyCommentSerializer, CitizenSuggestionSerializer, CitizenSuggestionAdminSerializer,
     EmailNotificationLogSerializer, PublicOfficeSerializer,
     AnnouncementSerializer, EventSerializer, PublicDocumentTypeSerializer,
@@ -486,7 +486,7 @@ def _evaluation_get(document):
         SurveyResponse.objects.filter(document=document).values_list('office_id', flat=True)
     )
     return Response({
-        "survey": SurveySerializer(survey).data,
+        "survey": RespondentSurveySerializer(survey).data,
         "offices": [
             {"id": o.id, "name": o.name, "code": o.code, "already_rated": o.id in rated_office_ids}
             for o in _document_route_offices(document)
@@ -1298,25 +1298,23 @@ class MyOfficePerformanceView(APIView):
 
 class SurveyListCreateView(generics.ListCreateAPIView):
     """
-    GET  /api/documents/surveys/            active surveys only (public —
-                                             Landing page + citizen portal),
-                                             or ?all=true for every survey
-                                             (admin Survey Manager)
+    GET  /api/documents/surveys/            admin Survey Manager: active
+                                             surveys, or ?all=true for all
     POST /api/documents/surveys/            admin creates a bare survey;
                                              questions are added afterward
                                              via .../<id>/questions/
+
+    Admin only, reads included. Citizens and guests are respondents: they
+    get the active form through the evaluation, post-scan and public survey
+    endpoints (RespondentSurveySerializer), never this management API.
     """
+    permission_classes = [IsAdmin]
 
     def get_queryset(self):
         qs = Survey.objects.all()
-        user = self.request.user
-        is_admin = bool(user and user.is_authenticated and getattr(user, 'role', None) == 'admin')
-        if not (is_admin and self.request.query_params.get('all') == 'true'):
+        if self.request.query_params.get('all') != 'true':
             qs = qs.filter(is_active=True)
         return qs.prefetch_related('questions')
-
-    def get_permissions(self):
-        return [IsAdmin()] if self.request.method == 'POST' else [AllowAny()]
 
     def get_serializer_class(self):
         return SurveyWriteSerializer if self.request.method == 'POST' else SurveySerializer
@@ -1331,21 +1329,10 @@ class SurveyListCreateView(generics.ListCreateAPIView):
 class SurveyDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     GET/PATCH/DELETE /api/documents/surveys/<id>/
-    Read is public (only if active, unless you're an admin); editing/
-    deleting is admin-only.
+    Admin only, like the rest of survey management.
     """
     queryset = Survey.objects.prefetch_related('questions')
-
-    def get_permissions(self):
-        return [AllowAny()] if self.request.method == 'GET' else [IsAdmin()]
-
-    def get_object(self):
-        obj = super().get_object()
-        user = self.request.user
-        is_admin = bool(user and user.is_authenticated and getattr(user, 'role', None) == 'admin')
-        if self.request.method == 'GET' and not obj.is_active and not is_admin:
-            raise NotFound("Survey not found.")
-        return obj
+    permission_classes = [IsAdmin]
 
     def get_serializer_class(self):
         return SurveySerializer if self.request.method == 'GET' else SurveyWriteSerializer
@@ -1703,7 +1690,7 @@ class PostScanSurveyView(APIView):
         document = self._get_document(request, pk)
         survey = _active_evaluation_survey()
         return Response({
-            "survey": SurveySerializer(survey).data if survey else None,
+            "survey": RespondentSurveySerializer(survey).data if survey else None,
             "already_submitted": bool(survey) and self._already_submitted(survey, document, request.user),
         })
 
@@ -1804,7 +1791,7 @@ class PublicSurveyView(APIView):
 
     def get(self, request):
         survey = _active_evaluation_survey()
-        return Response({"survey": SurveySerializer(survey).data if survey else None})
+        return Response({"survey": RespondentSurveySerializer(survey).data if survey else None})
 
     def post(self, request):
         survey = _active_evaluation_survey()

@@ -813,10 +813,9 @@ class SurveyQuestionSerializer(serializers.ModelSerializer):
 
 class SurveySerializer(serializers.ModelSerializer):
     """
-    Full read representation — includes the ordered question list plus
-    lightweight response stats, used both by the admin Survey Manager and
-    the public survey widget (the public one just won't have much use for
-    response_count/average_rating, but there's no harm exposing them).
+    Admin read representation — the ordered question list plus response
+    stats, for the Survey Manager. Respondents get RespondentSurveySerializer
+    below instead, which leaves the stats and publishing state out.
     """
     questions = SurveyQuestionSerializer(many=True, read_only=True)
     response_count = serializers.SerializerMethodField()
@@ -838,6 +837,18 @@ class SurveySerializer(serializers.ModelSerializer):
             rating_value__isnull=False,
         ).aggregate(avg=Avg('rating_value'))['avg']
         return round(avg, 2) if avg is not None else None
+
+
+class RespondentSurveySerializer(serializers.ModelSerializer):
+    """
+    What a citizen or guest answering a survey sees: the form itself and
+    nothing about how it is managed or how others have answered it.
+    """
+    questions = SurveyQuestionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Survey
+        fields = ['id', 'title', 'description', 'questions']
 
 
 class SurveyCommentSerializer(serializers.ModelSerializer):
