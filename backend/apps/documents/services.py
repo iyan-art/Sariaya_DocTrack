@@ -4,7 +4,7 @@ from django.db.models.functions import Trim, Upper
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from apps.accounts.models import User
-from .models import Document, DocumentLog, EmailNotificationLog, Notification, Office, RequestStatusHistory
+from .models import Document, DocumentLog, EmailNotificationLog, MissingDocumentAlert, Notification, Office, RequestStatusHistory
 from .notifications import send_ready_for_release_email, send_ready_for_release_staff_email
 
 # Mirrors sla_scan.py's DEFAULT_FALLBACK_SLA_HOURS (duplicated, not
@@ -839,19 +839,144 @@ def expedite_document(document, citizen_user):
     return document
 
 
-def flag_missing(document, flagging_user, notes=''):
-    """Marks a document as missing — can happen at any non-terminal state."""
-    if document.status in (Document.Status.COMPLETED, Document.Status.RELEASED):
-        raise ValidationError(f"Cannot flag a '{document.status}' document as missing.")
+def expected_holder(document):
+    """
+    The office that should physically have the document now: the office
+    it is travelling to while in transit (forward, or back on a return),
+    otherwise the office it sits at.
+    """
+    if document.status == Document.Status.IN_TRANSIT:
+        route = document.document_type.route
+        position = document.return_target_position if document.is_returning else document.route_position + 1
+        if position < len(route):
+            return route[position]
+    return document.current_office
 
+
+def _sending_office(document):
+    """The office behind the document's latest hand-off (forwarded or returned), if any."""
+    log = (
+        document.logs.filter(action__in=[DocumentLog.Action.RELEASED, DocumentLog.Action.RETURN_INITIATED])
+        .select_related('office').order_by('-timestamp', '-id').first()
+    )
+    return log.office.code if log and log.office else None
+
+
+def _actor_label(user):
+    return f"{user.full_name} ({user.employee_id})" if user.employee_id else user.full_name
+
+
+def flag_missing(document, flagging_user, notes=''):
+    """
+    Physical receipt exception: the system shows the document was sent to
+    (or received by) the user's office, but the paper never arrived there —
+    misrouted or lost in transit. Only staff of that office may report it,
+    with mandatory remarks. The document becomes MISSING, the report is
+    logged with the reporter's Employee ID, a 'missing' alert goes into
+    the admin feed, and the office that sent it plus every admin are
+    notified so the transit error can be traced. Cleared by mark_found().
+    """
+    if document.status not in (*Document.ACTIONABLE_STATUSES, Document.Status.IN_TRANSIT):
+        raise ValidationError(f"Cannot flag a '{document.status}' document as missing.")
+    if not notes or not notes.strip():
+        raise ValidationError("Please describe what happened — for example, that the physical copy never arrived.")
+    holder = expected_holder(document)
+    if not _same_office(flagging_user.office, holder):
+        raise ValidationError(
+            f"Only {_office_name(holder)}, where the document is expected, can report it missing."
+        )
+    notes = notes.strip()
+
+    document.status_before_missing = document.status
     document.status = Document.Status.MISSING
     document.save()
 
+    reporting_office = resolve_office(flagging_user.office)
     DocumentLog.objects.create(
         document=document,
         action=DocumentLog.Action.FLAGGED_MISSING,
-        office=resolve_office(document.current_office),
+        office=reporting_office,
+        sender=document.current_handler,
         acted_by=flagging_user,
         notes=notes,
     )
+    MissingDocumentAlert.objects.create(
+        document=document,
+        kind=MissingDocumentAlert.Kind.MISSING,
+        days_delayed=(timezone.now() - document.entered_current_office_at).days,
+        notes=f"Reported by {_office_name(holder)}: {notes}",
+    )
+
+    title = f"Reported missing: {document.tracking_number}"
+    message = (
+        f"{_office_name(holder)} reports that {document.tracking_number} ({document.document_type.name}) "
+        f"has not physically arrived, although the system shows it was sent there. "
+        f"Reported by {_actor_label(flagging_user)}. Remarks: {notes}"
+    )
+    sender_office = _sending_office(document)
+    if sender_office and not _same_office(sender_office, holder):
+        notify_office(
+            sender_office, title=title, message=message,
+            notification_type=Notification.NotificationType.DOCUMENT_MISSING,
+            sender=flagging_user, related_document=document, exclude_user=flagging_user,
+        )
+    notify_admins(
+        title=title, message=message,
+        notification_type=Notification.NotificationType.DOCUMENT_MISSING,
+        sender=flagging_user, related_document=document,
+    )
+    return document
+
+
+def mark_found(document, finding_user, notes=''):
+    """
+    A document reported missing was located: it goes back to the status it
+    had when reported (so an in-transit one is then received the usual
+    way), its missing alert is resolved, and the office that sent it plus
+    the admins are told. Staff of the reporting or the sending office, or
+    an admin, may record this.
+    """
+    if document.status != Document.Status.MISSING:
+        raise ValidationError("Only a document reported missing can be marked as found.")
+    report = document.logs.filter(action=DocumentLog.Action.FLAGGED_MISSING).select_related('office').order_by('-timestamp', '-id').first()
+    reporting_code = report.office.code if report and report.office else None
+    sender_office = _sending_office(document)
+    allowed = finding_user.role == User.Role.ADMIN or any(
+        code and _same_office(finding_user.office, code) for code in (reporting_code, sender_office, document.current_office)
+    )
+    if not allowed:
+        raise ValidationError("Only the office that reported it, the office that sent it, or an admin can mark it as found.")
+
+    document.status = document.status_before_missing or Document.Status.IN_PROGRESS
+    document.status_before_missing = ''
+    document.save()
+
+    MissingDocumentAlert.objects.filter(
+        document=document, kind=MissingDocumentAlert.Kind.MISSING, status=MissingDocumentAlert.Status.ACTIVE,
+    ).update(status=MissingDocumentAlert.Status.RESOLVED, resolved_at=timezone.now(), resolved_by=finding_user)
+    DocumentLog.objects.create(
+        document=document,
+        action=DocumentLog.Action.FOUND,
+        office=resolve_office(finding_user.office),
+        acted_by=finding_user,
+        notes=notes.strip(),
+    )
+
+    title = f"Found: {document.tracking_number}"
+    message = (
+        f"{document.tracking_number} ({document.document_type.name}), reported missing, was located by "
+        f"{_actor_label(finding_user)}." + (f" Remarks: {notes.strip()}" if notes.strip() else "")
+    )
+    for code in {c for c in (reporting_code, sender_office) if c}:
+        notify_office(
+            code, title=title, message=message,
+            notification_type=Notification.NotificationType.DOCUMENT_MISSING,
+            sender=finding_user, related_document=document, exclude_user=finding_user,
+        )
+    if finding_user.role != User.Role.ADMIN:
+        notify_admins(
+            title=title, message=message,
+            notification_type=Notification.NotificationType.DOCUMENT_MISSING,
+            sender=finding_user, related_document=document,
+        )
     return document

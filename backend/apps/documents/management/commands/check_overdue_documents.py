@@ -10,7 +10,7 @@ class Command(BaseCommand):
         "(WorkflowStep.max_hours_allowed), and emails every responsible active Employee "
         "an Overdue Warning (once per overdue episode) or, if it's not overdue yet but has "
         "crossed 80% of its SLA, a milder Approaching Due Date heads-up instead. Distinct "
-        "from check_missing_documents (a separate, more severe 'assumed lost' flag at a "
+        "from flag_overdue_documents (a separate Overdue flag in the history and admin feed at a "
         "flat 48h). The actual scan logic lives in sla_scan.run_overdue_scan() so it stays "
         "identical to what the in-process background scheduler (scheduler.py) and the "
         "admin 'Run Scan Now' action (behind the notification bell) run — this command "

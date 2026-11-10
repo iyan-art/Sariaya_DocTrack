@@ -27,8 +27,9 @@ from .serializers import (
 )
 from .permissions import IsStaffUser
 from apps.accounts.permissions import IsAdmin
-from .services import release_document, receive_document, return_document, citizen_return_document, mark_corrected, release_final, flag_missing, resolve_office, advance_processing_stage, can_delete_document, expedite_document, notify_citizen
-from .sla_scan import run_overdue_scan, run_missing_scan
+from .services import release_document, receive_document, return_document, citizen_return_document, mark_corrected, release_final, flag_missing, mark_found, resolve_office, advance_processing_stage, can_delete_document, expedite_document, notify_citizen
+from .sla_scan import run_overdue_scan, run_overdue_alert_scan
+from .services import DEFAULT_FALLBACK_SLA_HOURS
 from .qr_services import resolve_and_verify, enforce_scope_access, build_scan_context, generate_qr_code
 from .storage import database_storage
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -946,7 +947,9 @@ class DocumentReleaseView(APIView):
 
 class DocumentFlagMissingView(APIView):
     """
-    PATCH /api/documents/<id>/flag-missing/
+    PATCH /api/documents/<id>/flag-missing/   Body: { notes } (required)
+    The office expected to hold the document reports that the physical copy
+    never arrived — see services.flag_missing().
     """
     permission_classes = [IsStaffUser]
 
@@ -963,6 +966,22 @@ class DocumentFlagMissingView(APIView):
         except ValidationError as e:
             return Response({"detail": str(e.detail[0]) if hasattr(e, 'detail') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+        return Response(DocumentDetailSerializer(updated).data)
+
+
+class DocumentMarkFoundView(APIView):
+    """
+    PATCH /api/documents/<id>/mark-found/   Body: { notes } (optional)
+    A document reported missing was located — see services.mark_found().
+    """
+    permission_classes = [IsStaffUser]
+
+    def patch(self, request, pk):
+        document = get_object_or_404(Document, pk=pk)
+        try:
+            updated = mark_found(document, finding_user=request.user, notes=request.data.get('notes', ''))
+        except ValidationError as e:
+            return Response({"detail": str(e.detail[0]) if hasattr(e, 'detail') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(DocumentDetailSerializer(updated).data)
 
 
@@ -1112,6 +1131,15 @@ class AdminDashboardStatsView(APIView):
         completed = Document.objects.filter(status='completed').count()
         released = Document.objects.filter(status='released').count()
         missing = Document.objects.filter(status='missing').count()
+        # Overdue: held at an office longer than that step's own SLA (the red
+        # step on the progress pill). Being late is not being missing.
+        overdue = 0
+        for d in (Document.objects.filter(status__in=['in_progress', 'returned'])
+                  .select_related('document_type').prefetch_related('document_type__steps')):
+            steps = list(d.document_type.steps.all())
+            sla_hours = steps[d.route_position].max_hours_allowed if d.route_position < len(steps) else DEFAULT_FALLBACK_SLA_HOURS
+            if (now - d.entered_current_office_at).total_seconds() / 3600 > sla_hours:
+                overdue += 1
 
         week_start = now - timedelta(days=7)
         prev_week_start = now - timedelta(days=14)
@@ -1232,6 +1260,7 @@ class AdminDashboardStatsView(APIView):
             "completed": completed,
             "released": released,
             "missing": missing,
+            "overdue": overdue,
             "missing_rate_pct": round(missing / total * 100, 1) if total else 0,
             "weekly_trend_pct": weekly_trend_pct,
             "by_period": by_period,
@@ -1314,9 +1343,10 @@ class OfficeHistoryView(generics.ListAPIView):
 class MissingDocumentAlertListView(generics.ListAPIView):
     """
     GET /api/alerts/
-    Feeds the admin dashboard's "flagged documents" panel. Populated by the
-    check_missing_documents management command (run hourly via an OS-level
-    scheduler). Defaults to active alerts only — pass ?status=resolved or
+    Feeds the admin dashboard's "flagged documents" panel: Overdue alerts
+    from the scheduled scan (sla_scan.run_overdue_alert_scan()) and
+    Missing reports from offices (services.flag_missing()), told apart by
+    `kind`. Defaults to active alerts only — pass ?status=resolved or
     ?status=all to see the rest.
     """
     serializer_class = MissingDocumentAlertSerializer
@@ -1990,8 +2020,8 @@ class RunSlaScanView(APIView):
 
     def post(self, request):
         overdue_result = run_overdue_scan()
-        missing_result = run_missing_scan()
-        return Response({'overdue': overdue_result, 'missing': missing_result})
+        overdue_alert_result = run_overdue_alert_scan()
+        return Response({'overdue': overdue_result, 'overdue_alerts': overdue_alert_result})
 
 
 class NotificationPagination(PageNumberPagination):

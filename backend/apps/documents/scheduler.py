@@ -3,7 +3,7 @@ In-process background scheduler for the SLA/email scans (sla_scan.py). Runs
 inside the same `runserver` process as a daemon thread, so the "automated
 email notification system" actually runs on its own on a dev machine —
 without the user having to separately configure Windows Task Scheduler/cron
-(check_overdue_documents / check_missing_documents remain available as
+(check_overdue_documents / flag_overdue_documents remain available as
 management commands for that route in a real production deployment, see
 their docstrings).
 
@@ -26,7 +26,7 @@ _lock = threading.Lock()
 
 
 def _run_forever():
-    from .sla_scan import run_overdue_scan, run_missing_scan
+    from .sla_scan import run_overdue_scan, run_overdue_alert_scan
 
     interval = getattr(settings, 'SLA_SCAN_INTERVAL_SECONDS', 900)
     stop_event = threading.Event()
@@ -38,13 +38,13 @@ def _run_forever():
         stop_event.wait(wait_seconds)
         try:
             overdue_result = run_overdue_scan()
-            missing_result = run_missing_scan()
+            alert_result = run_overdue_alert_scan()
             logger.info(
                 "SLA scan: %s document(s) overdue (%s email(s) sent), %s approaching due date "
-                "(%s email(s) sent); %s document(s) past the 48h missing threshold (%s new alert(s)).",
+                "(%s email(s) sent); %s document(s) past the 48h overdue ceiling (%s new alert(s)).",
                 overdue_result['documents_overdue'], overdue_result['emails_sent'],
                 overdue_result['documents_due_soon'], overdue_result['due_soon_emails_sent'],
-                missing_result['total_stuck'], missing_result['alerts_created'],
+                alert_result['total_stuck'], alert_result['alerts_created'],
             )
         except Exception:
             # A single bad scan (e.g. transient DB hiccup) should never kill

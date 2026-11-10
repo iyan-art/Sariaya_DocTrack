@@ -23,7 +23,7 @@ const STATUS_TABS = [
   { value: 'returned', label: 'Returned' },
   { value: 'completed', label: 'Completed' },
   { value: 'released', label: 'Released' },
-  { value: 'missing', label: 'Missing' },
+  { value: 'missing', label: 'Reported Missing' },
 ];
 
 export default function DocumentRequest() {

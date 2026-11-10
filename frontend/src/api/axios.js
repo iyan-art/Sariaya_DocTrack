@@ -268,6 +268,9 @@ export const releaseToCitizen = (id, data = {}) => {
   return api.patch(`/documents/${id}/release/`, data);
 };
 
+// The office expected to hold a document reports that the paper never
+// arrived; `notes` is required. markDocumentFound() clears it.
+export const markDocumentFound = (id, data = {}) => api.patch(`/documents/${id}/mark-found/`, data);
 export const flagDocumentMissing = (id, data = {}) => {
   return api.patch(`/documents/${id}/flag-missing/`, data);
 };

@@ -201,6 +201,9 @@ class Document(models.Model):
     # instead of advancing it. Always False for the ordinary forward
     # release/receive flow — this never changes existing behavior.
     is_returning = models.BooleanField(default=False)
+    # The status a document had when an office reported it physically
+    # missing, so mark_found() can put it back exactly there.
+    status_before_missing = models.CharField(max_length=20, blank=True)
     # Where a Controlled Return is headed: the previous office, or straight
     # back to the originating office (route position 0). Only set while
     # is_returning; null means the previous office.
@@ -357,6 +360,12 @@ class DocumentLog(models.Model):
         # The office fixed what the citizen reported, and the document is
         # ready for pickup again — services.py::mark_corrected().
         CORRECTED = 'corrected', 'Corrected — Ready Again'
+        # The scheduled SLA check found the document sitting at one office
+        # far too long (sla_scan.run_overdue_alert_scan()). Informational:
+        # the office keeps working on it, nothing is blocked.
+        FLAGGED_OVERDUE = 'flagged_overdue', 'Flagged Overdue'
+        # A document reported missing was located again (services.mark_found()).
+        FOUND = 'found', 'Found'
         # A citizen flagging their own delayed document for staff attention
         # (services.py::expedite_document()) — purely informational, never
         # changes status/route_position, just raises a Notification at the
@@ -403,16 +412,25 @@ class DocumentLog(models.Model):
 
 class MissingDocumentAlert(models.Model):
     """
-    Raised when a document sits past its expected SLA at one office
-    (see documents/services.py::flag_missing, which sets Document.status
-    to MISSING and should also create one of these for the analytics/alerts feed).
+    One entry in the admin's flagged-documents feed (GET /api/alerts/), of
+    one of two kinds:
+      - OVERDUE: raised automatically when a document sits far past its time
+        at one office (sla_scan.run_overdue_alert_scan()); it resolves itself
+        once the document moves on.
+      - MISSING: an office reported that the physical copy never reached it
+        (services.flag_missing()); resolved by services.mark_found().
     """
 
     class Status(models.TextChoices):
         ACTIVE = 'active', 'Active'
         RESOLVED = 'resolved', 'Resolved'
 
+    class Kind(models.TextChoices):
+        OVERDUE = 'overdue', 'Overdue'
+        MISSING = 'missing', 'Reported Missing'
+
     document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='missing_alerts')
+    kind = models.CharField(max_length=10, choices=Kind.choices, default=Kind.OVERDUE, db_index=True)
     days_delayed = models.PositiveIntegerField()
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE, db_index=True)
 
@@ -792,6 +810,8 @@ class Notification(models.Model):
         DOCUMENT_UPDATE = 'document_update', 'Document Update'
         # Tells the office that started a request it has finished its route.
         DOCUMENT_COMPLETED = 'document_completed', 'Request Completed'
+        # An office reported a document's physical copy missing, or found it again.
+        DOCUMENT_MISSING = 'document_missing', 'Document Missing'
 
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications',

@@ -1,6 +1,6 @@
 """
 Core SLA-scan logic shared by three entry points that all need to run the
-exact same rules: the check_overdue_documents / check_missing_documents
+exact same rules: the check_overdue_documents / flag_overdue_documents
 management commands (for an OS-level scheduler in production), the
 in-process background scheduler in scheduler.py (so a plain `runserver` dev
 box still sends emails automatically, with no OS-level cron required), and
@@ -11,11 +11,12 @@ with each other.
 """
 from datetime import timedelta
 
+from django.db.models import F, Q
 from django.utils import timezone
 
-from .models import Document, EmailNotificationLog, MissingDocumentAlert, Notification
+from .models import Document, DocumentLog, EmailNotificationLog, MissingDocumentAlert, Notification
 from .notifications import send_overdue_warning_email, send_due_soon_email
-from .services import _office_name, flag_missing, notify_admins, notify_citizen, responsible_employees
+from .services import _office_name, notify_admins, notify_citizen, resolve_office, responsible_employees
 
 # Only used if a document's route_position has somehow drifted out of range
 # for its DocumentType's WorkflowStep rows — a data-integrity edge case, not
@@ -23,9 +24,9 @@ from .services import _office_name, flag_missing, notify_admins, notify_citizen,
 # judged against its own current step's WorkflowStep.max_hours_allowed.
 DEFAULT_FALLBACK_SLA_HOURS = 48
 
-# The flat "presumed lost" monitoring threshold, independent of any
-# document's own per-step SLA — see run_missing_scan()'s docstring.
-DEFAULT_MISSING_SLA_HOURS = 48
+# The flat Overdue-alert threshold at one office, independent of any
+# document's own per-step SLA — see run_overdue_alert_scan()'s docstring.
+DEFAULT_OVERDUE_ALERT_HOURS = 48
 
 # A document counts as "approaching its due date" once its dwell time
 # crosses this fraction of its own SLA, provided it hasn't already blown
@@ -138,18 +139,29 @@ def run_overdue_scan():
     }
 
 
-def run_missing_scan(hours=DEFAULT_MISSING_SLA_HOURS):
+def run_overdue_alert_scan(hours=DEFAULT_OVERDUE_ALERT_HOURS):
     """
-    A flat, SLA-independent safety net: any document In Progress or In
-    Transit for more than `hours` (default 48) at its current office gets
-    flagged Missing and raised as a MissingDocumentAlert, regardless of what
-    its own per-step SLA says. This is what guarantees a document is never
-    silently sitting unmonitored past 48h even if its configured SLA is
-    longer (e.g. 72h) — run_overdue_scan() above still governs when a
-    document counts as "Overdue" against its own SLA; this is the
-    independent, more severe 48h ceiling underneath it.
+    A flat, SLA-independent safety net: any document In Progress, Returned
+    or In Transit for more than `hours` (default 48) at its current office
+    is flagged Overdue — an entry in its history and an alert in the admin's
+    feed — regardless of what its own per-step SLA says, so nothing sits
+    unmonitored past 48h even if its configured SLA is longer.
+    run_overdue_scan() above still sends the per-step SLA emails.
+
+    Being late is not being lost: the status is left alone, so the office
+    can still release the document. "Missing" is reserved for an office
+    reporting that the physical copy never arrived (services.flag_missing()).
+    An alert resolves itself once its document leaves that office.
     """
-    cutoff = timezone.now() - timedelta(hours=hours)
+    now = timezone.now()
+    cutoff = now - timedelta(hours=hours)
+    overdue_alerts = MissingDocumentAlert.objects.filter(
+        kind=MissingDocumentAlert.Kind.OVERDUE, status=MissingDocumentAlert.Status.ACTIVE,
+    )
+    alerts_resolved = overdue_alerts.filter(
+        Q(raised_at__lt=F('document__entered_current_office_at'))
+        | Q(document__status__in=[Document.Status.COMPLETED, Document.Status.RELEASED])
+    ).update(status=MissingDocumentAlert.Status.RESOLVED, resolved_at=now)
 
     stuck_documents = Document.objects.filter(
         status__in=[*Document.ACTIONABLE_STATUSES, Document.Status.IN_TRANSIT],
@@ -159,22 +171,23 @@ def run_missing_scan(hours=DEFAULT_MISSING_SLA_HOURS):
 
     alerts_created = 0
     for document in stuck_documents:
-        # Already flagged and unresolved — don't spam a new alert every run.
-        if document.missing_alerts.filter(status=MissingDocumentAlert.Status.ACTIVE).exists():
+        # Already flagged for this stay at this office — don't repeat every run.
+        if overdue_alerts.filter(document=document).exists():
             continue
-
-        days_delayed = (timezone.now() - document.entered_current_office_at).days
 
         MissingDocumentAlert.objects.create(
             document=document,
-            days_delayed=days_delayed,
-            notes=f"Stuck at '{document.current_office}' for over {hours}h.",
+            kind=MissingDocumentAlert.Kind.OVERDUE,
+            days_delayed=(now - document.entered_current_office_at).days,
+            notes=f"At '{document.current_office}' for over {hours}h.",
         )
-        # flagging_user=None: this is a system/scheduled action, not a staff member acting.
-        flag_missing(
-            document, flagging_user=None,
-            notes=f"Auto-flagged by scheduled SLA check: exceeded {hours}h at '{document.current_office}'.",
+        DocumentLog.objects.create(
+            document=document,
+            action=DocumentLog.Action.FLAGGED_OVERDUE,
+            office=resolve_office(document.current_office),
+            acted_by=None,  # the scheduled check, not a staff member
+            notes=f"Flagged Overdue by the scheduled SLA check: over {hours}h at '{document.current_office}'.",
         )
         alerts_created += 1
 
-    return {'total_stuck': total_stuck, 'alerts_created': alerts_created}
+    return {'total_stuck': total_stuck, 'alerts_created': alerts_created, 'alerts_resolved': alerts_resolved}

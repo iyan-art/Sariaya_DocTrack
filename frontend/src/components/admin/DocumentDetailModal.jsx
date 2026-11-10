@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { fetchDocumentDetail, transitionDocument, releaseToCitizen, flagDocumentMissing, mediaUrl } from '../../api/axios';
+import { fetchDocumentDetail, transitionDocument, releaseToCitizen, flagDocumentMissing, markDocumentFound, mediaUrl } from '../../api/axios';
+import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import DocumentStatusBadge from './DocumentStatusBadge';
 import PrintableQRSlip from './PrintableQRSlip';
@@ -19,21 +20,34 @@ const NEXT_ACTIONS = {
   in_progress: [
     { action: 'release', label: 'Release to Next Office' },
     { action: 'return_to_office', label: 'Returned (send back for revision)' },
-    { action: 'flagged_missing', label: 'Flag as Missing' },
+    { action: 'flagged_missing', label: 'Flag as Missing (not physically here)' },
   ],
   // Back at this office for revision: once fixed, it moves forward again.
   returned: [
     { action: 'release', label: 'Corrected — Release to Next Office' },
     { action: 'return_to_office', label: 'Returned (send back for revision)' },
-    { action: 'flagged_missing', label: 'Flag as Missing' },
+    { action: 'flagged_missing', label: 'Flag as Missing (not physically here)' },
   ],
   in_transit: [
     { action: 'receive', label: 'Mark as Received' },
-    { action: 'flagged_missing', label: 'Flag as Missing' },
+    { action: 'flagged_missing', label: 'Flag as Missing (not physically here)' },
   ],
   completed: [{ action: 'return', label: 'Release to Citizen' }],
   released: [],
-  missing: [],
+  // Reported missing by the office expected to hold it; cleared once located.
+  missing: [{ action: 'mark_found', label: 'Mark as Found' }],
+};
+
+// Actions whose remarks are required, with what to ask for.
+const REQUIRED_REMARKS = {
+  return_to_office: {
+    label: 'Remarks / Reason',
+    placeholder: "e.g. Missing Mayor's signature, incomplete attachment, incorrect details…",
+  },
+  flagged_missing: {
+    label: 'Remarks / What happened',
+    placeholder: 'e.g. Document marked as forwarded here in the system, but the physical copy has not arrived from the previous office.',
+  },
 };
 
 // Maps DocumentReleaseView's `email_status` to the staff-facing toast —
@@ -64,6 +78,7 @@ const CORRECTED_EMAIL_STATUS_TOAST = {
 
 export default function DocumentDetailModal({ documentId, onClose, onUpdated }) {
   const { showToast } = useToast();
+  const { user } = useAuth();
   const [doc, setDoc] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionForm, setActionForm] = useState({ action: '', office: '', notes: '', destination: 'previous' });
@@ -99,9 +114,21 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
   // Returned to its final office (the requester sent it back): once fixed it
   // is ready for pickup again rather than forwarded anywhere.
   const atFinalStep = Boolean(doc) && doc.route_position === route.length - 1;
+  // Only the office that should have the paper can say it never arrived:
+  // where it is headed while in transit, otherwise where it sits.
+  const expectedHolder = doc?.status === 'in_transit'
+    ? (doc.is_returning ? doc.return_target_office : route[doc.route_position + 1]) || doc.current_office
+    : doc?.current_office;
+  const sameOffice = (a, b) => (a || '').trim().toUpperCase() === (b || '').trim().toUpperCase();
+  const canFlagMissing = sameOffice(user?.office, expectedHolder);
+  const missingReport = doc?.status === 'missing'
+    ? [...(doc.logs || [])].reverse().find((l) => l.action === 'flagged_missing')
+    : null;
+  const remarksRule = REQUIRED_REMARKS[actionForm.action];
   const availableActions = doc
     ? (NEXT_ACTIONS[doc.status] || [])
         .filter((a) => a.action !== 'return_to_office' || doc.route_position > 0)
+        .filter((a) => a.action !== 'flagged_missing' || canFlagMissing)
         .map((a) => (a.action === 'receive' && doc.is_returning) ? { ...a, label: 'Confirm Return Received' } : a)
         // Internal documents never go to a citizen — they finish back at the office that started them.
         .map((a) => (a.action === 'return' && isInternal) ? { ...a, label: 'Release to Originating Office' } : a)
@@ -113,8 +140,8 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
     e.preventDefault();
     const { action, office, notes, destination } = actionForm;
 
-    if (action === 'return_to_office' && !notes.trim()) {
-      showToast('Please provide the remarks / reason for returning this document.', 'error');
+    if (REQUIRED_REMARKS[action] && !notes.trim()) {
+      showToast('Please fill in the remarks first.', 'error');
       return;
     }
 
@@ -130,7 +157,10 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
         }
       } else if (action === 'flagged_missing') {
         await flagDocumentMissing(documentId, { notes });
-        showToast('Document status updated.', 'success');
+        showToast("Flagged as missing. The office that sent it and the Administrator's Office have been notified.", 'success');
+      } else if (action === 'mark_found') {
+        await markDocumentFound(documentId, { notes });
+        showToast('Marked as found. Everyone who was alerted has been told.', 'success');
       } else {
         // 'release', 'receive', or 'return_to_office' — office is only
         // meaningful for 'receive' (defaults to the current staff member's
@@ -187,6 +217,16 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
                   <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">
                     By {lastReturn.acted_by?.full_name || 'staff'}{lastReturn.acted_by?.employee_id ? ` (${lastReturn.acted_by.employee_id})` : ''}
                     {lastReturn.office?.code ? ` · ${lastReturn.office.code}` : ''}
+                  </p>
+                </div>
+              )}
+              {missingReport && (
+                <div role="note" className="mt-3 rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 p-3 text-sm">
+                  <p className="font-bold text-red-800 dark:text-red-300">Reported missing: the physical copy has not arrived</p>
+                  <p className="text-red-900 dark:text-red-200 mt-0.5 break-words">{missingReport.notes}</p>
+                  <p className="text-xs text-red-700 dark:text-red-400 mt-1">
+                    By {missingReport.acted_by?.full_name || 'staff'}{missingReport.acted_by?.employee_id ? ` (${missingReport.acted_by.employee_id})` : ''}
+                    {missingReport.office?.code ? ` · ${missingReport.office.code}` : ''}
                   </p>
                 </div>
               )}
@@ -261,26 +301,22 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
                   </div>
                 )}
                 <div>
-                  {actionForm.action === 'return_to_office' && (
+                  {remarksRule && (
                     <label htmlFor="action-notes" className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">
-                      Remarks / Reason <span className="text-red-500">*</span>
+                      {remarksRule.label} <span className="text-red-500">*</span>
                     </label>
                   )}
                   <textarea
                     id="action-notes"
-                    required={actionForm.action === 'return_to_office'}
-                    placeholder={
-                      actionForm.action === 'return_to_office'
-                        ? "e.g. Missing Mayor's signature, incomplete attachment, incorrect details…"
-                        : 'Notes (optional)'
-                    }
+                    required={Boolean(remarksRule)}
+                    placeholder={remarksRule ? remarksRule.placeholder : 'Notes (optional)'}
                     rows={2}
                     value={actionForm.notes}
                     onChange={(e) => setActionForm({ ...actionForm, notes: e.target.value })}
                     className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-                <button type="submit" disabled={submitting || (actionForm.action === 'return_to_office' && !actionForm.notes.trim())}
+                <button type="submit" disabled={submitting || (Boolean(remarksRule) && !actionForm.notes.trim())}
                   className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-medium rounded-lg py-2.5 text-sm transition-colors">
                   {submitting ? 'Updating…' : 'Apply update'}
                 </button>

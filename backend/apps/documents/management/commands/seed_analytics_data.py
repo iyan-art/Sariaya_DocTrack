@@ -253,17 +253,19 @@ class Command(BaseCommand):
         if final_status == 'missing':
             clock += timedelta(hours=random.uniform(50, 200))
             current_office_code = route[position]
+            # Missing means an office reported the physical copy never arrived.
             missing_log = DocumentLog.objects.create(
                 document=document, action=DocumentLog.Action.FLAGGED_MISSING,
-                office=offices[current_office_code], acted_by=None,
-                notes=f"Auto-flagged: exceeded SLA at '{offices[current_office_code].name}'.",
+                office=offices[current_office_code], acted_by=document.current_handler,
+                notes='Physical copy has not arrived from the previous office.',
             )
             DocumentLog.objects.filter(pk=missing_log.pk).update(timestamp=clock)
+            document.status_before_missing = document.status
             document.status = Document.Status.MISSING
             document.save()
             alert = MissingDocumentAlert.objects.create(
-                document=document, days_delayed=random.randint(1, 10),
-                notes=f"Stuck at '{document.current_office}'.",
+                document=document, kind=MissingDocumentAlert.Kind.MISSING, days_delayed=random.randint(1, 10),
+                notes=f"Reported by {offices[current_office_code].name}: physical copy not received.",
             )
             MissingDocumentAlert.objects.filter(pk=alert.pk).update(raised_at=clock)
 

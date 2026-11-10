@@ -32,8 +32,8 @@ from apps.documents.services import resolve_office
 # hide this key.
 SEED_KEY = 'seed_batch'
 
-# Matches sla_scan.DEFAULT_MISSING_SLA_HOURS: past this, the live scan flags a document Missing.
-MISSING_AFTER_HOURS = 48
+# Matches sla_scan.DEFAULT_OVERDUE_ALERT_HOURS: past this, the live scan flags a document Overdue.
+OVERDUE_ALERT_AFTER_HOURS = 48
 
 FIRST_NAMES = [
     'Juan', 'Maria', 'Jose', 'Ana', 'Pedro', 'Rosa', 'Ramon', 'Liza', 'Carlo', 'Grace', 'Mark', 'Joy',
@@ -65,7 +65,7 @@ OUTCOMES = [
     (15, 'pending'),     # forwarded, waiting to be received
     (22, 'processing'),  # at an office, within its SLA
     (14, 'overdue'),     # at an office, past its SLA
-    (5, 'missing'),      # stuck long enough to be flagged Missing
+    (5, 'stuck'),        # held long enough to be flagged Overdue by the scan
     (14, 'completed'),   # back at the final office, ready for pickup
     (30, 'released'),    # handed over to the requester
 ]
@@ -201,11 +201,11 @@ class Command(BaseCommand):
         creator = pick(0)
 
         # A two-office route has no office in between to be "at".
-        if last < 2 and outcome in ('processing', 'overdue', 'missing'):
+        if last < 2 and outcome in ('processing', 'overdue', 'stuck'):
             outcome = 'pending'
         if outcome == 'pending':
             target = random.randint(0, last - 1)
-        elif outcome in ('processing', 'overdue', 'missing'):
+        elif outcome in ('processing', 'overdue', 'stuck'):
             target = random.randint(1, last - 1)
         else:
             target = last
@@ -279,11 +279,12 @@ class Command(BaseCommand):
             dwell = random.uniform(1.2 * sla[position], max(1.25 * sla[position], min(46, 3 * sla[position])))
             status, now_offset = Document.Status.IN_PROGRESS, clock + dwell
             follow_up = clock + random.uniform(sla[position] * 1.05, dwell)
-        elif outcome == 'missing':
-            dwell = random.uniform(MISSING_AFTER_HOURS + 2, 120)
-            status, now_offset = Document.Status.MISSING, clock + dwell
-            events.append((clock + MISSING_AFTER_HOURS + random.uniform(0, 1), 'missing', {'at': position}))
-            follow_up = clock + random.uniform(sla[position] * 1.05, MISSING_AFTER_HOURS)
+        elif outcome == 'stuck':
+            # Late, not lost: still In Progress at the office, flagged Overdue.
+            dwell = random.uniform(OVERDUE_ALERT_AFTER_HOURS + 2, 120)
+            status, now_offset = Document.Status.IN_PROGRESS, clock + dwell
+            events.append((clock + OVERDUE_ALERT_AFTER_HOURS + random.uniform(0, 1), 'overdue_flag', {'at': position}))
+            follow_up = clock + random.uniform(sla[position] * 1.05, OVERDUE_ALERT_AFTER_HOURS)
         else:
             events.append((clock + 0.01, 'stage', {'stage': Document.ProcessingStage.READY_FOR_RELEASE, 'by': handler}))
             if outcome == 'completed':
@@ -382,11 +383,12 @@ class Command(BaseCommand):
             if citizen:
                 notify(citizen, 'Released to you', f"Your {name} request ({document.tracking_number}) has been released.",
                        Notification.NotificationType.DOCUMENT_UPDATE)
-        elif kind == 'missing':
-            log(DocumentLog.Action.FLAGGED_MISSING, office=office,
-                notes=f"Auto-flagged by scheduled SLA check: exceeded {MISSING_AFTER_HOURS}h at '{office.code}'.")
+        elif kind == 'overdue_flag':
+            log(DocumentLog.Action.FLAGGED_OVERDUE, office=office,
+                notes=f"Flagged Overdue by the scheduled SLA check: over {OVERDUE_ALERT_AFTER_HOURS}h at '{office.code}'.")
             alert = MissingDocumentAlert.objects.create(
-                document=document, days_delayed=2, notes=f"Stuck at '{office.code}' for over {MISSING_AFTER_HOURS}h.",
+                document=document, kind=MissingDocumentAlert.Kind.OVERDUE, days_delayed=2,
+                notes=f"At '{office.code}' for over {OVERDUE_ALERT_AFTER_HOURS}h.",
             )
             MissingDocumentAlert.objects.filter(pk=alert.pk).update(raised_at=when)
         elif kind == 'follow_up':

@@ -858,12 +858,13 @@ class MissingDocumentAlertSerializer(serializers.ModelSerializer):
     document_type_name = serializers.CharField(source='document.document_type.name', read_only=True)
     current_office = serializers.CharField(source='document.current_office', read_only=True)
     resolved_by = ActorSerializer(read_only=True, allow_null=True)
+    kind_label = serializers.CharField(source='get_kind_display', read_only=True)
 
     class Meta:
         model = MissingDocumentAlert
         fields = [
             'id', 'document', 'tracking_number', 'document_type_name', 'current_office',
-            'days_delayed', 'status', 'raised_at', 'resolved_at', 'resolved_by', 'notes',
+            'kind', 'kind_label', 'days_delayed', 'status', 'raised_at', 'resolved_at', 'resolved_by', 'notes',
         ]
 
 

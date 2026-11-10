@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     DocumentListCreateView, DocumentDetailView,
-    DocumentScanView, DocumentTransferView, DocumentReleaseView, DocumentFlagMissingView,
+    DocumentScanView, DocumentTransferView, DocumentReleaseView, DocumentFlagMissingView, DocumentMarkFoundView,
     DocumentTrackingLookupView, DocumentTypeListCreateView, DocumentTypeDetailView, DocumentTypeStepsView,
     AdminDashboardStatsView, HeatmapDataView, MyOfficePerformanceView, QRScanResolveView,
     SurveyListCreateView, SurveyDetailView, SurveyQuestionsView, SurveyAnalyticsView, SurveyCommentsView,
@@ -51,6 +51,7 @@ urlpatterns = [
     path('<int:pk>/scan/', DocumentScanView.as_view(), name='document-scan'),
     path('<int:pk>/release/', DocumentReleaseView.as_view(), name='document-release'),
     path('<int:pk>/flag-missing/', DocumentFlagMissingView.as_view(), name='document-flag-missing'),
+    path('<int:pk>/mark-found/', DocumentMarkFoundView.as_view(), name='document-mark-found'),
     path('<int:pk>/stage/', DocumentStageUpdateView.as_view(), name='document-stage-update'),
     path('<int:pk>/evaluation/', DocumentEvaluationView.as_view(), name='document-evaluation'),
     path('<int:pk>/post-scan-survey/', PostScanSurveyView.as_view(), name='post-scan-survey'),

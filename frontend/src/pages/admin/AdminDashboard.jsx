@@ -14,7 +14,7 @@ import {
 } from '../../components/Icons';
 
 const EMPTY_STATS = {
-  total: 0, pending: 0, completed: 0, released: 0, missing: 0,
+  total: 0, pending: 0, completed: 0, released: 0, missing: 0, overdue: 0,
   missing_rate_pct: 0, weekly_trend_pct: null,
   by_period: { daily: 0, weekly: 0, monthly: 0, yearly: 0 },
   by_type: [], top5_fastest: [], top5_slowest: [],
@@ -60,7 +60,7 @@ export default function AdminDashboard() {
     { name: 'Pending', key: 'pending', value: stats.pending },
     { name: 'Completed', key: 'completed', value: stats.completed },
     { name: 'Released', key: 'released', value: stats.released },
-    { name: 'Missing', key: 'missing', value: stats.missing },
+    { name: 'Reported Missing', key: 'missing', value: stats.missing },
   ].filter((d) => d.value > 0);
 
   return (
@@ -100,7 +100,7 @@ export default function AdminDashboard() {
             <BellIcon className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Missing / Flagged Rate</p>
+            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Reported Missing Rate</p>
             <p className="text-2xl font-black text-slate-900 dark:text-slate-100">{loading ? '—' : `${stats.missing_rate_pct}%`}</p>
           </div>
         </div>
@@ -117,13 +117,16 @@ export default function AdminDashboard() {
       </div>
 
       {/* Status breakdown strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mt-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mt-6">
         {[
           { label: 'Total', value: stats.total, color: 'text-slate-700 dark:text-slate-300' },
           { label: 'Pending', value: stats.pending, color: 'text-amber-600 dark:text-amber-400' },
           { label: 'Completed', value: stats.completed, color: 'text-green-600 dark:text-green-400' },
           { label: 'Released', value: stats.released, color: 'text-indigo-600 dark:text-indigo-400' },
-          { label: 'Missing', value: stats.missing, color: 'text-red-600 dark:text-red-400' },
+          // Overdue: past their office's time limit (part of Pending). Missing:
+          // an office reported the paper never arrived.
+          { label: 'Overdue', value: stats.overdue, color: 'text-orange-600 dark:text-orange-400' },
+          { label: 'Reported Missing', value: stats.missing, color: 'text-red-600 dark:text-red-400' },
         ].map((s) => (
           <div key={s.label} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 text-center">
             <p className={`text-2xl font-black ${s.color}`}>{loading ? '—' : s.value}</p>
