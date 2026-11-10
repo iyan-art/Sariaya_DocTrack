@@ -724,9 +724,8 @@ class DocumentScanView(APIView):
     the QR transfer endpoint, minus qr_verified. Body: { action: 'release' | 'receive' | 'return_to_office', office, notes }
     `office` is only used for 'receive' (defaults to the scanning user's own office);
     'release' and 'return_to_office' always target the document's current
-    office and need no office param — return_to_office's destination (the
-    previous office in the route) is computed automatically by
-    return_document(), not chosen by the caller.
+    office and need no office param. 'return_to_office' needs `notes` (the
+    reason) and takes `destination`: 'previous' (default) or 'origin'.
     """
     permission_classes = [IsStaffUser]
 
@@ -743,7 +742,10 @@ class DocumentScanView(APIView):
             if action == 'release':
                 updated = release_document(document, releasing_user=request.user, notes=notes)
             elif action == 'return_to_office':
-                updated = return_document(document, returning_user=request.user, notes=notes)
+                updated = return_document(
+                    document, returning_user=request.user, notes=notes,
+                    destination=request.data.get('destination') or 'previous',
+                )
             else:
                 office = request.data.get('office') or request.user.office
                 if not office:
@@ -1034,7 +1036,8 @@ class AdminDashboardStatsView(APIView):
     def get(self, request):
         now = timezone.now()
         total = Document.objects.count()
-        pending = Document.objects.filter(status__in=['in_progress', 'in_transit']).count()
+        pending = Document.objects.filter(status__in=['in_progress', 'returned', 'in_transit']).count()
+        returned = Document.objects.filter(status='returned').count()
         completed = Document.objects.filter(status='completed').count()
         released = Document.objects.filter(status='released').count()
         missing = Document.objects.filter(status='missing').count()
@@ -1073,7 +1076,7 @@ class AdminDashboardStatsView(APIView):
         office_workload = [
             {"office": row['current_office'], "count": row['count']}
             for row in (
-                Document.objects.filter(status__in=['in_progress', 'in_transit'])
+                Document.objects.filter(status__in=['in_progress', 'returned', 'in_transit'])
                 .exclude(current_office='')
                 .values('current_office')
                 .annotate(count=Count('id'))
@@ -1135,7 +1138,7 @@ class AdminDashboardStatsView(APIView):
         bottleneck_cutoff = now - timedelta(hours=bottleneck_hours)
         bottlenecks = []
         stuck_qs = (
-            Document.objects.filter(status__in=['in_progress', 'in_transit'], entered_current_office_at__lte=bottleneck_cutoff)
+            Document.objects.filter(status__in=['in_progress', 'returned', 'in_transit'], entered_current_office_at__lte=bottleneck_cutoff)
             .select_related('document_type', 'current_handler')
             .order_by('entered_current_office_at')[:10]
         )
@@ -1154,6 +1157,7 @@ class AdminDashboardStatsView(APIView):
         return Response({
             "total": total,
             "pending": pending,
+            "returned": returned,
             "completed": completed,
             "released": released,
             "missing": missing,
@@ -1211,7 +1215,7 @@ class OfficeHistoryView(generics.ListAPIView):
         )
         scope = self.request.query_params.get('scope')
         in_custody = Q(current_office=office.code, status__in=[
-            Document.Status.IN_PROGRESS, Document.Status.COMPLETED, Document.Status.MISSING,
+            *Document.ACTIONABLE_STATUSES, Document.Status.COMPLETED, Document.Status.MISSING,
         ])
         if scope == 'here':
             qs = qs.filter(in_custody)

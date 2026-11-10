@@ -136,9 +136,16 @@ class Document(models.Model):
     class Status(models.TextChoices):
         IN_PROGRESS = 'in_progress', 'In Progress'
         IN_TRANSIT = 'in_transit', 'In Transit'
+        # Sent back for revision (missing requirements, wrong details, a
+        # lacking signature) and now sitting at the office it was returned
+        # to, waiting to be fixed and forwarded again.
+        RETURNED = 'returned', 'Returned'
         COMPLETED = 'completed', 'Completed'
         RELEASED = 'released', 'Released to Citizen'
         MISSING = 'missing', 'Missing'
+
+    # Statuses where an office physically holds the document and can act on it.
+    ACTIONABLE_STATUSES = ('in_progress', 'returned')
 
     class ProcessingStage(models.TextChoices):
         """
@@ -192,6 +199,10 @@ class Document(models.Model):
     # instead of advancing it. Always False for the ordinary forward
     # release/receive flow — this never changes existing behavior.
     is_returning = models.BooleanField(default=False)
+    # Where a Controlled Return is headed: the previous office, or straight
+    # back to the originating office (route position 0). Only set while
+    # is_returning; null means the previous office.
+    return_to_position = models.PositiveIntegerField(null=True, blank=True)
     processing_stage = models.CharField(
         max_length=30, choices=ProcessingStage.choices, default=ProcessingStage.SUBMITTED, db_index=True,
     )
@@ -254,6 +265,17 @@ class Document(models.Model):
         if self.route_position < len(route):
             return route[self.route_position]
         return route[-1]
+
+    @property
+    def return_target_position(self):
+        """Route position a document being returned is headed back to."""
+        if self.return_to_position is not None:
+            return self.return_to_position
+        return max(self.route_position - 1, 0)
+
+    @property
+    def return_target_office(self):
+        return self.document_type.route[self.return_target_position] if self.is_returning else None
 
     @property
     def is_internal(self):

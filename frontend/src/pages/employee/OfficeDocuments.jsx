@@ -68,7 +68,7 @@ export default function OfficeDocuments() {
       // previous office, not forward to the next one — otherwise a
       // returned document would surface under the wrong office's "To Scan"
       // tab (or none at all).
-      const nextOffice = (d.is_returning ? d.route[d.route_position - 1] : d.route[d.route_position + 1])?.toUpperCase();
+      const nextOffice = (d.is_returning ? d.return_target_office : d.route[d.route_position + 1])?.toUpperCase();
 
       if (activeTab === 'my-requests') {
         // Two cases belong here: documents THIS office originated (still
@@ -78,7 +78,7 @@ export default function OfficeDocuments() {
         // review/forward a document it just received. Without the second
         // clause, a non-origin office had no tab showing what's on its desk.
         const originatedByMe = docOrigin === myOffice || (!docOrigin && myOffice === 'BPLO');
-        const onMyDeskNow = d.current_office?.toUpperCase() === myOffice && d.status === 'in_progress';
+        const onMyDeskNow = d.current_office?.toUpperCase() === myOffice && ['in_progress', 'returned'].includes(d.status);
         return (originatedByMe || onMyDeskNow) && d.status !== 'released';
       }
 

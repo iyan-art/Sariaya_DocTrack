@@ -259,7 +259,7 @@ def release_document(document, releasing_user, notes='', qr_verified=False):
     office in its route. Nothing may be received until this has happened —
     receive_document() below enforces that.
     """
-    if document.status != Document.Status.IN_PROGRESS:
+    if document.status not in Document.ACTIONABLE_STATUSES:
         raise ValidationError(f"Cannot release a document that is '{document.status}'.")
 
     if not _same_office(releasing_user.office, document.current_office):
@@ -309,18 +309,26 @@ def release_document(document, releasing_user, notes='', qr_verified=False):
     return document
 
 
-def return_document(document, returning_user, notes=''):
+RETURN_DESTINATIONS = ('previous', 'origin')
+
+
+def return_document(document, returning_user, notes='', destination='previous'):
     """
-    Controlled Return: sends an IN_PROGRESS document backward to whichever
-    office last forwarded it (route[route_position - 1]), with a mandatory
-    reason. Mirrors release_document() exactly, just in the opposite
-    direction — sets IN_TRANSIT and leaves route_position untouched, so the
-    target office receives it through the ordinary receive_document() flow
-    (see its is_returning branch below), the same "Mark as Received"
-    button/QR scan they already use for forward hand-offs.
+    Controlled Return: sends a document that needs revision (missing
+    requirements, incorrect details, a lacking signature) backward, with a
+    mandatory reason — to the office that last forwarded it, or with
+    destination='origin' straight back to the originating office. Mirrors
+    release_document(), just in the opposite direction: sets IN_TRANSIT and
+    leaves route_position untouched, so the target office receives it
+    through the ordinary receive_document() flow (see its is_returning
+    branch below). Once received there it is RETURNED until that office
+    fixes it and forwards it again.
     """
-    if document.status != Document.Status.IN_PROGRESS:
+    if document.status not in Document.ACTIONABLE_STATUSES:
         raise ValidationError(f"Cannot return a document that is '{document.status}'.")
+
+    if destination not in RETURN_DESTINATIONS:
+        raise ValidationError("Choose where to return this document: the previous office or the originating office.")
 
     if not _same_office(returning_user.office, document.current_office):
         raise ValidationError(
@@ -335,10 +343,13 @@ def return_document(document, returning_user, notes=''):
         raise ValidationError("Please provide a reason for returning this document.")
 
     route = document.document_type.route
-    previous_office = route[document.route_position - 1]
+    target_position = 0 if destination == 'origin' else document.route_position - 1
+    previous_office = route[target_position]
+    origin_office = route[0]
 
     document.status = Document.Status.IN_TRANSIT
     document.is_returning = True
+    document.return_to_position = target_position
     document.save()
 
     DocumentLog.objects.create(
@@ -360,6 +371,20 @@ def return_document(document, returning_user, notes=''):
         notification_type=Notification.NotificationType.DOCUMENT_RETURNED,
         sender=returning_user, related_document=document, exclude_user=returning_user,
     )
+    # The office that owns the request hears about it even when the document
+    # is only going back one step to a different office.
+    if not _same_office(origin_office, previous_office) and not _same_office(origin_office, returning_user.office):
+        notify_office(
+            origin_office,
+            title=f"Returned for revision: {document.tracking_number}",
+            message=(
+                f"The {document.document_type.name} request ({document.tracking_number}) that your office "
+                f"started was returned by {_office_name(document.current_office)} to "
+                f"{_office_name(previous_office)} for revision. Reason: {notes}"
+            ),
+            notification_type=Notification.NotificationType.DOCUMENT_RETURNED,
+            sender=returning_user, related_document=document, exclude_user=returning_user,
+        )
     # The same reason already appears on the public tracking page.
     notify_citizen(
         document,
@@ -392,7 +417,7 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
     route = document.document_type.route
 
     if document.is_returning:
-        target_position = document.route_position - 1
+        target_position = document.return_target_position
         expected_office = route[target_position]
 
         if not _same_office(scanning_office, expected_office):
@@ -408,8 +433,10 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
         document.route_position = target_position
         document.current_handler = scanning_user
         document.entered_current_office_at = now
-        document.status = Document.Status.IN_PROGRESS
+        # Waits here, marked Returned, until this office fixes it and forwards it again.
+        document.status = Document.Status.RETURNED
         document.is_returning = False
+        document.return_to_position = None
         document.save()
 
         DocumentLog.objects.create(
@@ -678,7 +705,7 @@ def expedite_document(document, citizen_user):
     actually running past its current step's own SLA — otherwise there's
     nothing to expedite yet.
     """
-    if document.status not in (Document.Status.IN_PROGRESS, Document.Status.IN_TRANSIT):
+    if document.status not in (*Document.ACTIONABLE_STATUSES, Document.Status.IN_TRANSIT):
         raise ValidationError(f"Cannot request a follow-up on a document that is '{document.status}'.")
 
     steps = list(document.document_type.steps.all())  # Meta.ordering = ['step_number']

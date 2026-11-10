@@ -137,6 +137,7 @@ def build_scan_context(document):
 
     suggested_action = {
         Document.Status.IN_PROGRESS: 'release',
+        Document.Status.RETURNED: 'release',
         Document.Status.IN_TRANSIT: 'receive',
         Document.Status.COMPLETED: 'return',
     }.get(document.status)

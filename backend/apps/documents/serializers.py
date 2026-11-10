@@ -273,7 +273,7 @@ class OfficeHistorySerializer(serializers.ModelSerializer):
     def get_in_custody(self, obj):
         office = self.context['office']
         return obj.current_office == office.code and obj.status in (
-            Document.Status.IN_PROGRESS, Document.Status.COMPLETED, Document.Status.MISSING,
+            *Document.ACTIONABLE_STATUSES, Document.Status.COMPLETED, Document.Status.MISSING,
         )
 
 
@@ -310,7 +310,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             'document_type_steps', 'route',
             'form_data', 'requested_by', 'requested_by_name', 'guest_name', 'guest_email', 'origin_office',
             'route_position', 'current_step_number', 'current_office', 'current_office_detail',
-            'status', 'status_label', 'is_returning', 'was_returned', 'processing_stage', 'processing_stage_label',
+            'status', 'status_label', 'is_returning', 'return_target_office', 'was_returned', 'processing_stage', 'processing_stage_label',
             'step_statuses', 'current_handler',
             'created_at', 'updated_at', 'entered_current_office_at', 'dwell_display', 'qr_code',
             'released_at', 'released_by_name',
@@ -354,11 +354,12 @@ class DocumentSerializer(serializers.ModelSerializer):
     def get_status_label(self, obj):
         if obj.status == 'in_progress':
             return f"At {obj.current_office}"
+        if obj.status == 'returned':
+            return f"Returned to {obj.current_office}"
         if obj.status == 'in_transit':
             route = obj.document_type.route
             if obj.is_returning:
-                target_office = route[obj.route_position - 1] if obj.route_position > 0 else obj.current_office
-                return f"Being Returned to {target_office}"
+                return f"Being Returned to {obj.return_target_office}"
             next_office = route[obj.route_position + 1] if obj.route_position + 1 < len(route) else obj.current_office
             return f"In Transit to {next_office}"
         if obj.status == 'completed':
@@ -513,11 +514,12 @@ class PublicDocumentTrackingSerializer(serializers.ModelSerializer):
     def get_status_label(self, obj):
         if obj.status == 'in_progress':
             return f"At {obj.current_office}"
+        if obj.status == 'returned':
+            return f"Returned to {obj.current_office}"
         if obj.status == 'in_transit':
             route = obj.document_type.route
             if obj.is_returning:
-                target_office = route[obj.route_position - 1] if obj.route_position > 0 else obj.current_office
-                return f"Being Returned to {target_office}"
+                return f"Being Returned to {obj.return_target_office}"
             next_office = route[obj.route_position + 1] if obj.route_position + 1 < len(route) else obj.current_office
             return f"In Transit to {next_office}"
         if obj.status == 'completed':

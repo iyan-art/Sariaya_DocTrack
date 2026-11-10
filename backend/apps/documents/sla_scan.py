@@ -59,7 +59,7 @@ def run_overdue_scan():
     """
     now = timezone.now()
     active_documents = Document.objects.filter(
-        status=Document.Status.IN_PROGRESS,
+        status__in=Document.ACTIONABLE_STATUSES,
     ).select_related('document_type', 'current_handler')
 
     documents_overdue = 0
@@ -152,7 +152,7 @@ def run_missing_scan(hours=DEFAULT_MISSING_SLA_HOURS):
     cutoff = timezone.now() - timedelta(hours=hours)
 
     stuck_documents = Document.objects.filter(
-        status__in=[Document.Status.IN_PROGRESS, Document.Status.IN_TRANSIT],
+        status__in=[*Document.ACTIONABLE_STATUSES, Document.Status.IN_TRANSIT],
         entered_current_office_at__lte=cutoff,
     )
     total_stuck = stuck_documents.count()

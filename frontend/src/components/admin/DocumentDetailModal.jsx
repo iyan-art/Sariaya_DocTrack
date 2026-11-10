@@ -9,8 +9,8 @@ import { PrinterIcon } from '../Icons';
 // Keyed by the document's actual Document.Status values. Mirrors the
 // release -> receive -> (repeat) -> completed -> released chain enforced
 // server-side in apps/documents/services.py.
-// 'return_to_office' (Controlled Return — sends an in-progress document
-// backward to whichever office last forwarded it) is deliberately a
+// 'return_to_office' (Controlled Return — marks the document Returned and
+// sends it back to the previous or the originating office) is deliberately a
 // different action value from 'return' below (kept as the internal action
 // value for backward compatibility — only the label changed), which calls
 // release_to_citizen() and means "hand the completed document to the
@@ -18,7 +18,13 @@ import { PrinterIcon } from '../Icons';
 const NEXT_ACTIONS = {
   in_progress: [
     { action: 'release', label: 'Release to Next Office' },
-    { action: 'return_to_office', label: 'Return' },
+    { action: 'return_to_office', label: 'Returned (send back for revision)' },
+    { action: 'flagged_missing', label: 'Flag as Missing' },
+  ],
+  // Back at this office for revision: once fixed, it moves forward again.
+  returned: [
+    { action: 'release', label: 'Corrected — Release to Next Office' },
+    { action: 'return_to_office', label: 'Returned (send back for revision)' },
     { action: 'flagged_missing', label: 'Flag as Missing' },
   ],
   in_transit: [
@@ -52,7 +58,7 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
   const { showToast } = useToast();
   const [doc, setDoc] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [actionForm, setActionForm] = useState({ action: '', office: '', notes: '' });
+  const [actionForm, setActionForm] = useState({ action: '', office: '', notes: '', destination: 'previous' });
   const [submitting, setSubmitting] = useState(false);
   const [showSlip, setShowSlip] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -70,6 +76,16 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
   // returning office attaches so the receiving office understands what
   // needs correcting. Every other action's Notes stays optional, unchanged.
   const isInternal = doc?.document_type_scope === 'internal';
+  // Where a return can go. Two choices only when the previous office isn't
+  // already the originating office.
+  const route = doc?.route || [];
+  const previousOffice = doc ? route[doc.route_position - 1] : null;
+  const originOffice = route[0];
+  const canReturnToOrigin = Boolean(doc) && doc.route_position >= 2 && originOffice !== previousOffice;
+  // The reason the last office gave, shown while the document waits here to be fixed.
+  const lastReturn = doc?.status === 'returned'
+    ? [...(doc.logs || [])].reverse().find((l) => l.action === 'return_initiated')
+    : null;
   const availableActions = doc
     ? (NEXT_ACTIONS[doc.status] || [])
         .filter((a) => a.action !== 'return_to_office' || doc.route_position > 0)
@@ -80,10 +96,10 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
 
   const handleTransition = async (e) => {
     e.preventDefault();
-    const { action, office, notes } = actionForm;
+    const { action, office, notes, destination } = actionForm;
 
     if (action === 'return_to_office' && !notes.trim()) {
-      showToast('Please provide a reason for returning this document.', 'error');
+      showToast('Please provide the remarks / reason for returning this document.', 'error');
       return;
     }
 
@@ -103,16 +119,19 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
       } else {
         // 'release', 'receive', or 'return_to_office' — office is only
         // meaningful for 'receive' (defaults to the current staff member's
-        // own office if left blank); return_to_office's destination is
-        // computed automatically server-side, not chosen here.
-        const res = await transitionDocument(documentId, { action, office, notes });
+        // own office if left blank); destination only for 'return_to_office'.
+        const returnTo = canReturnToOrigin ? destination : 'previous';
+        const res = await transitionDocument(documentId, {
+          action, office, notes, ...(action === 'return_to_office' && { destination: returnTo }),
+        });
         const readyOutcome = READY_EMAIL_STATUS_TOAST[res.data.email_status];
+        const returnedTo = returnTo === 'origin' ? originOffice : previousOffice;
         showToast(
-          readyOutcome?.message || (action === 'return_to_office' ? 'Document returned to the previous office.' : 'Document status updated.'),
+          readyOutcome?.message || (action === 'return_to_office' ? `Document marked Returned and sent back to ${returnedTo}.` : 'Document status updated.'),
           readyOutcome?.type || 'success',
         );
       }
-      setActionForm({ action: '', office: '', notes: '' });
+      setActionForm({ action: '', office: '', notes: '', destination: 'previous' });
       load();
       onUpdated();
     } catch (err) {
@@ -142,6 +161,16 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
               <p className="font-semibold text-slate-900 dark:text-slate-100 text-lg mt-1">{doc.document_type_name}</p>
               {doc.description && <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{doc.description}</p>}
               <div className="mt-2"><DocumentStatusBadge doc={doc} /></div>
+              {lastReturn && (
+                <div role="note" className="mt-3 rounded-xl border border-orange-200 dark:border-orange-500/30 bg-orange-50 dark:bg-orange-500/10 p-3 text-sm">
+                  <p className="font-bold text-orange-800 dark:text-orange-300">Returned for revision</p>
+                  <p className="text-orange-900 dark:text-orange-200 mt-0.5 break-words">{lastReturn.notes}</p>
+                  <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">
+                    By {lastReturn.acted_by?.full_name || 'staff'}{lastReturn.acted_by?.employee_id ? ` (${lastReturn.acted_by.employee_id})` : ''}
+                    {lastReturn.office?.code ? ` · ${lastReturn.office.code}` : ''}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="mt-5 space-y-2 text-sm">
@@ -192,17 +221,38 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
                   className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 )}
+                {actionForm.action === 'return_to_office' && (
+                  <div>
+                    <label htmlFor="return-destination" className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Send back to</label>
+                    {canReturnToOrigin ? (
+                      <select
+                        id="return-destination"
+                        value={actionForm.destination}
+                        onChange={(e) => setActionForm({ ...actionForm, destination: e.target.value })}
+                        className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="previous">Previous office ({previousOffice})</option>
+                        <option value="origin">Originating office ({originOffice})</option>
+                      </select>
+                    ) : (
+                      <p id="return-destination" className="text-sm text-slate-700 dark:text-slate-300">
+                        {previousOffice}{previousOffice === originOffice ? ' (originating office)' : ' (previous office)'}
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div>
                   {actionForm.action === 'return_to_office' && (
-                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">
-                      Reason for returning <span className="text-red-500">*</span>
+                    <label htmlFor="action-notes" className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">
+                      Remarks / Reason <span className="text-red-500">*</span>
                     </label>
                   )}
                   <textarea
+                    id="action-notes"
                     required={actionForm.action === 'return_to_office'}
                     placeholder={
                       actionForm.action === 'return_to_office'
-                        ? 'Explain what needs to be corrected before this document can move forward again…'
+                        ? "e.g. Missing Mayor's signature, incomplete attachment, incorrect details…"
                         : 'Notes (optional)'
                     }
                     rows={2}
@@ -211,7 +261,7 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
                     className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-                <button type="submit" disabled={submitting}
+                <button type="submit" disabled={submitting || (actionForm.action === 'return_to_office' && !actionForm.notes.trim())}
                   className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-medium rounded-lg py-2.5 text-sm transition-colors">
                   {submitting ? 'Updating…' : 'Apply update'}
                 </button>
