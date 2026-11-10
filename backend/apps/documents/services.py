@@ -1,5 +1,6 @@
 import re
 
+from django.db.models.functions import Trim, Upper
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from apps.accounts.models import User
@@ -35,20 +36,23 @@ def notify_office(office_label, title, message, notification_type, sender=None, 
     `office_label` — case-insensitively, same seam as _same_office()/
     resolve_office() between the free-text User.office and the canonical
     Office.code. `exclude_user` skips the acting user themselves, so staff
-    never get notified about their own action.
+    never get notified about their own action. Returns how many were sent:
+    0 when the office has no active staff (or all of them opted out).
     """
-    recipients = User.objects.filter(
-        office__iexact=(office_label or '').strip(), role__in=[User.Role.EMPLOYEE, User.Role.ADMIN], is_active=True,
+    # Trimmed on both sides: User.office is typed by hand, and a stray space
+    # would otherwise silently leave that person out.
+    recipients = User.objects.annotate(office_key=Upper(Trim('office'))).filter(
+        office_key=(office_label or '').strip().upper(), role__in=[User.Role.EMPLOYEE, User.Role.ADMIN], is_active=True,
     )
     if exclude_user:
         recipients = recipients.exclude(id=exclude_user.id)
-    Notification.objects.bulk_create([
+    return len(Notification.objects.bulk_create([
         Notification(
             recipient=user, sender=sender, title=title, message=message,
             notification_type=notification_type, related_document=related_document,
         )
         for user in recipients if _wants(user, notification_type)
-    ])
+    ]))
 
 
 # Matches an Employee ID (with its parentheses) inside free-text notes, so it
@@ -92,13 +96,13 @@ def notify_citizen(document, title, message):
 def notify_admins(title, message, notification_type, sender=None, related_document=None):
     """Same as notify_office(), but every active admin regardless of office."""
     recipients = User.objects.filter(role=User.Role.ADMIN, is_active=True)
-    Notification.objects.bulk_create([
+    return len(Notification.objects.bulk_create([
         Notification(
             recipient=user, sender=sender, title=title, message=message,
             notification_type=notification_type, related_document=related_document,
         )
         for user in recipients if _wants(user, notification_type)
-    ])
+    ]))
 
 
 def can_delete_document(document, user):
@@ -702,25 +706,38 @@ def citizen_return_document(document, citizen_user, notes=''):
 
     releasing_office = document.current_office
     title = f"Returned for correction: {document.tracking_number}"
-    notify_office(
+    message = (
+        f"{citizen_user.full_name} returned their {document.document_type.name} request "
+        f"({document.tracking_number}) for correction. Remarks: {notes}"
+    )
+    notified = notify_office(
         releasing_office,
         title=title,
-        message=(
-            f"{citizen_user.full_name} returned their {document.document_type.name} request "
-            f"({document.tracking_number}) for correction. Remarks: {notes}"
-        ),
+        message=message,
         notification_type=Notification.NotificationType.DOCUMENT_RETURNED,
         sender=citizen_user, related_document=document,
     )
     origin_office = document.document_type.route[0]
     if not _same_office(origin_office, releasing_office):
-        notify_office(
+        notified += notify_office(
             origin_office,
             title=title,
             message=(
                 f"The {document.document_type.name} request ({document.tracking_number}) that your office "
                 f"started was returned by the requester to {_office_name(releasing_office)} for correction. "
                 f"Remarks: {notes}"
+            ),
+            notification_type=Notification.NotificationType.DOCUMENT_RETURNED,
+            sender=citizen_user, related_document=document,
+        )
+    # Nobody at the office got it (no active staff there, or all opted out):
+    # the Municipal Administrator must hear about it instead of no one.
+    if notified == 0:
+        notify_admins(
+            title=title,
+            message=(
+                f"{message} No active staff at {_office_name(releasing_office)} could be notified, "
+                f"so someone there needs to be assigned to make this correction."
             ),
             notification_type=Notification.NotificationType.DOCUMENT_RETURNED,
             sender=citizen_user, related_document=document,
