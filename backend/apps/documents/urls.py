@@ -12,11 +12,16 @@ from .views import (
     DocumentStageUpdateView, DocumentCitizenReturnView, DocumentExpediteView,
     EmailNotificationLogListView, RunSlaScanView,
     AnnouncementListView, EventListView, PublicDocumentTypeListView, OfficeHistoryView,
+    AnnouncementManageListView, AnnouncementManageDetailView, EventManageListView, EventManageDetailView,
 )
 
 urlpatterns = [
     path('announcements/', AnnouncementListView.as_view(), name='announcement-list'),
     path('events/', EventListView.as_view(), name='event-list'),
+    path('announcements/manage/', AnnouncementManageListView.as_view(), name='announcement-manage-list'),
+    path('announcements/manage/<int:pk>/', AnnouncementManageDetailView.as_view(), name='announcement-manage-detail'),
+    path('events/manage/', EventManageListView.as_view(), name='event-manage-list'),
+    path('events/manage/<int:pk>/', EventManageDetailView.as_view(), name='event-manage-detail'),
 
     path('types/public/', PublicDocumentTypeListView.as_view(), name='document-type-list-public'),
     path('types/', DocumentTypeListCreateView.as_view(), name='document-type-list-create'),

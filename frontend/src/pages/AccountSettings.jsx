@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { changeMyPassword, fetchMyLinkedRequests, fetchMyProfile, updateMyProfile } from '../api/axios';
+import { changeMyPassword, fetchMyLinkedRequests, fetchMyProfile, removeMyAvatar, updateMyProfile, uploadMyAvatar } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { extractErrorMessage } from '../utils/apiError';
 import { CONTACT_NUMBER_ERROR, isInvalidContactNumber } from '../utils/contactNumber';
+import { IMAGE_ACCEPT, imageFileError, useObjectUrl } from '../utils/imageUpload';
 import PasswordInput from '../components/PasswordInput';
-import { BellIcon, MoonIcon, ShieldCheckIcon, SunIcon, UserCircleIcon, ArrowRightLeftIcon } from '../components/Icons';
+import UserAvatar from '../components/UserAvatar';
+import { BellIcon, MoonIcon, ShieldCheckIcon, SunIcon, UserCircleIcon, ArrowRightLeftIcon, CameraIcon } from '../components/Icons';
 
 const inputClass = 'mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50 dark:disabled:bg-slate-800/50 disabled:text-slate-500';
 const labelClass = 'block text-sm font-medium text-slate-700 dark:text-slate-300';
@@ -34,6 +36,86 @@ function Section({ id, icon: Icon, title, description, children }) {
       </div>
       {children}
     </section>
+  );
+}
+
+// Profile picture: choose a file, preview it, then save or cancel.
+function ProfilePhoto({ profile, onSaved }) {
+  const { showToast } = useToast();
+  const fileInput = useRef(null);
+  const [file, setFile] = useState(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const preview = useObjectUrl(file);
+
+  const pick = (e) => {
+    const chosen = e.target.files?.[0];
+    e.target.value = '';
+    if (!chosen) return;
+    const problem = imageFileError(chosen);
+    setError(problem || '');
+    setFile(problem ? null : chosen);
+  };
+
+  const run = async (request, message) => {
+    setBusy(true);
+    setError('');
+    try {
+      const res = await request();
+      setFile(null);
+      showToast(message, 'success');
+      onSaved(res.data);
+    } catch (err) {
+      const fieldError = err?.response?.data?.avatar;
+      setError(Array.isArray(fieldError) ? fieldError[0] : extractErrorMessage(err, "We couldn't update your picture."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center gap-4 pb-5 mb-5 border-b border-slate-100 dark:border-slate-800">
+      {preview ? (
+        <img src={preview} alt="New profile picture preview" className="h-20 w-20 rounded-full object-cover ring-2 ring-blue-500" />
+      ) : (
+        <UserAvatar user={profile} className="h-20 w-20 text-2xl" alt="Your profile picture" />
+      )}
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Profile picture</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          {preview ? 'This is how it will look. Save to use it.' : 'JPEG, PNG or WebP, up to 5 MB. It is cropped to a square.'}
+        </p>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {preview ? (
+            <>
+              <button type="button" disabled={busy} onClick={() => run(() => uploadMyAvatar(file), 'Profile picture updated.')}
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg px-4 py-2">
+                {busy ? 'Saving…' : 'Save picture'}
+              </button>
+              <button type="button" disabled={busy} onClick={() => setFile(null)}
+                className="rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800">
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" disabled={busy} onClick={() => fileInput.current?.click()}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 text-sm font-semibold px-4 py-2">
+                <CameraIcon className="w-4 h-4" /> {profile.avatar ? 'Change picture' : 'Upload picture'}
+              </button>
+              {profile.avatar && (
+                <button type="button" disabled={busy} onClick={() => run(removeMyAvatar, 'Profile picture removed.')}
+                  className="rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 text-sm font-semibold px-4 py-2">
+                  Remove
+                </button>
+              )}
+            </>
+          )}
+          <input ref={fileInput} type="file" accept={IMAGE_ACCEPT} onChange={pick} className="hidden" aria-label="Profile picture file" />
+        </div>
+        {error && <p role="alert" className={errorClass}>{error}</p>}
+      </div>
+    </div>
   );
 }
 
@@ -69,7 +151,8 @@ function ProfileSection({ profile, onSaved }) {
   };
 
   return (
-    <Section id="profile" icon={UserCircleIcon} title="Profile" description="Your name and how the office can reach you.">
+    <Section id="profile" icon={UserCircleIcon} title="Profile" description="Your picture, your name, and how the office can reach you.">
+      <ProfilePhoto profile={profile} onSaved={onSaved} />
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>

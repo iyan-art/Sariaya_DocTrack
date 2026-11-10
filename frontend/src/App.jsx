@@ -20,6 +20,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import Heatmap from './pages/admin/Heatmap';
 import AdminAccessLogs from './pages/admin/AdminAccessLogs';
 import AdminSurveys from './pages/admin/AdminSurveys';
+import AdminLandingContent from './pages/admin/AdminLandingContent';
 import AdminSuggestions from './pages/admin/AdminSuggestions';
 import CitizenHistory from './pages/citizen/History';
 import CitizenHome from './pages/citizen/Home';
@@ -59,6 +60,7 @@ function App() {
           <Route path="/admin/archive" element={<Archive />} />
           <Route path="/admin/access-logs" element={<AdminAccessLogs />} />
           <Route path="/admin/surveys" element={<AdminSurveys />} />
+          <Route path="/admin/news-events" element={<AdminLandingContent />} />
           <Route path="/admin/suggestions" element={<AdminSuggestions />} />
           <Route path="/admin/qr-scan" element={<QRScan />} />
           <Route path="/admin/settings" element={<AccountSettings />} />

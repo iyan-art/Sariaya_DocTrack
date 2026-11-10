@@ -14,6 +14,8 @@ from .services import EMPLOYEE_ID_RE, can_originate, originating_office, resolve
 from .qr_services import generate_qr_code
 from .sla_scan import DUE_SOON_THRESHOLD_RATIO
 from .validators import number_field_error
+from .images import NEWS_IMAGE_SIZE, prepare_image
+from .storage import database_storage
 from apps.accounts.validators import CONTACT_NUMBER_ERROR, is_valid_contact_number
 
 
@@ -79,6 +81,107 @@ class EventSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = ['id', 'title', 'description', 'image', 'location', 'start_date', 'end_date']
+
+
+def _save_with_image(instance, validated_data, save):
+    """
+    Shared by the admin news/event serializers: `remove_image` clears the
+    picture, a new upload replaces it, and either way the old file is
+    deleted from storage once the record is saved.
+    """
+    old_name = instance.image.name if instance and instance.image else ''
+    if validated_data.pop('remove_image', False) and 'image' not in validated_data:
+        validated_data['image'] = None
+    instance = save(validated_data)
+    new_name = instance.image.name if instance.image else ''
+    if old_name and old_name != new_name:
+        database_storage.delete(old_name)
+    return instance
+
+
+class AnnouncementAdminSerializer(serializers.ModelSerializer):
+    """
+    The admin's News & Events page. Pictures arrive as multipart uploads and
+    are checked and resized by images.prepare_image(); `status` says whether
+    the landing page shows the post yet.
+    """
+    image = serializers.ImageField(required=False, allow_null=True)
+    remove_image = serializers.BooleanField(write_only=True, required=False)
+    # Explicit default: a multipart form that leaves a checkbox out would
+    # otherwise read as False and post the item straight into the archive.
+    is_active = serializers.BooleanField(required=False, default=True)
+    status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Announcement
+        fields = ['id', 'title', 'summary', 'body', 'image', 'remove_image', 'is_active', 'published_at', 'created_at', 'status']
+        read_only_fields = ['created_at']
+
+    def validate_title(self, value):
+        if not value.strip():
+            raise serializers.ValidationError('Please enter a title.')
+        return value.strip()
+
+    def validate_image(self, value):
+        return prepare_image(value, NEWS_IMAGE_SIZE) if value else value
+
+    def get_status(self, obj):
+        if not obj.is_active:
+            return 'archived'
+        return 'scheduled' if obj.published_at > timezone.now() else 'published'
+
+    def create(self, validated_data):
+        validated_data.pop('remove_image', None)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        return _save_with_image(instance, validated_data, lambda data: super(AnnouncementAdminSerializer, self).update(instance, data))
+
+
+class EventAdminSerializer(serializers.ModelSerializer):
+    """Same as AnnouncementAdminSerializer, for events; `status` follows the event's dates."""
+    image = serializers.ImageField(required=False, allow_null=True)
+    remove_image = serializers.BooleanField(write_only=True, required=False)
+    # Explicit default: a multipart form that leaves a checkbox out would
+    # otherwise read as False and post the item straight into the archive.
+    is_active = serializers.BooleanField(required=False, default=True)
+    status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Event
+        fields = ['id', 'title', 'description', 'image', 'remove_image', 'location', 'start_date', 'end_date',
+                  'is_active', 'created_at', 'status']
+        read_only_fields = ['created_at']
+
+    def validate_title(self, value):
+        if not value.strip():
+            raise serializers.ValidationError('Please enter a title.')
+        return value.strip()
+
+    def validate_image(self, value):
+        return prepare_image(value, NEWS_IMAGE_SIZE) if value else value
+
+    def validate(self, attrs):
+        start = attrs.get('start_date', getattr(self.instance, 'start_date', None))
+        end = attrs.get('end_date', getattr(self.instance, 'end_date', None))
+        if start and end and end < start:
+            raise serializers.ValidationError({'end_date': 'The end date cannot be before the start date.'})
+        return attrs
+
+    def get_status(self, obj):
+        if not obj.is_active:
+            return 'archived'
+        today = timezone.localdate()
+        if (obj.end_date or obj.start_date) < today:
+            return 'past'
+        return 'ongoing' if obj.start_date <= today else 'upcoming'
+
+    def create(self, validated_data):
+        validated_data.pop('remove_image', None)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        return _save_with_image(instance, validated_data, lambda data: super(EventAdminSerializer, self).update(instance, data))
 
 
 class WorkflowStepSerializer(serializers.ModelSerializer):

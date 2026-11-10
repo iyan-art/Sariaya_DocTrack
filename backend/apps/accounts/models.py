@@ -3,6 +3,8 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.db import models
 from django.utils import timezone
 
+from apps.documents.storage import database_storage
+
 
 class UserManager(BaseUserManager):
     """
@@ -71,6 +73,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     # {"incoming_documents": false}. Anything not listed is on — see
     # NOTIFICATION_PREFERENCES for the keys each role can set.
     notification_preferences = models.JSONField(default=dict, blank=True)
+
+    # Profile picture, kept in the database like other uploads (see
+    # apps/documents/storage.py). Blank means the initials avatar is shown.
+    avatar = models.ImageField(upload_to='avatars/', storage=database_storage, blank=True, null=True)
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

@@ -18,10 +18,9 @@ from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include, re_path
-from django.views.static import serve
 
 from apps.documents.views import (
-    serve_document_qr,
+    serve_document_qr, serve_stored_media,
     MissingDocumentAlertListView, DocumentTypeListCreateView, DocumentTypeDetailView, DocumentTypeStepsView,
     OfficeListCreateView, OfficeDetailView, PublicOfficeListView,
     NotificationListView, NotificationUnreadCountView, NotificationMarkReadView, NotificationMarkAllReadView,
@@ -53,7 +52,8 @@ urlpatterns = [
     # characters Django's storage puts in a filename keeps "../" and "..\" from
     # reaching the rest of media/ through this route.
     path('media/document_qr/<str:filename>', serve_document_qr, name='document-qr-image'),
-    re_path(r'^media/(?P<path>(?:announcements|events)/[\w.-]+)$', serve, {'document_root': settings.MEDIA_ROOT}),
+    # Uploaded pictures live in the database (apps/documents/storage.py).
+    re_path(r'^media/(?P<path>(?:announcements|events|avatars)/[\w.-]+)$', serve_stored_media, name='stored-media'),
 ]
 
 if settings.DEBUG:

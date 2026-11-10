@@ -6,13 +6,14 @@ from rest_framework.views import APIView
 
 from django.core.files.storage import default_storage
 from django.db import transaction, IntegrityError
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, HttpResponse
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from django.shortcuts import get_object_or_404
 
 from .models import (
     Document, DocumentType, WorkflowStep, Office, DocumentLog, MissingDocumentAlert,
     Survey, SurveyQuestion, SurveyQuestionOption, SurveyAnswer, SurveyResponse,
-    CitizenSuggestion, EmailNotificationLog, Announcement, Event, Notification,
+    CitizenSuggestion, EmailNotificationLog, Announcement, Event, Notification, StoredFile,
 )
 from .serializers import (
     DocumentSerializer, DocumentDetailSerializer, CreateDocumentSerializer, DocumentTypeSerializer,
@@ -21,7 +22,7 @@ from .serializers import (
     SurveySerializer, RespondentSurveySerializer, SurveyWriteSerializer, SurveyQuestionsReplaceSerializer,
     SurveyCommentSerializer, CitizenSuggestionSerializer, CitizenSuggestionAdminSerializer,
     EmailNotificationLogSerializer, PublicOfficeSerializer,
-    AnnouncementSerializer, EventSerializer, PublicDocumentTypeSerializer,
+    AnnouncementSerializer, EventSerializer, AnnouncementAdminSerializer, EventAdminSerializer, PublicDocumentTypeSerializer,
     NotificationSerializer, OfficeHistorySerializer,
 )
 from .permissions import IsStaffUser
@@ -29,6 +30,7 @@ from apps.accounts.permissions import IsAdmin
 from .services import release_document, receive_document, return_document, citizen_return_document, mark_corrected, release_final, flag_missing, resolve_office, advance_processing_stage, can_delete_document, expedite_document, notify_citizen
 from .sla_scan import run_overdue_scan, run_missing_scan
 from .qr_services import resolve_and_verify, enforce_scope_access, build_scan_context, generate_qr_code
+from .storage import database_storage
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from django.db.models import Count, Avg, F, Max, Prefetch, Q, Subquery, OuterRef, DurationField, ExpressionWrapper
@@ -89,13 +91,21 @@ class AnnouncementListView(generics.ListAPIView):
     """
     GET /api/documents/announcements/
     Anonymous-safe, read-only. Powers the Landing page's "Latest
-    Announcements" section. No seed data ships with this — an empty table
-    means the section shows a genuine "nothing posted yet" state instead of
-    fabricated municipal news; real entries are added via Django Admin.
+    Announcements" section: the newest published posts — not archived ones,
+    and not those scheduled for later. No seed data ships with this — an
+    empty table means the section shows a genuine "nothing posted yet"
+    state instead of fabricated municipal news; the admin posts them on the
+    News & Events page.
     """
     serializer_class = AnnouncementSerializer
     permission_classes = [AllowAny]
-    queryset = Announcement.objects.filter(is_active=True).order_by('-published_at')
+    LIMIT = 6
+
+    def get_queryset(self):
+        return (
+            Announcement.objects.filter(is_active=True, published_at__lte=timezone.now())
+            .order_by('-published_at')[:self.LIMIT]
+        )
 
 
 class PublicDocumentTypeListView(generics.ListAPIView):
@@ -115,20 +125,62 @@ class EventListView(generics.ListAPIView):
     """
     GET /api/documents/events/
     Anonymous-safe, read-only. Powers the Landing page's "Events in
-    Sariaya" section. Same no-fake-seed-data pattern as AnnouncementListView.
+    Sariaya" section: events still upcoming or happening now, soonest
+    first, so last month's events drop off on their own. Same
+    no-fake-seed-data pattern as AnnouncementListView.
     """
     serializer_class = EventSerializer
     permission_classes = [AllowAny]
-    queryset = Event.objects.filter(is_active=True).order_by('start_date')
+    LIMIT = 6
 
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        if instance.workflow_steps.exists():
-            return Response(
-                {"detail": "Cannot delete an office already used by workflow steps. Deactivate it instead."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        return super().destroy(request, *args, **kwargs)
+    def get_queryset(self):
+        today = timezone.localdate()
+        return (
+            Event.objects.filter(is_active=True)
+            .filter(Q(end_date__gte=today) | Q(end_date__isnull=True, start_date__gte=today))
+            .order_by('start_date')[:self.LIMIT]
+        )
+
+
+class AnnouncementManageListView(generics.ListCreateAPIView):
+    """
+    GET  /api/documents/announcements/manage/   every post, archived included
+    POST /api/documents/announcements/manage/   new post (multipart, optional `image`)
+    Admin only — the News & Events page.
+    """
+    serializer_class = AnnouncementAdminSerializer
+    permission_classes = [IsAdmin]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    queryset = Announcement.objects.order_by('-published_at')
+
+
+class AnnouncementManageDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    GET/PATCH/DELETE /api/documents/announcements/manage/<id>/
+    PATCH edits (a new `image` replaces the picture, `remove_image` drops
+    it) or archives/restores with `is_active`. Admin only.
+    """
+    serializer_class = AnnouncementAdminSerializer
+    permission_classes = [IsAdmin]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    queryset = Announcement.objects.all()
+
+    def perform_destroy(self, instance):
+        image_name = instance.image.name if instance.image else ''
+        instance.delete()
+        database_storage.delete(image_name)
+
+
+class EventManageListView(AnnouncementManageListView):
+    """GET/POST /api/documents/events/manage/ — the same, for events."""
+    serializer_class = EventAdminSerializer
+    queryset = Event.objects.order_by('-start_date')
+
+
+class EventManageDetailView(AnnouncementManageDetailView):
+    """GET/PATCH/DELETE /api/documents/events/manage/<id>/ — the same, for events."""
+    serializer_class = EventAdminSerializer
+    queryset = Event.objects.all()
 
 
 class DocumentTypeListCreateView(generics.ListCreateAPIView):
@@ -430,6 +482,22 @@ class DocumentExpediteView(APIView):
             return Response({"detail": str(e.detail[0]) if hasattr(e, 'detail') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response({"detail": "Follow-up request sent to the office currently handling your document."})
+
+
+def serve_stored_media(request, path):
+    """
+    GET /media/<announcements|events|avatars>/<filename>
+    Serves an uploaded image from the database (storage.DatabaseStorage).
+    Every upload gets a new random name, so a URL's bytes never change and
+    browsers may cache it for good.
+    """
+    stored = StoredFile.objects.filter(name=path).only('content', 'content_type').first()
+    if stored is None:
+        raise Http404
+    response = HttpResponse(bytes(stored.content), content_type=stored.content_type)
+    response['Cache-Control'] = 'public, max-age=31536000, immutable'
+    response['X-Content-Type-Options'] = 'nosniff'
+    return response
 
 
 def serve_document_qr(request, filename):

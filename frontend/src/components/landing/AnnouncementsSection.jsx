@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchPublicAnnouncements } from '../../api/axios';
+import { fetchPublicAnnouncements, mediaUrl } from '../../api/axios';
 import { NewspaperIcon } from '../Icons';
 
 function formatDate(value) {
@@ -39,7 +39,7 @@ export default function AnnouncementsSection() {
             {announcements.map((a) => (
               <div key={a.id} className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                 {a.image ? (
-                  <img src={a.image} alt={a.title} className="w-full h-40 object-cover" />
+                  <img src={mediaUrl(a.image)} alt={a.title} loading="lazy" className="w-full h-40 object-cover" />
                 ) : (
                   <div className="w-full h-40 bg-amber-50 flex items-center justify-center">
                     <NewspaperIcon className="w-8 h-8 text-amber-300" />

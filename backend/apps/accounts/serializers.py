@@ -74,11 +74,12 @@ class UserSerializer(serializers.ModelSerializer):
     Never includes password.
     """
     full_name = serializers.ReadOnlyField()
+    avatar = serializers.ImageField(read_only=True)
 
     class Meta:
         model = User
         fields = ['id', 'email', 'first_name', 'last_name', 'full_name', 'role', 'employee_id',
-                  'office', 'position', 'is_active', 'date_joined']
+                  'office', 'position', 'is_active', 'date_joined', 'avatar']
 
 class ProfileSerializer(serializers.ModelSerializer):
     """
@@ -87,11 +88,13 @@ class ProfileSerializer(serializers.ModelSerializer):
     role, office, and position stay under the admin's control.
     """
     full_name = serializers.ReadOnlyField()
+    # Changed through MyAvatarView (multipart), not this JSON endpoint.
+    avatar = serializers.ImageField(read_only=True)
 
     class Meta:
         model = User
         fields = ['id', 'email', 'first_name', 'last_name', 'full_name', 'role', 'employee_id',
-                  'office', 'position', 'contact_number', 'notification_preferences', 'date_joined']
+                  'office', 'position', 'contact_number', 'notification_preferences', 'date_joined', 'avatar']
         read_only_fields = ['id', 'role', 'employee_id', 'office', 'position', 'date_joined']
 
     def validate_first_name(self, value):

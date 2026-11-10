@@ -81,6 +81,15 @@ api.interceptors.response.use(
 
 export const fetchPublicAnnouncements = () => api.get('/documents/announcements/');
 export const fetchPublicEvents = () => api.get('/documents/events/');
+
+// --- Admin News & Events page: kind is 'news' or 'events'. Saves send
+// FormData so a picture can go with them (multipart).
+const MANAGED_CONTENT = { news: '/documents/announcements/manage/', events: '/documents/events/manage/' };
+export const fetchManagedContent = (kind) => api.get(MANAGED_CONTENT[kind]);
+export const saveManagedContent = (kind, id, formData) => (
+  id ? api.patch(`${MANAGED_CONTENT[kind]}${id}/`, formData) : api.post(MANAGED_CONTENT[kind], formData)
+);
+export const deleteManagedContent = (kind, id) => api.delete(`${MANAGED_CONTENT[kind]}${id}/`);
 export const fetchPublicOffices = () => api.get('/offices/public/');
 export const fetchPublicDocumentTypes = () => api.get('/documents/types/public/');
 
@@ -119,6 +128,12 @@ export const updateUser = (userId, data) => {
 export const fetchMyProfile = () => api.get('/accounts/me/');
 export const updateMyProfile = (data) => api.patch('/accounts/me/', data);
 export const changeMyPassword = (data) => api.post('/accounts/me/password/', data);
+export const uploadMyAvatar = (file) => {
+  const data = new FormData();
+  data.append('avatar', file);
+  return api.put('/accounts/me/avatar/', data);
+};
+export const removeMyAvatar = () => api.delete('/accounts/me/avatar/');
 export const fetchMyLinkedRequests = () => api.get('/accounts/me/linked-requests/');
 
 // Admin-only system-wide audit trail (logins, etc.) — powers AdminAccessLogs.

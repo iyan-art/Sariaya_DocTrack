@@ -1,4 +1,6 @@
 from rest_framework import generics, status, filters
+from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -19,6 +21,8 @@ from .serializers import (
 from .permissions import IsAdmin
 from .services import link_guest_documents
 from apps.documents.permissions import IsStaffUser
+from apps.documents.images import AVATAR_SIZE, prepare_image
+from apps.documents.storage import database_storage
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
@@ -147,6 +151,51 @@ class MeView(APIView):
                 ip_address=_client_ip(request), user_agent=request.META.get('HTTP_USER_AGENT', '')[:255],
             )
         return Response(ProfileSerializer(user).data)
+
+
+class MyAvatarView(APIView):
+    """
+    PUT    /api/accounts/me/avatar/  multipart `avatar`: upload or replace the
+                                     signed-in user's profile picture
+    DELETE /api/accounts/me/avatar/  remove it; the initials avatar shows again
+    Pictures are cropped square, resized and stripped of metadata
+    (apps/documents/images.py), then stored in the database.
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def _log(self, request, detail):
+        AccessLog.objects.create(
+            user=request.user, action=AccessLog.Action.PROFILE_UPDATED, detail=detail,
+            ip_address=_client_ip(request), user_agent=request.META.get('HTTP_USER_AGENT', '')[:255],
+        )
+
+    def put(self, request):
+        upload = request.FILES.get('avatar')
+        if upload is None:
+            raise ValidationError({'avatar': ['Choose a picture to upload.']})
+        try:
+            image = prepare_image(upload, AVATAR_SIZE, square=True)
+        except ValidationError as exc:
+            raise ValidationError({'avatar': exc.detail})
+
+        user = request.user
+        old_name = user.avatar.name if user.avatar else ''
+        user.avatar.save(image.name, image, save=False)
+        user.save(update_fields=['avatar'])
+        database_storage.delete(old_name)
+        self._log(request, 'Updated profile picture.')
+        return Response(ProfileSerializer(user, context={'request': request}).data)
+
+    def delete(self, request):
+        user = request.user
+        if user.avatar:
+            old_name = user.avatar.name
+            user.avatar = None
+            user.save(update_fields=['avatar'])
+            database_storage.delete(old_name)
+            self._log(request, 'Removed profile picture.')
+        return Response(ProfileSerializer(user, context={'request': request}).data)
 
 
 class ChangePasswordView(APIView):

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchPublicEvents } from '../../api/axios';
+import { fetchPublicEvents, mediaUrl } from '../../api/axios';
 import { CalendarIcon, MapPinIcon } from '../Icons';
 
 function formatDateRange(start, end) {
@@ -42,7 +42,7 @@ export default function EventsSection() {
             {events.map((ev) => (
               <div key={ev.id} className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                 {ev.image ? (
-                  <img src={ev.image} alt={ev.title} className="w-full h-40 object-cover" />
+                  <img src={mediaUrl(ev.image)} alt={ev.title} loading="lazy" className="w-full h-40 object-cover" />
                 ) : (
                   <div className="w-full h-40 bg-blue-50 flex items-center justify-center">
                     <CalendarIcon className="w-8 h-8 text-blue-300" />

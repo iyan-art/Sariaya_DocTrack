@@ -4,6 +4,8 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+from .storage import database_storage
+
 # Excludes visually-ambiguous characters (0/O, 1/I/L) so a citizen reading a
 # tracking number off a slip or a phone call doesn't misread it.
 _TRACKING_SUFFIX_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
@@ -709,18 +711,36 @@ class CitizenSuggestion(models.Model):
         return f"[{self.get_category_display()}] {self.subject[:50]}"
 
 
+class StoredFile(models.Model):
+    """
+    One uploaded image kept in the database (see storage.DatabaseStorage),
+    so it survives hosts that wipe the disk on every deploy. `name` is the
+    path an ImageField stores, e.g. 'avatars/3f9c….jpg'.
+    """
+    name = models.CharField(max_length=255, unique=True)
+    content = models.BinaryField()
+    content_type = models.CharField(max_length=100)
+    size = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Announcement(models.Model):
     """
     A municipal announcement/news item shown on the public Landing page —
-    admin-authored via Django Admin (no dedicated frontend authoring UI yet).
-    Deliberately has no seed data: an empty
-    table means the Landing page's Announcements section shows a genuine
-    "nothing posted yet" state rather than fabricated municipal news.
+    authored by the admin on the News & Events page (or Django Admin).
+    Hidden from the landing page until `published_at` (so a post can be
+    scheduled) and once archived (is_active=False). Deliberately has no
+    seed data: an empty table means the Landing page's Announcements
+    section shows a genuine "nothing posted yet" state rather than
+    fabricated municipal news.
     """
     title = models.CharField(max_length=200)
     summary = models.CharField(max_length=300, blank=True, help_text='Short teaser shown on the card.')
     body = models.TextField(blank=True, help_text='Full text, shown when a citizen clicks through.')
-    image = models.ImageField(upload_to='announcements/', blank=True, null=True)
+    image = models.ImageField(upload_to='announcements/', storage=database_storage, blank=True, null=True)
     is_active = models.BooleanField(default=True, db_index=True)
     published_at = models.DateTimeField(default=timezone.now, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -735,12 +755,12 @@ class Announcement(models.Model):
 class Event(models.Model):
     """
     A municipal event (festival, program, community activity) shown on the
-    public Landing page — same admin-authored, no-fake-seed-data pattern as
-    Announcement above.
+    public Landing page while it is upcoming or ongoing — same admin-
+    authored, no-fake-seed-data pattern as Announcement above.
     """
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
-    image = models.ImageField(upload_to='events/', blank=True, null=True)
+    image = models.ImageField(upload_to='events/', storage=database_storage, blank=True, null=True)
     location = models.CharField(max_length=200, blank=True)
     start_date = models.DateField(db_index=True)
     end_date = models.DateField(null=True, blank=True)
