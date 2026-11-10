@@ -1,21 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { CameraIcon, ScanLineIcon } from './Icons';
-
-// Mirrors qr_services.py::parse_qr_payload — a scanned code is either a
-// full "https://.../track/<tracking_number>?..." URL or a bare tracking
-// number typed/printed directly; either way we just want the last path
-// segment (or the raw string if it isn't a URL at all).
-function extractTrackingNumber(raw) {
-  const trimmed = raw.trim();
-  try {
-    const url = new URL(trimmed);
-    const segments = url.pathname.split('/').filter(Boolean);
-    return segments[segments.length - 1] || trimmed;
-  } catch {
-    return trimmed;
-  }
-}
+import { extractTrackingNumber } from '../utils/trackingNumber';
 
 /**
  * Guest-facing QR scan modal — same Html5QrcodeScanner engine as

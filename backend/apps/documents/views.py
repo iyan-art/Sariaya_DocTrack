@@ -463,7 +463,11 @@ def _document_route_offices(document):
 
 
 def _active_evaluation_survey():
-    return Survey.objects.filter(is_active=True).prefetch_related('questions').first()
+    """The newest active survey that actually has questions — an empty one can't be filled in."""
+    return (
+        Survey.objects.filter(is_active=True, questions__isnull=False).distinct()
+        .prefetch_related('questions__options').first()
+    )
 
 
 def _evaluation_get(document):
@@ -514,18 +518,16 @@ def _evaluation_post(request, document, respondent):
             continue
 
         answers = entry.get('answers', [])
-        seen_question_ids = set()
-        for answer in answers:
-            question = questions_by_id.get(answer.get('question'))
-            if question is None or question.id in seen_question_ids:
-                return Response({"detail": "Invalid or duplicate answer for this evaluation."}, status=status.HTTP_400_BAD_REQUEST)
-            seen_question_ids.add(question.id)
-            if question.question_type == SurveyQuestion.QuestionType.RATING and answer.get('rating_value') is None:
-                return Response({"detail": f"'{question.text}' requires a star rating."}, status=status.HTTP_400_BAD_REQUEST)
-
-        missing = set(questions_by_id) - seen_question_ids
-        if missing:
-            return Response({"detail": "Please answer every question for each office."}, status=status.HTTP_400_BAD_REQUEST)
+        if not isinstance(answers, list) or any(
+            not isinstance(a, dict) or a.get('question') not in questions_by_id for a in answers
+        ):
+            return Response({"detail": "Invalid answer for this evaluation."}, status=status.HTTP_400_BAD_REQUEST)
+        # Same rules as the post-scan and landing surveys: stars 1-5, one
+        # option for Likert/single choice, at least one for checkboxes.
+        cleaned, error = _parse_survey_answers(survey, answers)
+        if error:
+            office_name = offices_by_id[office_id].name
+            return Response({"detail": f"{office_name}: {error}"}, status=status.HTTP_400_BAD_REQUEST)
 
         # A guest and the account holder racing to rate the same office
         # both pass the already_rated_ids check above before either commits
@@ -538,13 +540,7 @@ def _evaluation_post(request, document, respondent):
                 )
         except IntegrityError:
             continue
-        SurveyAnswer.objects.bulk_create([
-            SurveyAnswer(
-                response=response, question_id=answer['question'],
-                rating_value=answer.get('rating_value'), text_value=answer.get('text_value', ''),
-            )
-            for answer in answers
-        ])
+        _persist_survey_answers(response, cleaned)
         saved += 1
 
     if saved == 0:
@@ -607,12 +603,16 @@ class PublicDocumentEvaluationView(APIView):
 
     def _get_document(self, request, tracking_number):
         try:
-            document = Document.objects.select_related('document_type').get(tracking_number=tracking_number)
+            document = Document.objects.select_related('document_type').get(
+                tracking_number__iexact=tracking_number.strip(),
+            )
         except Document.DoesNotExist:
-            raise NotFound("Document not found.")
+            raise NotFound("No document matches that tracking number. Please check it and try again.")
         enforce_scope_access(document, request.user)
         if document.status != Document.Status.RELEASED:
-            raise ValidationError("This document hasn't been released yet.")
+            raise ValidationError(
+                "This document hasn't been released to you yet. You can rate the offices once you've received it."
+            )
         return document
 
     def get(self, request, tracking_number):

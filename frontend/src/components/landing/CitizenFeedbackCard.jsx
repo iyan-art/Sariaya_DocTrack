@@ -4,6 +4,7 @@ import { useToast } from '../../context/ToastContext';
 import { extractErrorMessage } from '../../utils/apiError';
 import DocumentEvaluationModal from '../citizen/DocumentEvaluationModal';
 import ScanTrackingModal from '../ScanTrackingModal';
+import { extractTrackingNumber } from '../../utils/trackingNumber';
 import { StarIcon, CameraIcon } from '../Icons';
 
 /**
@@ -20,16 +21,11 @@ export default function CitizenFeedbackCard() {
   const [scanning, setScanning] = useState(false);
   const [checking, setChecking] = useState(false);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (trackingNumber.trim()) setEvaluating(trackingNumber.trim());
-  };
-
-  // Pre-flight check before opening the modal, so a bad/expired number gets
-  // a clear toast instead of the modal silently failing to load.
-  const handleScanned = async (raw) => {
-    setScanning(false);
-    const number = (raw || '').trim();
+  // Typed, pasted (even the whole QR link) or scanned, the number is checked
+  // first, so a wrong or not-yet-released one gets a clear message instead
+  // of an empty form.
+  const openEvaluation = async (raw) => {
+    const number = extractTrackingNumber(raw);
     if (!number) {
       showToast('Could not read a tracking number from that code.', 'error');
       return;
@@ -43,6 +39,16 @@ export default function CitizenFeedbackCard() {
     } finally {
       setChecking(false);
     }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    openEvaluation(trackingNumber);
+  };
+
+  const handleScanned = (raw) => {
+    setScanning(false);
+    openEvaluation(raw);
   };
 
   return (
@@ -67,9 +73,10 @@ export default function CitizenFeedbackCard() {
         />
         <button
           type="submit"
-          className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm rounded-lg px-4 py-2.5 transition-colors whitespace-nowrap"
+          disabled={checking}
+          className="bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white font-bold text-sm rounded-lg px-4 py-2.5 transition-colors whitespace-nowrap"
         >
-          Give Feedback
+          {checking ? 'Checking…' : 'Give Feedback'}
         </button>
       </form>
 

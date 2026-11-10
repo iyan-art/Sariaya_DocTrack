@@ -221,11 +221,11 @@ export const citizenReturnDocument = (id, notes) => {
 // Same per-office evaluation, but for a guest with no account — reached by
 // tracking number from the public Track page (see DocumentEvaluationModal).
 export const fetchPublicDocumentEvaluation = (trackingNumber) => {
-  return api.get(`/documents/track/${trackingNumber}/evaluation/`);
+  return api.get(`/documents/track/${encodeURIComponent(trackingNumber)}/evaluation/`);
 };
 
 export const submitPublicDocumentEvaluation = (trackingNumber, officeRatings) => {
-  return api.post(`/documents/track/${trackingNumber}/evaluation/`, { office_ratings: officeRatings });
+  return api.post(`/documents/track/${encodeURIComponent(trackingNumber)}/evaluation/`, { office_ratings: officeRatings });
 };
 
 export const createDocument = (data) => {

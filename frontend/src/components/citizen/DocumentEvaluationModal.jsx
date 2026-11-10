@@ -47,7 +47,7 @@ export default function DocumentEvaluationModal({
   const [loading, setLoading] = useState(true);
   const [survey, setSurvey] = useState(null);
   const [offices, setOffices] = useState([]);
-  const [answers, setAnswers] = useState({}); // officeId -> { questionId -> { rating_value } | { text_value } }
+  const [answers, setAnswers] = useState({}); // officeId -> { questionId -> { rating_value } | { text_value } | { selected_option_ids } }
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
@@ -70,17 +70,29 @@ export default function DocumentEvaluationModal({
     setAnswers((a) => ({ ...a, [officeId]: { ...a[officeId], [questionId]: { rating_value: value } } }));
   const setText = (officeId, questionId, value) =>
     setAnswers((a) => ({ ...a, [officeId]: { ...a[officeId], [questionId]: { text_value: value } } }));
+  const setSingle = (officeId, questionId, optionId) =>
+    setAnswers((a) => ({ ...a, [officeId]: { ...a[officeId], [questionId]: { selected_option_ids: [optionId] } } }));
+  const toggleMulti = (officeId, questionId, optionId) =>
+    setAnswers((a) => {
+      const current = a[officeId]?.[questionId]?.selected_option_ids || [];
+      const next = current.includes(optionId) ? current.filter((id) => id !== optionId) : [...current, optionId];
+      return { ...a, [officeId]: { ...a[officeId], [questionId]: { selected_option_ids: next } } };
+    });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     for (const office of pendingOffices) {
-      const missingRating = survey.questions.find(
-        (q) => q.question_type === 'rating' && !answers[office.id]?.[q.id]?.rating_value
-      );
-      if (missingRating) {
-        showToast(`Please rate "${missingRating.text}" for ${office.name}.`, 'error');
-        return;
+      for (const q of survey.questions) {
+        const ans = answers[office.id]?.[q.id] || {};
+        if (q.question_type === 'rating' && !ans.rating_value) {
+          showToast(`Please rate "${q.text}" for ${office.name}.`, 'error');
+          return;
+        }
+        if (q.question_type !== 'rating' && q.question_type !== 'text' && !ans.selected_option_ids?.length) {
+          showToast(`Please answer "${q.text}" for ${office.name}.`, 'error');
+          return;
+        }
       }
     }
 
@@ -88,7 +100,12 @@ export default function DocumentEvaluationModal({
     try {
       const officeRatings = pendingOffices.map((office) => ({
         office: office.id,
-        answers: survey.questions.map((q) => ({ question: q.id, ...(answers[office.id]?.[q.id] || {}) })),
+        answers: survey.questions.map((q) => {
+          const ans = answers[office.id]?.[q.id] || {};
+          if (q.question_type === 'rating') return { question: q.id, rating_value: ans.rating_value };
+          if (q.question_type === 'text') return { question: q.id, text_value: ans.text_value || '' };
+          return { question: q.id, selected_option_ids: ans.selected_option_ids || [] };
+        }),
       }));
       await submitEvaluation(subject, officeRatings);
       setSubmitted(true);
@@ -124,7 +141,9 @@ export default function DocumentEvaluationModal({
           {loading ? (
             <p className="text-slate-400 dark:text-slate-500 text-center py-16">Loading…</p>
           ) : !survey ? (
-            <p className="text-slate-400 dark:text-slate-500 text-center py-10">No evaluation form is available right now.</p>
+            <p className="text-slate-500 dark:text-slate-400 text-center py-10">
+              The evaluation form hasn't been set up yet. Please try again later.
+            </p>
           ) : submitted || pendingOffices.length === 0 ? (
             <div className="text-center py-8">
               <div className="w-14 h-14 bg-green-500 text-white rounded-full flex items-center justify-center mx-auto mb-4">
@@ -156,12 +175,13 @@ export default function DocumentEvaluationModal({
                     {survey.questions.map((q) => (
                       <div key={q.id}>
                         <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">{q.text}</label>
-                        {q.question_type === 'rating' ? (
+                        {q.question_type === 'rating' && (
                           <StarRatingInput
                             value={answers[office.id]?.[q.id]?.rating_value || 0}
                             onChange={(v) => setRating(office.id, q.id, v)}
                           />
-                        ) : (
+                        )}
+                        {q.question_type === 'text' && (
                           <textarea
                             rows={2}
                             value={answers[office.id]?.[q.id]?.text_value || ''}
@@ -169,6 +189,33 @@ export default function DocumentEvaluationModal({
                             placeholder="Your answer (optional)…"
                             className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
+                        )}
+                        {/* Likert / single choice: one pick; checkboxes: one or more. */}
+                        {['likert', 'single', 'multiple'].includes(q.question_type) && (
+                          <div className="space-y-1.5">
+                            {(q.options || []).map((opt) => {
+                              const picked = answers[office.id]?.[q.id]?.selected_option_ids || [];
+                              const multi = q.question_type === 'multiple';
+                              const checked = picked.includes(opt.id);
+                              return (
+                                <label
+                                  key={opt.id}
+                                  className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 text-sm cursor-pointer transition-colors ${
+                                    checked ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10 text-blue-900 dark:text-blue-300' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                                  }`}
+                                >
+                                  <input
+                                    type={multi ? 'checkbox' : 'radio'}
+                                    name={`o${office.id}-q${q.id}`}
+                                    checked={checked}
+                                    onChange={() => (multi ? toggleMulti : setSingle)(office.id, q.id, opt.id)}
+                                    className={multi ? 'rounded text-blue-600' : 'text-blue-600'}
+                                  />
+                                  {opt.label}
+                                </label>
+                              );
+                            })}
+                          </div>
                         )}
                       </div>
                     ))}
