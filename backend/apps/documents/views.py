@@ -26,7 +26,7 @@ from .serializers import (
 )
 from .permissions import IsStaffUser
 from apps.accounts.permissions import IsAdmin
-from .services import release_document, receive_document, return_document, citizen_return_document, release_final, flag_missing, resolve_office, advance_processing_stage, can_delete_document, expedite_document, notify_citizen
+from .services import release_document, receive_document, return_document, citizen_return_document, mark_corrected, release_final, flag_missing, resolve_office, advance_processing_stage, can_delete_document, expedite_document, notify_citizen
 from .sla_scan import run_overdue_scan, run_missing_scan
 from .qr_services import resolve_and_verify, enforce_scope_access, build_scan_context, generate_qr_code
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -721,7 +721,8 @@ class DocumentScanView(APIView):
     """
     PATCH /api/documents/<id>/scan/
     Manual (non-QR) override for staff — same release/receive mechanics as
-    the QR transfer endpoint, minus qr_verified. Body: { action: 'release' | 'receive' | 'return_to_office', office, notes }
+    the QR transfer endpoint, minus qr_verified. Body: { action: 'release' |
+    'receive' | 'return_to_office' | 'mark_corrected', office, notes }
     `office` is only used for 'receive' (defaults to the scanning user's own office);
     'release' and 'return_to_office' always target the document's current
     office and need no office param. 'return_to_office' needs `notes` (the
@@ -746,6 +747,8 @@ class DocumentScanView(APIView):
                     document, returning_user=request.user, notes=notes,
                     destination=request.data.get('destination') or 'previous',
                 )
+            elif action == 'mark_corrected':
+                updated = mark_corrected(document, correcting_user=request.user, notes=notes)
             else:
                 office = request.data.get('office') or request.user.office
                 if not office:

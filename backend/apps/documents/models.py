@@ -352,6 +352,9 @@ class DocumentLog(models.Model):
         # still moving); this one reopens a document that had already
         # reached its terminal state.
         CITIZEN_RETURN_INITIATED = 'citizen_return_initiated', 'Returned by Citizen'
+        # The office fixed what the citizen reported, and the document is
+        # ready for pickup again — services.py::mark_corrected().
+        CORRECTED = 'corrected', 'Corrected — Ready Again'
         # A citizen flagging their own delayed document for staff attention
         # (services.py::expedite_document()) — purely informational, never
         # changes status/route_position, just raises a Notification at the

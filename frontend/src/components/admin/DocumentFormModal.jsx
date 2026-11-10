@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchDocumentDetail, mediaUrl } from '../../api/axios';
 import DocumentStatusBadge from './DocumentStatusBadge';
-import { PrinterIcon, CheckCircle2Icon } from '../Icons';
+import { PrinterIcon, CheckCircle2Icon, ArrowRightLeftIcon } from '../Icons';
 
 // Same "print just this one element" technique as the other printables.
 const PRINT_STYLES = `
@@ -35,7 +35,7 @@ function humanizeKey(key) {
  * onManage, so citizens get the identical print/download record with no
  * edit access — editing stays staff-only via DocumentDetailModal.
  */
-export default function DocumentFormModal({ documentId, onClose, onManage, fetchDetail = fetchDocumentDetail }) {
+export default function DocumentFormModal({ documentId, onClose, onManage, onReturnForCorrection, fetchDetail = fetchDocumentDetail }) {
   const [doc, setDoc] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -255,6 +255,15 @@ export default function DocumentFormModal({ documentId, onClose, onManage, fetch
                   className="flex-1 min-w-[10rem] bg-slate-900 dark:bg-slate-700 hover:bg-black dark:hover:bg-slate-600 text-white font-bold py-2.5 rounded-xl transition-colors"
                 >
                   Manage / Update Status
+                </button>
+              )}
+              {/* Citizen view only: send a released document back to fix a mistake. */}
+              {onReturnForCorrection && doc.status === 'released' && (
+                <button
+                  onClick={() => onReturnForCorrection(doc)}
+                  className="flex-1 min-w-[10rem] flex items-center justify-center gap-2 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-700 dark:text-red-400 font-bold py-2.5 rounded-xl transition-colors"
+                >
+                  <ArrowRightLeftIcon className="w-4 h-4" /> Return for Correction
                 </button>
               )}
               <button

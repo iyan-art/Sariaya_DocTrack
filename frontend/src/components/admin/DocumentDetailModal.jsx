@@ -54,6 +54,14 @@ const READY_EMAIL_STATUS_TOAST = {
   failed: { message: 'Document received, but the ready-for-pickup email failed to send. Please follow up with the citizen directly.', type: 'error' },
 };
 
+// After a requester's return is fixed (services.py::mark_corrected()).
+const CORRECTED_EMAIL_STATUS_TOAST = {
+  sent: { message: 'Marked corrected. The citizen was emailed that it is ready for pickup again.', type: 'success' },
+  already_sent: { message: 'Marked corrected. The citizen was already emailed.', type: 'success' },
+  skipped: { message: 'Marked corrected, but no email is on file for this citizen. Please contact them directly.', type: 'error' },
+  failed: { message: 'Marked corrected, but the email failed to send. Please follow up with the citizen directly.', type: 'error' },
+};
+
 export default function DocumentDetailModal({ documentId, onClose, onUpdated }) {
   const { showToast } = useToast();
   const [doc, setDoc] = useState(null);
@@ -82,16 +90,23 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
   const previousOffice = doc ? route[doc.route_position - 1] : null;
   const originOffice = route[0];
   const canReturnToOrigin = Boolean(doc) && doc.route_position >= 2 && originOffice !== previousOffice;
-  // The reason the last office gave, shown while the document waits here to be fixed.
+  // Who sent it back and why (another office, or the requester after
+  // release), shown while the document waits here to be fixed.
   const lastReturn = doc?.status === 'returned'
-    ? [...(doc.logs || [])].reverse().find((l) => l.action === 'return_initiated')
+    ? [...(doc.logs || [])].reverse().find((l) => ['return_initiated', 'citizen_return_initiated'].includes(l.action))
     : null;
+  const returnedByRequester = lastReturn?.action === 'citizen_return_initiated';
+  // Returned to its final office (the requester sent it back): once fixed it
+  // is ready for pickup again rather than forwarded anywhere.
+  const atFinalStep = Boolean(doc) && doc.route_position === route.length - 1;
   const availableActions = doc
     ? (NEXT_ACTIONS[doc.status] || [])
         .filter((a) => a.action !== 'return_to_office' || doc.route_position > 0)
         .map((a) => (a.action === 'receive' && doc.is_returning) ? { ...a, label: 'Confirm Return Received' } : a)
         // Internal documents never go to a citizen — they finish back at the office that started them.
         .map((a) => (a.action === 'return' && isInternal) ? { ...a, label: 'Release to Originating Office' } : a)
+        .map((a) => (doc.status === 'returned' && atFinalStep && a.action === 'release')
+          ? { action: 'mark_corrected', label: 'Corrected — Ready for Pickup Again' } : a)
     : [];
 
   const handleTransition = async (e) => {
@@ -124,7 +139,9 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
         const res = await transitionDocument(documentId, {
           action, office, notes, ...(action === 'return_to_office' && { destination: returnTo }),
         });
-        const readyOutcome = READY_EMAIL_STATUS_TOAST[res.data.email_status];
+        const readyOutcome = action === 'mark_corrected'
+          ? CORRECTED_EMAIL_STATUS_TOAST[res.data.email_status]
+          : READY_EMAIL_STATUS_TOAST[res.data.email_status];
         const returnedTo = returnTo === 'origin' ? originOffice : previousOffice;
         showToast(
           readyOutcome?.message || (action === 'return_to_office' ? `Document marked Returned and sent back to ${returnedTo}.` : 'Document status updated.'),
@@ -163,7 +180,9 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
               <div className="mt-2"><DocumentStatusBadge doc={doc} /></div>
               {lastReturn && (
                 <div role="note" className="mt-3 rounded-xl border border-orange-200 dark:border-orange-500/30 bg-orange-50 dark:bg-orange-500/10 p-3 text-sm">
-                  <p className="font-bold text-orange-800 dark:text-orange-300">Returned for revision</p>
+                  <p className="font-bold text-orange-800 dark:text-orange-300">
+                    {returnedByRequester ? 'Returned by the requester for correction' : 'Returned for revision'}
+                  </p>
                   <p className="text-orange-900 dark:text-orange-200 mt-0.5 break-words">{lastReturn.notes}</p>
                   <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">
                     By {lastReturn.acted_by?.full_name || 'staff'}{lastReturn.acted_by?.employee_id ? ` (${lastReturn.acted_by.employee_id})` : ''}

@@ -216,6 +216,7 @@ class OfficeHistorySerializer(serializers.ModelSerializer):
         DocumentLog.Action.RECEIVED: 'Received',
         DocumentLog.Action.RETURNED: 'Received (final step)',
         DocumentLog.Action.RETURN_RECEIVED: 'Received back',
+        DocumentLog.Action.CITIZEN_RETURN_INITIATED: 'Returned by requester for correction',
     }
     DEPARTURES = {
         DocumentLog.Action.RELEASED: 'Forwarded',

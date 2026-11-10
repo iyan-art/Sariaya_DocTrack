@@ -135,7 +135,7 @@ export default function History() {
                             onClick={(e) => { e.stopPropagation(); setReturningDoc(doc); }}
                             className="inline-flex items-center gap-1.5 text-xs font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 px-3 py-1.5 rounded-lg transition-colors"
                           >
-                            <ArrowRightLeftIcon className="w-3.5 h-3.5" /> Return
+                            <ArrowRightLeftIcon className="w-3.5 h-3.5" /> Return for Correction
                           </button>
                         )}
                         {doc.step_statuses?.[doc.route_position] === 'delayed' && (
@@ -178,6 +178,7 @@ export default function History() {
           documentId={selectedId}
           fetchDetail={fetchMyDocumentDetail}
           onClose={() => setSelectedId(null)}
+          onReturnForCorrection={(doc) => { setSelectedId(null); setReturningDoc(doc); }}
         />
       )}
       {returningDoc && (

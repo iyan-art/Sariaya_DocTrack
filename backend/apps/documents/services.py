@@ -661,22 +661,30 @@ def release_to_citizen(document, releasing_user, notes='', qr_verified=False):
 
 def citizen_return_document(document, citizen_user, notes=''):
     """
-    A citizen sending a RELEASED document back to the office that released
-    it, because of a problem. Unlike return_document() above (staff,
-    mid-route, moving between two different offices), a RELEASED document's
-    route_position is always already sitting at the origin office — the
-    same office that released it — so this just reopens it there instead
-    of moving anything. Ownership (only the requesting citizen may do this)
-    is checked by the view, not here, so it can return a clean 403.
+    A citizen sending a RELEASED document back for correction (a typo,
+    incorrect or missing details), with mandatory remarks. A released
+    document already sits at the office that released it — its final route
+    step — so this reopens it there as RETURNED instead of moving anything,
+    and alerts that office's staff (and the originating office, if it's a
+    different one) with the tracking number and the citizen's remarks.
+    Once fixed, staff use mark_corrected() below. Ownership (only the
+    requesting citizen may do this) is checked by the view, not here, so it
+    can return a clean 403.
     """
+    if document.is_internal:
+        raise ValidationError("Internal documents can't be returned by a citizen.")
+
     if document.status != Document.Status.RELEASED:
         raise ValidationError(f"Cannot return a document that is '{document.status}'.")
 
     if not notes or not notes.strip():
         raise ValidationError("Please provide a reason for returning this document.")
+    notes = notes.strip()
 
     previous_handler = document.current_handler
-    document.status = Document.Status.IN_PROGRESS
+    document.status = Document.Status.RETURNED
+    # Dwell time and SLA alerts measure how long the correction takes.
+    document.entered_current_office_at = timezone.now()
     document.save()
 
     DocumentLog.objects.create(
@@ -691,6 +699,78 @@ def citizen_return_document(document, citizen_user, notes=''):
     # timeline too — otherwise it would still say "Completed" even though
     # the document is physically back in the workflow.
     advance_processing_stage(document, Document.ProcessingStage.UNDER_REVIEW, actor=citizen_user, note=notes)
+
+    releasing_office = document.current_office
+    title = f"Returned for correction: {document.tracking_number}"
+    notify_office(
+        releasing_office,
+        title=title,
+        message=(
+            f"{citizen_user.full_name} returned their {document.document_type.name} request "
+            f"({document.tracking_number}) for correction. Remarks: {notes}"
+        ),
+        notification_type=Notification.NotificationType.DOCUMENT_RETURNED,
+        sender=citizen_user, related_document=document,
+    )
+    origin_office = document.document_type.route[0]
+    if not _same_office(origin_office, releasing_office):
+        notify_office(
+            origin_office,
+            title=title,
+            message=(
+                f"The {document.document_type.name} request ({document.tracking_number}) that your office "
+                f"started was returned by the requester to {_office_name(releasing_office)} for correction. "
+                f"Remarks: {notes}"
+            ),
+            notification_type=Notification.NotificationType.DOCUMENT_RETURNED,
+            sender=citizen_user, related_document=document,
+        )
+    return document
+
+
+def mark_corrected(document, correcting_user, notes=''):
+    """
+    The office that released a document fixed what the citizen reported
+    (citizen_return_document() above): it is ready for pickup again, and the
+    citizen is told so. If another office has to make the correction, staff
+    return it along the route instead, and it becomes ready again the usual
+    way when it reaches its final office.
+    """
+    if document.status != Document.Status.RETURNED or not document.is_final_step:
+        raise ValidationError(
+            "Only a document returned to its final office can be marked corrected. "
+            "Forward it along its route instead."
+        )
+    if not _same_office(correcting_user.office, document.current_office):
+        raise ValidationError(
+            f"Your current assigned office ('{correcting_user.office or 'none'}') does not match the "
+            f"office required for this step ('{document.current_office}')."
+        )
+
+    previous_handler = document.current_handler
+    document.status = Document.Status.COMPLETED
+    document.current_handler = correcting_user
+    document.save()
+
+    DocumentLog.objects.create(
+        document=document,
+        action=DocumentLog.Action.CORRECTED,
+        office=resolve_office(document.current_office),
+        sender=previous_handler,
+        acted_by=correcting_user,
+        notes=notes,
+    )
+    advance_processing_stage(document, Document.ProcessingStage.READY_FOR_RELEASE, actor=correcting_user)
+    # Not a model field: lets the calling view tell staff how the email went.
+    document.ready_email_status = _maybe_notify_citizen_ready(document)
+    notify_citizen(
+        document,
+        title="Corrected and ready for pickup",
+        message=(
+            f"Your {document.document_type.name} request ({document.tracking_number}) has been corrected "
+            f"and is ready for pickup again at {_office_name(document.current_office)}."
+        ),
+    )
     return document
 
 
