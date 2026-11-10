@@ -1,11 +1,12 @@
 import { CONTACT_NUMBER_ERROR, isInvalidContactNumber } from '../../utils/contactNumber';
+import { blockInvalidNumberKeys, numberFieldError } from '../../utils/positiveNumber';
 
 // Fallback for a document type with no request_fields configured yet
 // (e.g. one an admin just created) — better than showing nothing.
 const GENERIC_FALLBACK_FIELDS = [
   { key: 'purpose', label: 'Purpose', type: 'text', required: true },
   { key: 'contact_no', label: 'Contact Number', type: 'tel', required: true },
-  { key: 'number_of_copies', label: 'Number of Copies', type: 'number', required: false, placeholder: '1' },
+  { key: 'number_of_copies', label: 'Number of Copies', type: 'number', integer: true, required: false, placeholder: '1' },
 ];
 
 /**
@@ -20,7 +21,11 @@ export default function DocumentRequestFields({ fields, value, onChange }) {
 
   return (
     <div className="space-y-4">
-      {effectiveFields.map((f) => (
+      {effectiveFields.map((f) => {
+        const error = f.type === 'tel'
+          ? (isInvalidContactNumber(value[f.key]) ? CONTACT_NUMBER_ERROR : null)
+          : (f.type === 'number' ? numberFieldError(f, value[f.key]) : null);
+        return (
         <div key={f.key}>
           <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
             {f.label}{' '}
@@ -59,22 +64,30 @@ export default function DocumentRequestFields({ fields, value, onChange }) {
               value={value[f.key] || ''}
               onChange={(e) => onChange(f.key, e.target.value)}
               placeholder={f.placeholder || (f.type === 'tel' ? '09XXXXXXXXX' : undefined)}
-              aria-invalid={f.type === 'tel' && isInvalidContactNumber(value[f.key])}
+              // Quantities and amounts are always greater than zero; counts are whole numbers.
+              {...(f.type === 'number' && {
+                min: f.integer ? 1 : 0.01,
+                step: f.integer ? 1 : 0.01,
+                inputMode: f.integer ? 'numeric' : 'decimal',
+                onKeyDown: blockInvalidNumberKeys(f),
+              })}
+              aria-invalid={Boolean(error)}
               className={`w-full border bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 ${
-                f.type === 'tel' && isInvalidContactNumber(value[f.key])
+                error
                   ? 'border-red-400 dark:border-red-500 focus:ring-red-500'
                   : 'border-slate-200 dark:border-slate-700 focus:ring-blue-500'
               }`}
             />
           )}
 
-          {f.type === 'tel' && isInvalidContactNumber(value[f.key]) && (
-            <p role="alert" className="text-xs text-red-600 dark:text-red-400 mt-1">{CONTACT_NUMBER_ERROR}</p>
+          {error && (
+            <p role="alert" className="text-xs text-red-600 dark:text-red-400 mt-1">{error}</p>
           )}
 
           {f.help_text && <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{f.help_text}</p>}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

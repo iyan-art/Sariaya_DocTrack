@@ -13,6 +13,7 @@ from .models import (
 from .services import EMPLOYEE_ID_RE, can_originate, originating_office, resolve_office, release_document
 from .qr_services import generate_qr_code
 from .sla_scan import DUE_SOON_THRESHOLD_RATIO
+from .validators import number_field_error
 from apps.accounts.validators import CONTACT_NUMBER_ERROR, is_valid_contact_number
 
 
@@ -666,6 +667,24 @@ class CreateDocumentSerializer(serializers.ModelSerializer):
                     self.validate_contact_number(value)
                 except serializers.ValidationError as exc:
                     raise serializers.ValidationError({key: exc.detail})
+
+            # Quantities, amounts and areas: every 'number' field must be > 0
+            # (and a whole number if marked `integer`). The fallback form's
+            # only number field is `number_of_copies`.
+            number_fields = (
+                [field for field in request_fields if field.get('type') == 'number']
+                if request_fields else [{'key': 'number_of_copies', 'label': 'Number of Copies', 'integer': True}]
+            )
+            number_errors = {}
+            for field in number_fields:
+                value = form_data.get(field.get('key'))
+                if value in (None, ''):
+                    continue
+                message = number_field_error(field, value)
+                if message:
+                    number_errors[field.get('key')] = [message]
+            if number_errors:
+                raise serializers.ValidationError(number_errors)
         return attrs
 
     def validate_contact_number(self, value):
