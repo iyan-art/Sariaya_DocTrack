@@ -104,116 +104,55 @@ export default function DocumentFormModal({ documentId, onClose, onManage, fetch
                 )}
               </div>
 
-              {/* Two-column on desktop: the full record on the left, a
-                  quick-glance summary on the right — collapses to one
-                  column (summary flows after the record) on narrower
-                  screens. The summary is screen-only (doc-view-no-print) —
-                  everything it restates is already in the printable record
-                  to its left, so print output is unaffected. */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6 min-w-0">
-                <div className="lg:col-span-2 space-y-6 min-w-0">
-                  {/* Applicant / request details */}
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 sm:p-5 min-w-0">
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">
-                      Request Details
-                    </p>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <tbody>
+              {/* Desktop: request details (8 of 12 columns) beside the
+                  quick-glance summary (4 of 12), then the routing history
+                  across the full 12 so its edges line up with both cards
+                  above. One column on narrower screens and in print. The
+                  summary is screen-only (doc-view-no-print) — everything it
+                  restates is already in the printable record. */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6 min-w-0">
+                {/* Applicant / request details */}
+                <div className="lg:col-span-8 bg-slate-50 border border-slate-100 rounded-xl p-4 sm:p-5 min-w-0">
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">
+                    Request Details
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <tbody>
+                        <tr className="border-b border-slate-200/70">
+                          <td className="py-1.5 pr-4 text-slate-500 w-1/3 align-top">Document Type</td>
+                          <td className="py-1.5 font-semibold text-slate-900 break-words">{doc.document_type_name}</td>
+                        </tr>
+                        <tr className="border-b border-slate-200/70">
+                          <td className="py-1.5 pr-4 text-slate-500 align-top">Date Submitted</td>
+                          <td className="py-1.5 font-semibold text-slate-900">
+                            {new Date(doc.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                          </td>
+                        </tr>
+                        <tr className="border-b border-slate-200/70">
+                          <td className="py-1.5 pr-4 text-slate-500 align-top">Requested By</td>
+                          <td className="py-1.5 font-semibold text-slate-900 break-words">{doc.requested_by_name}</td>
+                        </tr>
+                        {!doc.requested_by && doc.guest_email && (
                           <tr className="border-b border-slate-200/70">
-                            <td className="py-1.5 pr-4 text-slate-500 w-1/3 align-top">Document Type</td>
-                            <td className="py-1.5 font-semibold text-slate-900 break-words">{doc.document_type_name}</td>
+                            <td className="py-1.5 pr-4 text-slate-500 align-top">Contact Email</td>
+                            <td className="py-1.5 font-semibold text-slate-900 break-all">{doc.guest_email}</td>
                           </tr>
-                          <tr className="border-b border-slate-200/70">
-                            <td className="py-1.5 pr-4 text-slate-500 align-top">Date Submitted</td>
-                            <td className="py-1.5 font-semibold text-slate-900">
-                              {new Date(doc.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
-                            </td>
+                        )}
+                        {formEntries.map(([key, value]) => (
+                          <tr key={key} className="border-b border-slate-200/70">
+                            <td className="py-1.5 pr-4 text-slate-500 align-top">{humanizeKey(key)}</td>
+                            <td className="py-1.5 font-semibold text-slate-900 break-words">{String(value)}</td>
                           </tr>
-                          <tr className="border-b border-slate-200/70">
-                            <td className="py-1.5 pr-4 text-slate-500 align-top">Requested By</td>
-                            <td className="py-1.5 font-semibold text-slate-900 break-words">{doc.requested_by_name}</td>
-                          </tr>
-                          {!doc.requested_by && doc.guest_email && (
-                            <tr className="border-b border-slate-200/70">
-                              <td className="py-1.5 pr-4 text-slate-500 align-top">Contact Email</td>
-                              <td className="py-1.5 font-semibold text-slate-900 break-all">{doc.guest_email}</td>
-                            </tr>
-                          )}
-                          {formEntries.map(([key, value]) => (
-                            <tr key={key} className="border-b border-slate-200/70">
-                              <td className="py-1.5 pr-4 text-slate-500 align-top">{humanizeKey(key)}</td>
-                              <td className="py-1.5 font-semibold text-slate-900 break-words">{String(value)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Complete office routing & handler history — the real audit trail.
-                      Internally scrollable once it's long, rather than pushing
-                      everything below it further down the page. */}
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 sm:p-5 min-w-0">
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">
-                      Office Routing &amp; Handler History
-                    </p>
-                    {doc.logs.length === 0 ? (
-                      <p className="text-sm text-slate-400">No activity recorded yet.</p>
-                    ) : (
-                      <div className="border border-slate-200 rounded-lg overflow-hidden">
-                        <div className="max-h-72 overflow-y-auto overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead className="bg-slate-100 sticky top-0">
-                              <tr>
-                                <th className="text-left px-3 py-2 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">Action</th>
-                                <th className="text-left px-3 py-2 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">Office</th>
-                                <th className="text-left px-3 py-2 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">Handled By</th>
-                                <th className="text-left px-3 py-2 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">Duration</th>
-                                <th className="text-left px-3 py-2 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">Timestamp</th>
-                                <th className="text-left px-3 py-2 text-[10px] font-black text-slate-400 uppercase">Notes</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {doc.logs.map((log) => (
-                                <tr key={log.id} className="border-t border-slate-100 align-top bg-white">
-                                  <td className="px-3 py-2 font-bold text-slate-700 capitalize whitespace-nowrap">{log.action.replace(/_/g, ' ')}</td>
-                                  <td className="px-3 py-2 text-slate-800 break-words">{log.office?.name || '—'}</td>
-                                  <td className="px-3 py-2">
-                                    {log.acted_by ? (
-                                      <div>
-                                        <p className="font-semibold text-slate-800 break-words">{log.acted_by.full_name}</p>
-                                        <p className="font-mono text-[10px] font-bold text-blue-600">
-                                          {log.acted_by.employee_id || '—'}
-                                        </p>
-                                      </div>
-                                    ) : (
-                                      <span className="text-slate-400">System</span>
-                                    )}
-                                  </td>
-                                  <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{log.duration_display || '—'}</td>
-                                  <td className="px-3 py-2 text-slate-500 text-xs whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td>
-                                  <td className="px-3 py-2 text-slate-600 text-xs break-words max-w-[16rem]">
-                                    {log.notes || '—'}
-                                    {log.qr_verified && (
-                                      <span className="ml-1.5 inline-flex items-center gap-1 text-[9px] font-black uppercase text-green-700 whitespace-nowrap">
-                                        <CheckCircle2Icon className="w-3 h-3" /> QR Verified
-                                      </span>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
 
                 {/* Quick-glance summary — screen only, everything here is
                     already in the printable record to the left. */}
-                <div className="doc-view-no-print space-y-4 min-w-0">
+                <div className="lg:col-span-4 doc-view-no-print space-y-4 min-w-0">
                   <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
                     <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">
                       At a Glance
@@ -241,6 +180,66 @@ export default function DocumentFormModal({ documentId, onClose, onManage, fetch
                       </div>
                     </dl>
                   </div>
+                </div>
+
+                {/* Complete office routing & handler history — the real audit trail.
+                    Spans the full row, edge to edge with the cards above it.
+                    Internally scrollable once it's long, rather than pushing
+                    everything below it further down the page. */}
+                <div className="lg:col-span-12 bg-slate-50 border border-slate-100 rounded-xl p-4 sm:p-5 min-w-0">
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">
+                    Office Routing &amp; Handler History
+                  </p>
+                  {doc.logs.length === 0 ? (
+                    <p className="text-sm text-slate-400">No activity recorded yet.</p>
+                  ) : (
+                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                      <div className="max-h-72 overflow-y-auto overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-slate-100 sticky top-0">
+                            <tr>
+                              <th className="text-left px-3 py-2 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">Action</th>
+                              <th className="text-left px-3 py-2 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">Office</th>
+                              <th className="text-left px-3 py-2 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">Handled By</th>
+                              <th className="text-left px-3 py-2 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">Duration</th>
+                              <th className="text-left px-3 py-2 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">Timestamp</th>
+                              <th className="text-left px-3 py-2 text-[10px] font-black text-slate-400 uppercase">Notes</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {doc.logs.map((log) => (
+                              <tr key={log.id} className="border-t border-slate-100 align-top bg-white">
+                                <td className="px-3 py-2 font-bold text-slate-700 capitalize whitespace-nowrap">{log.action.replace(/_/g, ' ')}</td>
+                                <td className="px-3 py-2 text-slate-800 break-words">{log.office?.name || '—'}</td>
+                                <td className="px-3 py-2">
+                                  {log.acted_by ? (
+                                    <div>
+                                      <p className="font-semibold text-slate-800 break-words">{log.acted_by.full_name}</p>
+                                      <p className="font-mono text-[10px] font-bold text-blue-600">
+                                        {log.acted_by.employee_id || '—'}
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-400">System</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{log.duration_display || '—'}</td>
+                                <td className="px-3 py-2 text-slate-500 text-xs whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td>
+                                <td className="px-3 py-2 text-slate-600 text-xs break-words min-w-[12rem]">
+                                  {log.notes || '—'}
+                                  {log.qr_verified && (
+                                    <span className="ml-1.5 inline-flex items-center gap-1 text-[9px] font-black uppercase text-green-700 whitespace-nowrap">
+                                      <CheckCircle2Icon className="w-3 h-3" /> QR Verified
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
