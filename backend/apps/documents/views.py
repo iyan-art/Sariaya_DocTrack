@@ -27,7 +27,7 @@ from .serializers import (
 )
 from .permissions import IsStaffUser
 from apps.accounts.permissions import IsAdmin
-from .services import release_document, receive_document, return_document, citizen_return_document, mark_corrected, release_final, flag_missing, mark_found, resolve_office, advance_processing_stage, can_delete_document, expedite_document, notify_citizen
+from .services import release_document, receive_document, return_document, citizen_return_document, mark_corrected, release_final, flag_missing, mark_found, resolve_office, advance_processing_stage, can_delete_document, holds_document, expedite_document, notify_citizen
 from .sla_scan import run_overdue_scan, run_overdue_alert_scan
 from .services import DEFAULT_FALLBACK_SLA_HOURS
 from .qr_services import resolve_and_verify, enforce_scope_access, build_scan_context, generate_qr_code
@@ -40,7 +40,7 @@ from django.utils import timezone
 from datetime import timedelta
 
 from apps.accounts.models import AccessLog
-from apps.accounts.views import _client_ip
+from apps.accounts.views import _client_ip, log_record_deleted, password_confirmation_failed
 
 
 class OfficeListCreateView(generics.ListCreateAPIView):
@@ -73,6 +73,20 @@ class OfficeDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_permissions(self):
         return [IsAuthenticated()] if self.request.method == 'GET' else [IsAdmin()]
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        refused = password_confirmation_failed(request, f'office {instance.code}')
+        if refused:
+            return refused
+        if instance.workflow_steps.exists():
+            return Response(
+                {"detail": "Cannot delete an office already used by workflow steps. Deactivate it instead."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        response = super().destroy(request, *args, **kwargs)
+        log_record_deleted(request, f'office {instance.code} ({instance.name})')
+        return response
 
 
 class PublicOfficeListView(generics.ListAPIView):
@@ -241,12 +255,17 @@ class DocumentTypeDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        refused = password_confirmation_failed(request, f'document type "{instance.name}"')
+        if refused:
+            return refused
         if instance.documents.exists():
             return Response(
                 {"detail": "Cannot delete a document type already in use by existing documents. Deactivate it instead."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        return super().destroy(request, *args, **kwargs)
+        response = super().destroy(request, *args, **kwargs)
+        log_record_deleted(request, f'document type "{instance.name}"')
+        return response
 
 
 class DocumentTypeStepsView(APIView):
@@ -518,19 +537,6 @@ def serve_document_qr(request, filename):
     return FileResponse(document.qr_code.open('rb'), content_type='image/png')
 
 
-def _document_route_offices(document):
-    """Route office codes resolved to real Office rows, de-duplicated — an
-    office appearing twice in a route is only ever rated once per document."""
-    seen_ids = set()
-    offices = []
-    for code in document.document_type.route:
-        office = resolve_office(code)
-        if office and office.id not in seen_ids:
-            seen_ids.add(office.id)
-            offices.append(office)
-    return offices
-
-
 def _active_evaluation_survey():
     """The newest active survey that actually has questions — an empty one can't be filled in."""
     return (
@@ -539,96 +545,68 @@ def _active_evaluation_survey():
     )
 
 
+def _release_evaluations():
+    return SurveyResponse.objects.filter(source=SurveyResponse.Source.RELEASE)
+
+
 def _evaluation_get(document):
     """
     Shared by DocumentEvaluationView (logged-in owner, by id) and
     PublicDocumentEvaluationView (anyone with the tracking number, no
-    account needed) — "already rated" is scoped to the document/office pair
-    itself, not to who's asking, since only one evaluation exists per office
-    per document however it was submitted.
+    account needed). One Overall Experience Rating per transaction:
+    `already_rated` is about the document itself, however it was submitted
+    (older per-office ratings of it count too).
     """
     survey = _active_evaluation_survey()
-    if not survey:
-        return Response({"survey": None, "offices": []})
-
-    rated_office_ids = set(
-        SurveyResponse.objects.filter(document=document).values_list('office_id', flat=True)
-    )
+    already_rated = _release_evaluations().filter(document=document).exists()
     return Response({
-        "survey": RespondentSurveySerializer(survey).data,
-        "offices": [
-            {"id": o.id, "name": o.name, "code": o.code, "already_rated": o.id in rated_office_ids}
-            for o in _document_route_offices(document)
-        ],
+        "survey": RespondentSurveySerializer(survey).data if survey else None,
+        "already_rated": already_rated,
     })
 
 
 def _evaluation_post(request, document, respondent):
+    """Records the citizen's overall rating of the whole transaction, once per document."""
     survey = _active_evaluation_survey()
     if not survey:
         return Response({"detail": "No active evaluation form is configured."}, status=status.HTTP_400_BAD_REQUEST)
+    if _release_evaluations().filter(document=document).exists():
+        return Response({"detail": "This request has already been rated. Thank you!"}, status=status.HTTP_400_BAD_REQUEST)
 
     questions_by_id = {q.id: q for q in survey.questions.all()}
-    offices_by_id = {o.id: o for o in _document_route_offices(document)}
-    already_rated_ids = set(
-        SurveyResponse.objects.filter(document=document).values_list('office_id', flat=True)
-    )
+    answers = request.data.get('answers', [])
+    if not isinstance(answers, list) or not answers or any(
+        not isinstance(a, dict) or a.get('question') not in questions_by_id for a in answers
+    ):
+        return Response({"detail": "Please answer the evaluation questions."}, status=status.HTTP_400_BAD_REQUEST)
+    # Same rules as the post-scan and landing surveys: stars 1-5, one
+    # option for Likert/single choice, at least one for checkboxes.
+    cleaned, error = _parse_survey_answers(survey, answers)
+    if error:
+        return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
 
-    office_ratings = request.data.get('office_ratings', [])
-    if not isinstance(office_ratings, list) or not office_ratings:
-        return Response({"detail": "office_ratings is required."}, status=status.HTTP_400_BAD_REQUEST)
-
-    saved = 0
-    for entry in office_ratings:
-        office_id = entry.get('office')
-        if office_id not in offices_by_id or office_id in already_rated_ids:
-            # Not part of this document's route, or already rated —
-            # skip silently rather than fail the whole batch.
-            continue
-
-        answers = entry.get('answers', [])
-        if not isinstance(answers, list) or any(
-            not isinstance(a, dict) or a.get('question') not in questions_by_id for a in answers
-        ):
-            return Response({"detail": "Invalid answer for this evaluation."}, status=status.HTTP_400_BAD_REQUEST)
-        # Same rules as the post-scan and landing surveys: stars 1-5, one
-        # option for Likert/single choice, at least one for checkboxes.
-        cleaned, error = _parse_survey_answers(survey, answers)
-        if error:
-            office_name = offices_by_id[office_id].name
-            return Response({"detail": f"{office_name}: {error}"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # A guest and the account holder racing to rate the same office
-        # both pass the already_rated_ids check above before either commits
-        # — the DB's unique_evaluation_per_document_office constraint is the
-        # real backstop, so the loser of that race is skipped, not errored.
-        try:
-            with transaction.atomic():
-                response = SurveyResponse.objects.create(
-                    survey=survey, respondent=respondent, document=document, office=offices_by_id[office_id],
-                )
-        except IntegrityError:
-            continue
-        _persist_survey_answers(response, cleaned)
-        saved += 1
-
-    if saved == 0:
-        return Response({"detail": "Nothing new to save — those offices are already rated."}, status=status.HTTP_400_BAD_REQUEST)
-
-    return Response(
-        {"detail": f"Thank you! Your evaluation for {saved} office{'s' if saved != 1 else ''} has been recorded."},
-        status=status.HTTP_201_CREATED,
-    )
+    # A guest and the account holder racing to rate the same request both
+    # pass the check above; the unique_overall_evaluation_per_document
+    # constraint is the backstop.
+    try:
+        with transaction.atomic():
+            response = SurveyResponse.objects.create(
+                survey=survey, respondent=respondent, document=document, office=None,
+                source=SurveyResponse.Source.RELEASE,
+            )
+    except IntegrityError:
+        return Response({"detail": "This request has already been rated. Thank you!"}, status=status.HTTP_400_BAD_REQUEST)
+    _persist_survey_answers(response, cleaned)
+    return Response({"detail": "Thank you! Your evaluation has been recorded."}, status=status.HTTP_201_CREATED)
 
 
 class DocumentEvaluationView(APIView):
     """
-    GET  /api/documents/<id>/evaluation/   what's left to rate
-    POST /api/documents/<id>/evaluation/   submit ratings
+    GET  /api/documents/<id>/evaluation/   the form, and whether it's rated yet
+    POST /api/documents/<id>/evaluation/   submit { answers }
 
-    A logged-in citizen evaluating one of THEIR OWN documents, broken out
-    PER OFFICE that actually touched it — so a bad experience at one office
-    doesn't drag down another office's KPI. Only reachable by the citizen
+    A logged-in citizen giving one Overall Experience Rating for one of
+    THEIR OWN requests, as a whole transaction. Only reachable by the citizen
     who requested the document, and only once it has actually been handed
     back to them. Guests without an account use PublicDocumentEvaluationView
     instead, by tracking number.
@@ -659,12 +637,12 @@ class PublicDocumentEvaluationView(APIView):
     GET  /api/documents/track/<tracking_number>/evaluation/
     POST /api/documents/track/<tracking_number>/evaluation/
 
-    Same per-office evaluation as DocumentEvaluationView, but reachable by
+    Same overall evaluation as DocumentEvaluationView, but reachable by
     tracking number with no account required — mirrors
     DocumentTrackingLookupView's public-lookup model (still refuses INTERNAL
     documents to non-staff). Whoever holds the tracking number is trusted to
     be the recipient, same as the public Track page itself; the DB's
-    (document, office) uniqueness is what actually stops double-rating, not
+    one-evaluation-per-document constraint is what actually stops double-rating, not
     an ownership check.
     """
     permission_classes = [AllowAny]
@@ -750,6 +728,11 @@ class QRScanResolveView(APIView):
 
         user = request.user
         is_staff = bool(user and user.is_authenticated and getattr(user, 'role', None) in ('admin', 'employee'))
+        if user and user.is_authenticated:
+            AccessLog.objects.create(
+                user=user, action=AccessLog.Action.SCAN_QR, detail=f"Scanned {document.tracking_number}",
+                ip_address=_client_ip(request), user_agent=request.META.get('HTTP_USER_AGENT', '')[:255],
+            )
 
         if is_staff:
             return Response({
@@ -1018,6 +1001,13 @@ class DocumentStageUpdateView(APIView):
         except Document.DoesNotExist:
             return Response({"detail": "Document not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        # Only the office that has received the document and holds it now.
+        if not holds_document(request.user, document):
+            return Response(
+                {"detail": f"Only {document.current_office}, which holds this document, can update it."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         stage = request.data.get('stage')
         note = request.data.get('note', '')
         valid_stages = {choice.value for choice in Document.ProcessingStage}
@@ -1051,43 +1041,33 @@ class DocumentStageUpdateView(APIView):
         return Response(DocumentDetailSerializer(document).data)
 
 
-def _office_rating_stats():
+def _satisfaction(evaluations):
+    """Average star rating and number of star answers across these evaluations."""
+    agg = SurveyAnswer.objects.filter(
+        response__in=evaluations,
+        question__question_type=SurveyQuestion.QuestionType.RATING,
+        rating_value__isnull=False,
+    ).aggregate(avg=Avg('rating_value'), count=Count('id'))
+    return {
+        "avg_rating": round(agg['avg'], 2) if agg['avg'] is not None else None,
+        "rating_count": agg['count'],
+    }
+
+
+def _evaluations_for_office(office):
     """
-    Average citizen-satisfaction rating per office, computed from
-    SurveyAnswer.rating_value on RATING-type questions attached to a
-    per-document, per-office evaluation (see DocumentEvaluationView) —
-    the citizen feedback KPI, independent of processing speed. Highest
-    rated first.
+    Post-release evaluations of transactions this office took part in: the
+    overall rating of every document that passed through it, plus older
+    ratings given to this office specifically.
     """
-    rows = (
-        SurveyAnswer.objects
-        .filter(
-            question__question_type=SurveyQuestion.QuestionType.RATING,
-            rating_value__isnull=False,
-            response__office__isnull=False,
-        )
-        .values('response__office__code', 'response__office__name')
-        .annotate(avg_rating=Avg('rating_value'), rating_count=Count('id'))
-        .order_by('-avg_rating')
-    )
-    return [
-        {
-            "office": row['response__office__code'],
-            "office_name": row['response__office__name'],
-            "avg_rating": round(row['avg_rating'], 2),
-            "rating_count": row['rating_count'],
-        }
-        for row in rows
-    ]
+    handled = DocumentLog.objects.filter(office=office).values('document_id')
+    return _release_evaluations().filter(Q(office=office) | Q(office__isnull=True, document_id__in=handled))
 
 
 def _office_speed_stats():
     """
     Shared by AdminDashboardStatsView and HeatmapDataView: average
     duration_at_office per office, grouped by office code, fastest first.
-    Each row also carries that office's avg_rating/rating_count from
-    _office_rating_stats(), so the heatmap and Top 5 lists can show
-    citizen satisfaction alongside processing speed without a second call.
     """
     stats = (
         DocumentLog.objects
@@ -1097,15 +1077,12 @@ def _office_speed_stats():
         .annotate(avg_time=Avg('duration_at_office'), doc_count=Count('id'))
         .order_by('avg_time')
     )
-    rating_by_office = {row['office']: row for row in _office_rating_stats()}
     return [
         {
             "office": item['office__code'],
             "office_name": item['office__name'],
             "avg_hours": round(item['avg_time'].total_seconds() / 3600, 2),
             "count": item['doc_count'],
-            "avg_rating": rating_by_office.get(item['office__code'], {}).get('avg_rating'),
-            "rating_count": rating_by_office.get(item['office__code'], {}).get('rating_count', 0),
         }
         for item in stats
     ]
@@ -1113,7 +1090,7 @@ def _office_speed_stats():
 
 class AdminDashboardStatsView(APIView):
     """
-    GET /api/documents/dashboard-stats/?scan_days=14&bottleneck_hours=48
+    GET /api/documents/dashboard-stats/?scan_days=14
     Powers the Admin Analytics Dashboard. Deliberately kept as ONE endpoint
     rather than a separate /api/admin/analytics/ — it already owned the
     status counters/period counts/per-type demand/office-speed rankings, and
@@ -1167,7 +1144,9 @@ class AdminDashboardStatsView(APIView):
         ]
 
         office_stats = _office_speed_stats()
-        rating_stats = _office_rating_stats()
+        # Citizen satisfaction: the Overall Experience Rating across every
+        # post-release evaluation.
+        satisfaction = _satisfaction(_release_evaluations())
 
         # Office workload — currently-active (not yet done) documents sitting
         # at each office right now, distinct from office_stats above (which
@@ -1231,27 +1210,37 @@ class AdminDashboardStatsView(APIView):
         ]
         access_logs_today = AccessLog.objects.filter(timestamp__date=timezone.localdate()).count()
 
-        # Bottleneck / high-priority alert widget — active documents that
-        # have sat at their current office past a threshold (default 48h).
-        bottleneck_hours = int(request.query_params.get('bottleneck_hours', 48))
-        bottleneck_cutoff = now - timedelta(hours=bottleneck_hours)
+        # Bottleneck / high-priority alert widget — active documents held past
+        # the time limit (SLA) set for the workflow step they are at, most
+        # overdue first. Each step has its own limit, so a 4-hour step is
+        # flagged after 4 hours and a 72-hour step only after 72.
         bottlenecks = []
-        stuck_qs = (
-            Document.objects.filter(status__in=['in_progress', 'returned', 'in_transit'], entered_current_office_at__lte=bottleneck_cutoff)
-            .select_related('document_type', 'current_handler')
-            .order_by('entered_current_office_at')[:10]
+        active = (
+            Document.objects.filter(status__in=['in_progress', 'returned', 'in_transit'])
+            .select_related('document_type', 'current_handler').prefetch_related('document_type__steps')
         )
-        for doc in stuck_qs:
+        for doc in active:
+            steps = list(doc.document_type.steps.all())
+            position = doc.route_position
+            if doc.status == 'in_transit':
+                # Travelling: measured against the step it is headed to.
+                position = doc.return_target_position if doc.is_returning else doc.route_position + 1
+            sla_hours = steps[position].max_hours_allowed if position < len(steps) else DEFAULT_FALLBACK_SLA_HOURS
             dwell_hours = (now - doc.entered_current_office_at).total_seconds() / 3600
+            if dwell_hours <= sla_hours:
+                continue
             bottlenecks.append({
                 "id": doc.id,
                 "tracking_number": doc.tracking_number,
                 "document_type_name": doc.document_type.name,
                 "current_office": doc.current_office,
                 "status": doc.status,
-                "dwell_hours": round(dwell_hours, 1),
+                "dwell_hours": round(dwell_hours, 2),
+                "sla_hours": sla_hours,
+                "over_by_hours": round(dwell_hours - sla_hours, 2),
                 "handler": doc.current_handler.full_name if doc.current_handler else None,
             })
+        bottlenecks = sorted(bottlenecks, key=lambda b: b['over_by_hours'], reverse=True)[:10]
 
         return Response({
             "total": total,
@@ -1267,8 +1256,7 @@ class AdminDashboardStatsView(APIView):
             "by_type": by_type,
             "top5_fastest": office_stats[:5],
             "top5_slowest": list(reversed(office_stats))[:5],
-            "top5_highest_rated": rating_stats[:5],
-            "top5_lowest_rated": list(reversed(rating_stats))[:5],
+            "satisfaction": satisfaction,
             "office_workload": office_workload,
             "avg_resolution_hours": avg_resolution_hours,
             "avg_resolution_display": avg_resolution_display,
@@ -1276,7 +1264,6 @@ class AdminDashboardStatsView(APIView):
             "access_log_breakdown": access_log_breakdown,
             "access_logs_today": access_logs_today,
             "bottlenecks": bottlenecks,
-            "bottleneck_hours": bottleneck_hours,
         })
 
 class OfficeHistoryPagination(PageNumberPagination):
@@ -1387,14 +1374,11 @@ class MyOfficePerformanceView(APIView):
                 "avg_rating": None, "rating_count": 0,
             })
 
-        row = next((r for r in _office_speed_stats() if r['office'] == office.code), None)
-        if not row:
-            return Response({
-                "office": office.code, "office_name": office.name,
-                "avg_hours": None, "count": 0,
-                "avg_rating": None, "rating_count": 0,
-            })
-        return Response(row)
+        row = next((r for r in _office_speed_stats() if r['office'] == office.code), None) or {
+            "office": office.code, "office_name": office.name, "avg_hours": None, "count": 0,
+        }
+        # How citizens rated the transactions this office took part in.
+        return Response({**row, **_satisfaction(_evaluations_for_office(office))})
 
 
 class SurveyListCreateView(generics.ListCreateAPIView):
@@ -1434,6 +1418,15 @@ class SurveyDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     queryset = Survey.objects.prefetch_related('questions')
     permission_classes = [IsAdmin]
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        refused = password_confirmation_failed(request, f'survey "{instance.title}"')
+        if refused:
+            return refused
+        response = super().destroy(request, *args, **kwargs)
+        log_record_deleted(request, f'survey "{instance.title}" and its responses')
+        return response
 
     def get_serializer_class(self):
         return SurveySerializer if self.request.method == 'GET' else SurveyWriteSerializer
@@ -1632,9 +1625,8 @@ class MySurveyCommentsView(generics.ListAPIView):
         if not office:
             return SurveyResponse.objects.none()
         return (
-            SurveyResponse.objects
+            _evaluations_for_office(office)
             .filter(
-                office=office,
                 answers__question__question_type=SurveyQuestion.QuestionType.TEXT,
                 answers__text_value__gt='',
             )
@@ -1765,7 +1757,7 @@ class PostScanSurveyView(APIView):
 
     The whole-transaction citizen survey shown right after a logged-in
     citizen scans their own document's QR code (see CitizenQRScanView.jsx).
-    Unlike the per-office post-release evaluation, this is one survey for the
+    Unlike the post-release evaluation (one per request), this is one survey for the
     entire request, capped at one submission per (survey, document, citizen)
     by SurveyResponse's unique_post_scan_survey_per_document_respondent
     constraint.
@@ -1958,8 +1950,9 @@ class AdminSuggestionListView(generics.ListAPIView):
 class AdminSuggestionDetailView(generics.RetrieveUpdateAPIView):
     """
     GET/PATCH /api/documents/suggestions/admin/<id>/
-    Admin-only. PATCH updates `status` and/or `admin_notes`; changing the
-    status stamps who reviewed it and when.
+    Admin-only. PATCH updates `status` and/or `admin_notes` (the reply);
+    changing the status stamps who reviewed it and when. Sending a reply
+    notifies the citizen and locks it: it can't be edited afterwards.
     """
     queryset = CitizenSuggestion.objects.select_related('respondent', 'reviewed_by')
     serializer_class = CitizenSuggestionAdminSerializer
@@ -1970,11 +1963,26 @@ class AdminSuggestionDetailView(generics.RetrieveUpdateAPIView):
             'status' in serializer.validated_data
             and serializer.validated_data['status'] != serializer.instance.status
         )
+        sending_reply = (
+            not serializer.instance.replied_at
+            and bool(serializer.validated_data.get('admin_notes'))
+        )
         instance = serializer.save()
         if changing_status:
             instance.reviewed_by = self.request.user
             instance.reviewed_at = timezone.now()
             instance.save(update_fields=['reviewed_by', 'reviewed_at'])
+        if sending_reply:
+            instance.replied_at = timezone.now()
+            instance.replied_by = self.request.user
+            instance.save(update_fields=['replied_at', 'replied_by'])
+            if instance.respondent and instance.respondent.is_active:
+                Notification.objects.create(
+                    recipient=instance.respondent, sender=self.request.user,
+                    title=f"Reply to your suggestion: {instance.subject}"[:200],
+                    message=instance.admin_notes,
+                    notification_type=Notification.NotificationType.SUGGESTION_REPLY,
+                )
 
 
 class EmailNotificationLogPagination(PageNumberPagination):

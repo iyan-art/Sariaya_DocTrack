@@ -144,7 +144,7 @@ export default function SuggestionBox() {
               <p className="text-sm text-slate-600 dark:text-slate-400 mt-2 whitespace-pre-wrap">{s.message}</p>
               {s.admin_notes && (
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-lg px-3 py-2">
-                  <span className="font-bold text-slate-600 dark:text-slate-300">LGU response: </span>{s.admin_notes}
+                  <span className="font-bold text-slate-600 dark:text-slate-300">LGU reply{s.replied_at ? ` (${new Date(s.replied_at).toLocaleDateString()})` : ''}: </span>{s.admin_notes}
                 </p>
               )}
               <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">{new Date(s.created_at).toLocaleString()}</p>

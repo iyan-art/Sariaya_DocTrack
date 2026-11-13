@@ -200,6 +200,19 @@ def _same_office(label_a, label_b):
     return (label_a or '').strip().casefold() == (label_b or '').strip().casefold()
 
 
+def holds_document(user, document):
+    """
+    True when the user's office has the document in its custody: it was
+    received there (or created there) and sits at that office now, waiting
+    to be worked on, forwarded or handed over. Only then may that office
+    update or process it.
+    """
+    return (
+        document.status in (*Document.ACTIONABLE_STATUSES, Document.Status.COMPLETED)
+        and _same_office(user.office, document.current_office)
+    )
+
+
 def resolve_office(label):
     """
     Best-effort lookup of an Office row matching a free-text label (matches
@@ -623,6 +636,10 @@ def release_to_citizen(document, releasing_user, notes='', qr_verified=False):
         raise ValidationError(
             f"Only a 'completed' document can be released to the citizen. "
             f"This document is currently '{document.status}'."
+        )
+    if not holds_document(releasing_user, document):
+        raise ValidationError(
+            f"Only {_office_name(document.current_office)}, which holds the document, can release it to the citizen."
         )
 
     previous_handler = document.current_handler

@@ -46,6 +46,72 @@ def _client_ip(request):
     return request.META.get('REMOTE_ADDR') or '0.0.0.0'
 
 
+def _login_failure_reason(user, email, password):
+    if not email:
+        return 'Failed sign-in: no email entered.'
+    if user is None:
+        return 'Failed sign-in: no account uses this email.'
+    if not user.is_active:
+        return 'Failed sign-in: the account is deactivated.'
+    if not password or not user.check_password(password):
+        return 'Failed sign-in: incorrect password.'
+    return 'Failed sign-in.'
+
+
+def password_confirmation_failed(request, record):
+    """
+    Deleting an important record (a document type, an office, a survey)
+    needs the admin's password typed again — a second check on top of the
+    signed-in session, so an unattended, signed-in screen can't be used to
+    wipe configuration. Returns a 403 Response when the password is missing
+    or wrong (and logs the blocked attempt), else None.
+    """
+    password = request.data.get('password', '') if hasattr(request.data, 'get') else ''
+    if password and request.user.check_password(password):
+        return None
+    AccessLog.objects.create(
+        user=request.user, action=AccessLog.Action.DELETE_BLOCKED,
+        detail=f"Wrong or missing password; {record} was not deleted.",
+        ip_address=_client_ip(request), user_agent=request.META.get('HTTP_USER_AGENT', '')[:255],
+    )
+    return Response(
+        {"detail": "Incorrect password. Nothing was deleted.", "password": ["Incorrect password."]},
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
+def log_record_deleted(request, record):
+    AccessLog.objects.create(
+        user=request.user, action=AccessLog.Action.RECORD_DELETED, detail=f"Deleted {record}.",
+        ip_address=_client_ip(request), user_agent=request.META.get('HTTP_USER_AGENT', '')[:255],
+    )
+
+
+class LogoutView(APIView):
+    """
+    POST /api/accounts/logout/   Body: { refresh }
+    Ends the session on the server: the refresh token is blacklisted so it
+    can't be used again, and the sign-out is recorded in the Access Logs.
+    Works even if the short-lived access token has already expired.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            token = RefreshToken(request.data.get('refresh', ''))
+            user = User.objects.filter(pk=token.get('user_id')).first()
+            token.blacklist()
+        except Exception:
+            # Already blacklisted, expired or malformed: nothing left to end.
+            return Response(status=status.HTTP_205_RESET_CONTENT)
+        if user:
+            AccessLog.objects.create(
+                user=user, action=AccessLog.Action.LOGOUT,
+                ip_address=_client_ip(request), user_agent=request.META.get('HTTP_USER_AGENT', '')[:255],
+            )
+        return Response(status=status.HTTP_205_RESET_CONTENT)
+
+
 class LoginView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
     permission_classes = [AllowAny]  # anyone can attempt to log in
@@ -62,8 +128,14 @@ class LoginView(TokenObtainPairView):
             # that has to be caught here, not read off a response status.
             response = super().post(request, *args, **kwargs)
         except Exception:
+            # Recorded with the email that was tried and why it failed, so an
+            # attempt on an address with no account isn't a blank row. Only
+            # admins see this; the person signing in still gets the generic
+            # message, which doesn't reveal whether the account exists.
             AccessLog.objects.create(
                 user=matched_user, action=AccessLog.Action.LOGIN_FAILED,
+                attempted_email=email.strip().lower()[:254],
+                detail=_login_failure_reason(matched_user, email, request.data.get('password', '')),
                 ip_address=ip_address, user_agent=user_agent,
             )
             raise

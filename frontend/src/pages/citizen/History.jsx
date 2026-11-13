@@ -128,8 +128,8 @@ export default function History() {
                     </td>
                     <td data-label="Status" className="px-5 py-3"><DocumentStatusBadge doc={doc} /></td>
                     <td data-label="Date Requested" className="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs">{new Date(doc.created_at).toLocaleDateString()}</td>
-                    <td className="rt-actions px-5 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="rt-actions px-5 py-3 text-center">
+                      <div className="flex items-center justify-center gap-2">
                         {doc.status === 'released' && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setReturningDoc(doc); }}

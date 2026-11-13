@@ -117,6 +117,10 @@ export function AuthProvider({ children }) {
   // always lands back on the public Landing page, regardless of which
   // protected route the user was on when they logged out.
   const logout = () => {
+    // Tell the server first, so the refresh token can't be reused and the
+    // sign-out shows in the Access Logs; never wait on it to leave.
+    const refresh = localStorage.getItem('refresh_token');
+    if (refresh) api.post('/accounts/logout/', { refresh }).catch(() => {});
     localStorage.clear();
     setUser(null);
     navigate('/', { replace: true });

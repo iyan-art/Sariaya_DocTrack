@@ -3,6 +3,7 @@ import { fetchMyOfficePerformance, fetchMyOfficeComments } from '../../api/axios
 import { useAuth } from '../../context/AuthContext';
 import CitizenCommentsWidget from '../../components/admin/CitizenCommentsWidget';
 import { Clock3Icon, StarIcon } from '../../components/Icons';
+import { formatHoursMinutes } from '../../utils/duration';
 
 /**
  * Staff/employee dashboard — the office-scoped equivalent of the Admin
@@ -50,7 +51,7 @@ export default function Dashboard() {
             <p className="text-slate-400 dark:text-slate-500 text-sm py-4">Not enough data yet — this office hasn't processed a timed document yet.</p>
           ) : (
             <>
-              <p className="text-4xl font-black text-indigo-700 dark:text-indigo-400">{stats.avg_hours}<span className="text-lg">h</span></p>
+              <p className="text-3xl font-black text-indigo-700 dark:text-indigo-400">{formatHoursMinutes(stats.avg_hours)}</p>
               <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-2">
                 Based on {stats.count} document{stats.count === 1 ? '' : 's'} processed
               </p>
@@ -66,7 +67,7 @@ export default function Dashboard() {
             </div>
             <div>
               <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Citizen Satisfaction</p>
-              <p className="text-xs text-slate-400 dark:text-slate-500">Average rating from citizen evaluations</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Overall rating citizens gave the requests your office handled</p>
             </div>
           </div>
 

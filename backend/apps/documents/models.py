@@ -641,6 +641,13 @@ class SurveyResponse(models.Model):
                 condition=models.Q(document__isnull=False, office__isnull=False),
                 name='unique_evaluation_per_document_office',
             ),
+            # Since the switch to one Overall Experience Rating per
+            # transaction: one office-less post-release evaluation per document.
+            models.UniqueConstraint(
+                fields=['document'],
+                condition=models.Q(source='release', document__isnull=False, office__isnull=True),
+                name='unique_overall_evaluation_per_document',
+            ),
             # One post-scan survey per citizen per document — the DB backstop
             # behind PostScanSurveyView's "you've already answered" check.
             models.UniqueConstraint(
@@ -714,7 +721,14 @@ class CitizenSuggestion(models.Model):
     status = models.CharField(
         max_length=12, choices=Status.choices, default=Status.NEW, db_index=True,
     )
+    # The LGU's reply to the citizen. Final once sent (replied_at is set):
+    # the citizen is notified and the reply can no longer be edited.
     admin_notes = models.TextField(blank=True)
+    replied_at = models.DateTimeField(null=True, blank=True)
+    replied_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='suggestion_replies',
+    )
     reviewed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='reviewed_suggestions',
@@ -812,6 +826,8 @@ class Notification(models.Model):
         DOCUMENT_COMPLETED = 'document_completed', 'Request Completed'
         # An office reported a document's physical copy missing, or found it again.
         DOCUMENT_MISSING = 'document_missing', 'Document Missing'
+        # The LGU replied to a citizen's Suggestion Box entry.
+        SUGGESTION_REPLY = 'suggestion_reply', 'Suggestion Reply'
 
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications',

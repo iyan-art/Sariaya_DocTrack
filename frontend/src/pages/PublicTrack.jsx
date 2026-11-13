@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api, { fetchPublicDocumentEvaluation, submitPublicDocumentEvaluation } from '../api/axios';
 import DocumentEvaluationModal from '../components/citizen/DocumentEvaluationModal';
 import DocumentTrackingTimeline from '../components/DocumentTrackingTimeline';
+import OfficialLetterhead from '../components/OfficialLetterhead';
 import { MapPinIcon, PrinterIcon, StarIcon } from '../components/Icons';
 
 function formatDateTime(value) {
@@ -125,13 +126,15 @@ export default function PublicTrack() {
         </div>
 
         <div className="track-scroll-body flex-1 overflow-y-auto p-8 min-h-0">
+           {/* Printed copies carry the municipal letterhead; on screen the blue header above says it all. */}
+           <OfficialLetterhead className="hidden print:block mb-6" />
            {/* Print / download this record */}
            <div className="track-no-print flex justify-end mb-6">
               <button
                 onClick={() => window.print()}
                 className="flex items-center gap-2 text-sm font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 px-4 py-2 rounded-xl transition-colors"
               >
-                <PrinterIcon className="w-4 h-4" /> Print / Download
+                <PrinterIcon className="w-4 h-4" /> Print
               </button>
            </div>
 

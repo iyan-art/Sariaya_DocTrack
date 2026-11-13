@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { fetchUsers, toggleUserActive } from '../../api/axios';
 import ConfirmModal from '../../components/ConfirmModal';
 import { useToast } from '../../context/ToastContext';
+import Pagination from '../../components/Pagination';
 
 export default function Archive() {
   const [roleTab, setRoleTab] = useState('citizen');
@@ -13,7 +14,6 @@ export default function Archive() {
   const { showToast } = useToast();
 
   const pageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(count / pageSize));
 
   const loadUsers = useCallback(() => {
     setLoading(true);
@@ -81,7 +81,7 @@ export default function Archive() {
               {roleTab === 'employee' && <th className="text-left px-5 py-3">Office</th>}
               {roleTab === 'employee' && <th className="text-left px-5 py-3">Position</th>}
               <th className="text-left px-5 py-3">Status</th>
-              <th className="text-left px-5 py-3">Action</th>
+              <th className="text-center px-5 py-3">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -104,7 +104,7 @@ export default function Archive() {
                   <td data-label="Status" className="px-5 py-3">
                     <span className="text-xs font-medium text-slate-400 dark:text-slate-500">● Inactive</span>
                   </td>
-                  <td className="rt-actions px-5 py-3">
+                  <td className="rt-actions px-5 py-3 text-center">
                     <button
                       onClick={() => handleReactivateClick(u)}
                       className="text-xs font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 hover:bg-green-100 dark:hover:bg-green-500/20 rounded-lg px-3 py-1.5 transition-colors"
@@ -119,27 +119,7 @@ export default function Archive() {
         </table>
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 text-sm">
-          <p className="text-slate-500 dark:text-slate-400">Page {page} of {totalPages}</p>
-          <div className="flex gap-2">
-            <button
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40"
-            >
-              Previous
-            </button>
-            <button
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+      <Pagination page={page} pageSize={pageSize} count={count} onPageChange={setPage} />
 
       {confirmTarget && (
         <ConfirmModal

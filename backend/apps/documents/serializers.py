@@ -465,7 +465,8 @@ class DocumentSerializer(serializers.ModelSerializer):
             if obj.is_returning:
                 return f"Being Returned to {obj.return_target_office}"
             next_office = route[obj.route_position + 1] if obj.route_position + 1 < len(route) else obj.current_office
-            return f"In Transit to {next_office}"
+            # "Sent", not "Released": Released is only the final hand-over.
+            return f"Sent to {next_office}"
         if obj.status == 'completed':
             return f"Ready at {obj.origin_office}"
         if obj.status == 'released':
@@ -625,7 +626,8 @@ class PublicDocumentTrackingSerializer(serializers.ModelSerializer):
             if obj.is_returning:
                 return f"Being Returned to {obj.return_target_office}"
             next_office = route[obj.route_position + 1] if obj.route_position + 1 < len(route) else obj.current_office
-            return f"In Transit to {next_office}"
+            # "Sent", not "Released": Released is only the final hand-over.
+            return f"Sent to {next_office}"
         if obj.status == 'completed':
             return f"Ready at {obj.origin_office}"
         if obj.status == 'released':
@@ -791,6 +793,17 @@ class CreateDocumentSerializer(serializers.ModelSerializer):
                     number_errors[field.get('key')] = [message]
             if number_errors:
                 raise serializers.ValidationError(number_errors)
+
+            # A dropdown answer must be one of its listed options.
+            choice_errors = {
+                field['key']: [f"Choose one of the listed options for {field.get('label', field['key'])}."]
+                for field in request_fields
+                if field.get('type') == 'select' and field.get('options')
+                and form_data.get(field.get('key')) not in (None, '')
+                and form_data.get(field.get('key')) not in field['options']
+            }
+            if choice_errors:
+                raise serializers.ValidationError(choice_errors)
         return attrs
 
     def validate_contact_number(self, value):
@@ -1081,9 +1094,9 @@ class CitizenSuggestionSerializer(serializers.ModelSerializer):
         model = CitizenSuggestion
         fields = [
             'id', 'category', 'category_display', 'subject', 'message',
-            'status', 'status_display', 'admin_notes', 'created_at', 'reviewed_at',
+            'status', 'status_display', 'admin_notes', 'replied_at', 'created_at', 'reviewed_at',
         ]
-        read_only_fields = ['status', 'admin_notes', 'created_at', 'reviewed_at']
+        read_only_fields = ['status', 'admin_notes', 'replied_at', 'created_at', 'reviewed_at']
 
 
 class CitizenSuggestionAdminSerializer(serializers.ModelSerializer):
@@ -1098,10 +1111,16 @@ class CitizenSuggestionAdminSerializer(serializers.ModelSerializer):
         model = CitizenSuggestion
         fields = [
             'id', 'category', 'category_display', 'subject', 'message',
-            'status', 'status_display', 'admin_notes',
+            'status', 'status_display', 'admin_notes', 'replied_at',
             'respondent_name', 'reviewed_by_name', 'created_at', 'reviewed_at',
         ]
-        read_only_fields = ['category', 'subject', 'message', 'created_at', 'reviewed_at']
+        read_only_fields = ['category', 'subject', 'message', 'replied_at', 'created_at', 'reviewed_at']
+
+    def validate_admin_notes(self, value):
+        # A sent reply is final: the citizen has already been notified of it.
+        if self.instance and self.instance.replied_at and value != self.instance.admin_notes:
+            raise serializers.ValidationError("This reply was already sent to the citizen and can't be changed.")
+        return value.strip()
 
     def get_respondent_name(self, obj):
         u = obj.respondent

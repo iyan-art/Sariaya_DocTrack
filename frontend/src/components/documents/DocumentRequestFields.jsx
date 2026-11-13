@@ -58,26 +58,40 @@ export default function DocumentRequestFields({ fields, value, onChange }) {
               ))}
             </select>
           ) : (
-            <input
-              type={['number', 'date', 'tel'].includes(f.type) ? f.type : 'text'}
-              required={f.required}
-              value={value[f.key] || ''}
-              onChange={(e) => onChange(f.key, e.target.value)}
-              placeholder={f.placeholder || (f.type === 'tel' ? '09XXXXXXXXX' : undefined)}
-              // Quantities and amounts are always greater than zero; counts are whole numbers.
-              {...(f.type === 'number' && {
-                min: f.integer ? 1 : 0.01,
-                step: f.integer ? 1 : 0.01,
-                inputMode: f.integer ? 'numeric' : 'decimal',
-                onKeyDown: blockInvalidNumberKeys(f),
-              })}
-              aria-invalid={Boolean(error)}
-              className={`w-full border bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 ${
-                error
-                  ? 'border-red-400 dark:border-red-500 focus:ring-red-500'
-                  : 'border-slate-200 dark:border-slate-700 focus:ring-blue-500'
-              }`}
-            />
+            // A field's unit sits inside the box: `prefix` before the value
+            // (₱ for amounts), `suffix` after it (sq m for areas).
+            <div className={`flex items-stretch w-full border rounded-lg overflow-hidden bg-white dark:bg-slate-800 focus-within:ring-2 ${
+              error
+                ? 'border-red-400 dark:border-red-500 focus-within:ring-red-500'
+                : 'border-slate-200 dark:border-slate-700 focus-within:ring-blue-500'
+            }`}>
+              {f.prefix && (
+                <span className="flex items-center px-3 bg-slate-50 dark:bg-slate-700/60 border-r border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-700 dark:text-slate-200">
+                  {f.prefix}
+                </span>
+              )}
+              <input
+                type={['number', 'date', 'tel'].includes(f.type) ? f.type : 'text'}
+                required={f.required}
+                value={value[f.key] || ''}
+                onChange={(e) => onChange(f.key, e.target.value)}
+                placeholder={f.placeholder || (f.type === 'tel' ? '09XXXXXXXXX' : undefined)}
+                // Quantities and amounts are always greater than zero; counts are whole numbers.
+                {...(f.type === 'number' && {
+                  min: f.integer ? 1 : 0.01,
+                  step: f.integer ? 1 : 0.01,
+                  inputMode: f.integer ? 'numeric' : 'decimal',
+                  onKeyDown: blockInvalidNumberKeys(f),
+                })}
+                aria-invalid={Boolean(error)}
+                className="flex-1 min-w-0 bg-transparent text-slate-900 dark:text-slate-100 p-2 text-sm focus:outline-none"
+              />
+              {f.suffix && (
+                <span className="flex items-center px-3 bg-slate-50 dark:bg-slate-700/60 border-l border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                  {f.suffix}
+                </span>
+              )}
+            </div>
           )}
 
           {error && (

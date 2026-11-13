@@ -197,7 +197,8 @@ class AccessLogSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AccessLog
-        fields = ['id', 'user_email', 'user_name', 'action', 'action_label', 'detail', 'ip_address', 'user_agent', 'timestamp']
+        fields = ['id', 'user_email', 'user_name', 'attempted_email', 'action', 'action_label', 'detail',
+                  'ip_address', 'user_agent', 'timestamp']
 
     def get_user_email(self, obj):
         return obj.user.email if obj.user else None

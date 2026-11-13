@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { fetchHeatmapData } from '../../api/axios';
 import { useTheme } from '../../context/ThemeContext';
-import { BarChart3Icon, StarIcon } from '../../components/Icons';
+import { BarChart3Icon } from '../../components/Icons';
+import { formatHoursMinutes } from '../../utils/duration';
 
 // Green (fast) -> yellow -> red (slow), interpolated by where this office's
 // avg_hours falls between the fastest and slowest office currently on record.
@@ -89,17 +90,12 @@ export default function Heatmap() {
                   <p className="text-xs font-black uppercase tracking-widest" style={{ color: color.text }}>
                     {o.office_name || o.office}
                   </p>
-                  <p className="text-4xl font-black mt-3" style={{ color: color.text }}>
-                    {o.avg_hours}<span className="text-lg">h</span>
+                  <p className="text-2xl font-black mt-3" style={{ color: color.text }}>
+                    {formatHoursMinutes(o.avg_hours)}
                   </p>
                   <p className="text-[10px] font-bold uppercase tracking-widest mt-2 opacity-70" style={{ color: color.text }}>
                     {o.count} document{o.count === 1 ? '' : 's'} processed
                   </p>
-                  {o.avg_rating != null && (
-                    <p className="text-xs font-bold mt-2 flex items-center gap-1 opacity-80" style={{ color: color.text }}>
-                      <StarIcon className="w-3.5 h-3.5" filled /> {o.avg_rating} citizen rating
-                    </p>
-                  )}
                 </div>
               );
             })}

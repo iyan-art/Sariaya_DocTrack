@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchAdminSuggestions, updateSuggestion } from '../../api/axios';
 import { useToast } from '../../context/ToastContext';
+import { extractErrorMessage } from '../../utils/apiError';
 import { HandshakeIcon } from '../../components/Icons';
 
 const CATEGORIES = [
@@ -68,15 +69,16 @@ export default function AdminSuggestions() {
     }
   };
 
-  const saveNotes = async (row) => {
-    const value = notesDraft[row.id] ?? row.admin_notes ?? '';
+  const sendReply = async (row) => {
+    const value = (notesDraft[row.id] ?? '').trim();
+    if (!value) return;
     try {
       await updateSuggestion(row.id, { admin_notes: value });
-      showToast('Response saved.', 'success');
+      showToast('Reply sent. The citizen has been notified.', 'success');
       setNotesDraft((d) => { const n = { ...d }; delete n[row.id]; return n; });
       load();
-    } catch {
-      showToast('Failed to save response.', 'error');
+    } catch (err) {
+      showToast(extractErrorMessage(err, 'Failed to send the reply.'), 'error');
     }
   };
 
@@ -131,23 +133,38 @@ export default function AdminSuggestions() {
 
               <p className="text-sm text-slate-600 dark:text-slate-400 mt-3 whitespace-pre-wrap">{row.message}</p>
 
-              <div className="mt-4">
-                <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
-                  Response to citizen (optional)
-                </label>
-                <textarea
-                  rows={2}
-                  value={notesDraft[row.id] ?? row.admin_notes ?? ''}
-                  onChange={(e) => setNotesDraft((d) => ({ ...d, [row.id]: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  onClick={() => saveNotes(row)}
-                  className="mt-2 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                >
-                  Save response
-                </button>
-              </div>
+              {row.replied_at ? (
+                // A sent reply is final — the citizen was notified of exactly this text.
+                <div className="mt-4 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 px-3 py-2">
+                  <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                    Reply sent {new Date(row.replied_at).toLocaleString()}
+                  </p>
+                  <p className="text-sm text-slate-700 dark:text-slate-300 mt-1 whitespace-pre-wrap">{row.admin_notes}</p>
+                </div>
+              ) : (
+                <div className="mt-4">
+                  <label htmlFor={`reply-${row.id}`} className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
+                    Reply to citizen
+                  </label>
+                  <textarea
+                    id={`reply-${row.id}`}
+                    rows={2}
+                    value={notesDraft[row.id] ?? ''}
+                    onChange={(e) => setNotesDraft((d) => ({ ...d, [row.id]: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <div className="flex items-center justify-between gap-2 mt-2">
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500">The citizen is notified, and a sent reply can't be edited.</p>
+                    <button
+                      onClick={() => sendReply(row)}
+                      disabled={!(notesDraft[row.id] ?? '').trim()}
+                      className="shrink-0 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-3 py-1.5 rounded-lg"
+                    >
+                      Send reply
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-slate-50 dark:border-slate-800 text-xs font-bold">
                 {NEXT_ACTIONS.filter((a) => a.to !== row.status).map((a) => (

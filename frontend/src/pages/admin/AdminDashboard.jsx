@@ -8,6 +8,7 @@ import { fetchDashboardStats } from '../../api/axios';
 import { useTheme } from '../../context/ThemeContext';
 import SurveyAnalyticsWidget from '../../components/admin/SurveyAnalyticsWidget';
 import CitizenCommentsWidget from '../../components/admin/CitizenCommentsWidget';
+import { formatHoursMinutes } from '../../utils/duration';
 import {
   Clock3Icon, FileTextIcon, BellIcon, TrendingUpIcon, TrendingDownIcon,
   BarChart3Icon, ShieldCheckIcon, StarIcon,
@@ -18,10 +19,10 @@ const EMPTY_STATS = {
   missing_rate_pct: 0, weekly_trend_pct: null,
   by_period: { daily: 0, weekly: 0, monthly: 0, yearly: 0 },
   by_type: [], top5_fastest: [], top5_slowest: [],
-  top5_highest_rated: [], top5_lowest_rated: [],
+  satisfaction: { avg_rating: null, rating_count: 0 },
   office_workload: [], avg_resolution_hours: null, avg_resolution_display: null,
   scan_timeline: [], access_logs_today: 0,
-  bottlenecks: [], bottleneck_hours: 48,
+  bottlenecks: [],
 };
 
 const STATUS_COLORS = { pending: '#f59e0b', completed: '#22c55e', released: '#6366f1', missing: '#ef4444' };
@@ -256,7 +257,7 @@ export default function AdminDashboard() {
           <BellIcon className="w-4 h-4" /> Bottleneck Alerts
         </h2>
         <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">
-          Active documents that have sat at their current office for more than {stats.bottleneck_hours}h.
+          Active documents held longer than the time limit (SLA) set for their workflow step, most overdue first.
         </p>
         {stats.bottlenecks.length === 0 ? (
           <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">No overdue documents right now — nice.</p>
@@ -269,7 +270,7 @@ export default function AdminDashboard() {
                   <th className="text-left py-2 pr-4">Type</th>
                   <th className="text-left py-2 pr-4">Office</th>
                   <th className="text-left py-2 pr-4">Handler</th>
-                  <th className="text-left py-2">Dwell Time</th>
+                  <th className="text-left py-2">Time at Office</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -281,7 +282,10 @@ export default function AdminDashboard() {
                     <td data-label="Handler" className="py-2.5 pr-4 text-slate-600 dark:text-slate-400">{b.handler || '—'}</td>
                     <td data-label="Dwell Time" className="py-2.5">
                       <span className="inline-flex text-xs font-black text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 px-2.5 py-1 rounded-full">
-                        {b.dwell_hours}h
+                        {formatHoursMinutes(b.dwell_hours)}
+                      </span>
+                      <span className="block text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                        Limit {formatHoursMinutes(b.sla_hours)} · over by {formatHoursMinutes(b.over_by_hours)}
                       </span>
                     </td>
                   </tr>
@@ -314,7 +318,7 @@ export default function AdminDashboard() {
             {stats.top5_fastest.map((o) => (
               <div key={o.office} className="flex justify-between items-center bg-green-50 dark:bg-green-500/10 border border-green-100 dark:border-green-500/30 rounded-xl px-4 py-2.5">
                 <span className="text-sm font-semibold text-green-900 dark:text-green-400">{o.office_name || o.office}</span>
-                <span className="text-sm font-black text-green-700 dark:text-green-400">{o.avg_hours}h</span>
+                <span className="text-sm font-black text-green-700 dark:text-green-400">{formatHoursMinutes(o.avg_hours)}</span>
               </div>
             ))}
           </div>
@@ -329,61 +333,34 @@ export default function AdminDashboard() {
             {stats.top5_slowest.map((o) => (
               <div key={o.office} className="flex justify-between items-center bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/30 rounded-xl px-4 py-2.5">
                 <span className="text-sm font-semibold text-red-900 dark:text-red-400">{o.office_name || o.office}</span>
-                <span className="text-sm font-black text-red-700 dark:text-red-400">{o.avg_hours}h</span>
+                <span className="text-sm font-black text-red-700 dark:text-red-400">{formatHoursMinutes(o.avg_hours)}</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Citizen satisfaction — per-office KPI from post-release evaluations */}
+      {/* Citizen satisfaction — the Overall Experience Rating citizens give a
+          request once it is released, across every evaluation. */}
       <div className="mt-8 bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-800">
         <h2 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
-          <StarIcon className="w-4 h-4 text-amber-500" filled /> Citizen Satisfaction by Office
+          <StarIcon className="w-4 h-4 text-amber-500" filled /> Citizen Satisfaction
         </h2>
         <p className="text-xs text-slate-400 dark:text-slate-500 mb-5">
-          Average star rating citizens give each office when evaluating a released document — every office involved is rated separately.
+          Overall Experience Rating citizens give their whole transaction after their document is released.
         </p>
-
-        <div className="grid sm:grid-cols-2 gap-8">
-          <div>
-            <p className="text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-widest flex items-center gap-1.5 mb-3">
-              <TrendingUpIcon className="w-3.5 h-3.5" /> Top 5 Highest Rated
+        {stats.satisfaction.avg_rating == null ? (
+          <p className="text-sm text-slate-400 dark:text-slate-500">{loading ? 'Loading…' : 'No citizen evaluations yet.'}</p>
+        ) : (
+          <div className="flex items-end gap-4 flex-wrap">
+            <p className="text-5xl font-black text-amber-600 dark:text-amber-400 flex items-center gap-2">
+              {stats.satisfaction.avg_rating} <StarIcon className="w-9 h-9" filled />
             </p>
-            <div className="space-y-2">
-              {stats.top5_highest_rated.length === 0 && !loading && (
-                <p className="text-xs text-slate-400 dark:text-slate-500">No citizen evaluations yet.</p>
-              )}
-              {stats.top5_highest_rated.map((o) => (
-                <div key={o.office} className="flex justify-between items-center bg-green-50 dark:bg-green-500/10 border border-green-100 dark:border-green-500/30 rounded-xl px-4 py-2.5">
-                  <span className="text-sm font-semibold text-green-900 dark:text-green-400">{o.office_name || o.office}</span>
-                  <span className="text-sm font-black text-green-700 dark:text-green-400 flex items-center gap-1">
-                    <StarIcon className="w-3.5 h-3.5" filled /> {o.avg_rating}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-widest flex items-center gap-1.5 mb-3">
-              <TrendingDownIcon className="w-3.5 h-3.5" /> Top 5 Lowest Rated
+            <p className="text-sm text-slate-500 dark:text-slate-400 pb-1.5">
+              out of 5 · from {stats.satisfaction.rating_count} star rating{stats.satisfaction.rating_count === 1 ? '' : 's'}
             </p>
-            <div className="space-y-2">
-              {stats.top5_lowest_rated.length === 0 && !loading && (
-                <p className="text-xs text-slate-400 dark:text-slate-500">No citizen evaluations yet.</p>
-              )}
-              {stats.top5_lowest_rated.map((o) => (
-                <div key={o.office} className="flex justify-between items-center bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/30 rounded-xl px-4 py-2.5">
-                  <span className="text-sm font-semibold text-red-900 dark:text-red-400">{o.office_name || o.office}</span>
-                  <span className="text-sm font-black text-red-700 dark:text-red-400 flex items-center gap-1">
-                    <StarIcon className="w-3.5 h-3.5" filled /> {o.avg_rating}
-                  </span>
-                </div>
-              ))}
-            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <CitizenCommentsWidget />

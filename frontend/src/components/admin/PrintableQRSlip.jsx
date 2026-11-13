@@ -37,6 +37,7 @@ export default function PrintableQRSlip({ document, onClose }) {
 
         {/* Printable slip content */}
         <div className="qr-slip-printable p-8 text-center border-2 border-dashed border-slate-300 m-4 rounded-2xl">
+          <img src="/sariaya-logo.jpg" alt="Official Seal of the Municipality of Sariaya" className="h-12 w-12 mx-auto mb-2 rounded-full object-contain bg-white" />
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
             Sariaya Office of the Municipal Administrator
           </p>

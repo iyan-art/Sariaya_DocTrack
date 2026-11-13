@@ -1,5 +1,6 @@
 import { mediaUrl } from '../../api/axios';
 import { PrinterIcon } from '../Icons';
+import OfficialLetterhead from '../OfficialLetterhead';
 
 // Same "print just this one element" technique as PrintableQRSlip.jsx, tuned
 // for a full A4/Letter page rather than a small slip.
@@ -45,13 +46,7 @@ export default function PrintableDocumentForm({ document, onClose }) {
 
         {/* Printable form content */}
         <div className="doc-form-printable p-8 sm:p-10">
-          {/* Letterhead */}
-          <div className="text-center border-b-2 border-slate-800 pb-4">
-            <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Republic of the Philippines</p>
-            <p className="text-xs text-slate-600">Province of Quezon</p>
-            <p className="text-sm font-bold text-slate-900 mt-1">MUNICIPALITY OF SARIAYA</p>
-            <p className="text-sm font-bold text-slate-900">Office of the Municipal Administrator</p>
-          </div>
+          <OfficialLetterhead />
 
           <div className="flex items-start justify-between mt-6">
             <div>

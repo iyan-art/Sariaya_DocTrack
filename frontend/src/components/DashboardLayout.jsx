@@ -30,6 +30,9 @@ import {
   UsersIcon,
 } from './Icons';
 
+// Where the sidebar logo goes: each role's home page.
+const HOME_PAGES = { admin: '/admin/dashboard', employee: '/employee/dashboard', citizen: '/citizen/home' };
+
 const MENUS = {
   admin: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutGridIcon },
@@ -123,15 +126,22 @@ export default function DashboardLayout() {
         {/* Logo */}
         <div className="h-16 sm:h-20 shrink-0 flex items-center gap-3 px-4 sm:px-6 border-b border-slate-100 dark:border-slate-800">
           {/* The seal's white corners are clipped to its circle so it sits cleanly on the dark sidebar too. */}
-          <img
-            src="/sariaya-logo.jpg"
-            alt="Municipality of Sariaya Official Seal"
-            className="h-10 w-10 shrink-0 rounded-full object-contain bg-white"
-          />
-          <div className="leading-tight flex-1 min-w-0">
-            <p className="font-bold text-slate-900 dark:text-white text-sm">Sariaya DocTrack</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500">Sariaya LGU</p>
-          </div>
+          <NavLink
+            to={HOME_PAGES[user.role] || '/'}
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Sariaya DocTrack home"
+            className="flex items-center gap-3 flex-1 min-w-0 rounded-lg"
+          >
+            <img
+              src="/sariaya-logo.jpg"
+              alt="Municipality of Sariaya Official Seal"
+              className="h-10 w-10 shrink-0 rounded-full object-contain bg-white"
+            />
+            <div className="leading-tight flex-1 min-w-0">
+              <p className="font-bold text-slate-900 dark:text-white text-sm">Sariaya DocTrack</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Sariaya LGU</p>
+            </div>
+          </NavLink>
           <button
             onClick={() => setSidebarOpen(false)}
             aria-label="Close menu"

@@ -3,6 +3,7 @@ import { fetchOfficeHistory } from '../../api/axios';
 import { useToast } from '../../context/ToastContext';
 import DocumentFormModal from '../../components/admin/DocumentFormModal';
 import { CheckCircle2Icon, Clock3Icon } from '../../components/Icons';
+import Pagination from '../../components/Pagination';
 
 const PAGE_SIZE = 15; // matches OfficeHistoryPagination on the backend
 const SCOPES = [
@@ -52,7 +53,6 @@ export default function OfficeHistory() {
     return () => { cancelled = true; };
   }, [page, scope, query, showToast]);
 
-  const totalPages = data ? Math.max(1, Math.ceil(data.count / PAGE_SIZE)) : 1;
 
   return (
     <div>
@@ -148,17 +148,7 @@ export default function OfficeHistory() {
         </table>
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 text-sm">
-          <p className="text-slate-500 dark:text-slate-400">Page {page} of {totalPages} · {data.count} documents</p>
-          <div className="flex gap-2">
-            <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}
-              className="px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40">Previous</button>
-            <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}
-              className="px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40">Next</button>
-          </div>
-        </div>
-      )}
+      <Pagination page={page} pageSize={PAGE_SIZE} count={data?.count} onPageChange={setPage} />
 
       {selectedId && <DocumentFormModal documentId={selectedId} onClose={() => setSelectedId(null)} />}
     </div>

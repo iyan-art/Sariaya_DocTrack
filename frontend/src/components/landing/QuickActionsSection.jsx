@@ -137,7 +137,7 @@ function LoginForm({ onSwitch }) {
 
       <div className="flex items-center justify-between mt-5 text-sm">
         <label className="flex items-center gap-2 text-slate-600">
-          <input type="checkbox" className="rounded border-slate-300 w-4 h-4" />
+          <input type="checkbox" className="rounded border-slate-300 w-5 h-5 shrink-0" />
           Remember me
         </label>
         <a href="#" className="text-blue-600 hover:underline font-medium">Forgot password?</a>
@@ -269,7 +269,7 @@ function RegisterForm({ onSwitch }) {
           type="checkbox"
           checked={agreed}
           onChange={(e) => setAgreed(e.target.checked)}
-          className="mt-0.5 rounded border-slate-300 w-4 h-4"
+          className="rounded border-slate-300 w-5 h-5 shrink-0"
         />
         I agree to the Data Privacy Notice and consent to the processing of my
         personal information for municipal document services.

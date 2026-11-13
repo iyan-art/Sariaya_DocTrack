@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchDocumentDetail, mediaUrl } from '../../api/axios';
 import DocumentStatusBadge from './DocumentStatusBadge';
+import OfficialLetterhead from '../OfficialLetterhead';
 import { PrinterIcon, CheckCircle2Icon, ArrowRightLeftIcon } from '../Icons';
 
 // Same "print just this one element" technique as the other printables.
@@ -9,7 +10,7 @@ const PRINT_STYLES = `
   @media print {
     body * { visibility: hidden; }
     .doc-view-printable, .doc-view-printable * { visibility: visible; }
-    .doc-view-printable { position: absolute; top: 0; left: 0; width: 100%; margin: 0; box-shadow: none; border: none; }
+    .doc-view-printable { position: absolute; top: 0; left: 0; width: 100%; margin: 0; box-shadow: none; border: none; overflow: visible !important; }
     .doc-view-no-print { display: none !important; }
   }
 `;
@@ -78,13 +79,7 @@ export default function DocumentFormModal({ documentId, onClose, onManage, onRet
                 record exactly as it will print, and should always look like
                 a sheet of paper regardless of the app's dark/light mode. */}
             <div className="doc-view-printable bg-white flex-1 overflow-y-auto min-h-0 p-6 sm:p-8">
-              {/* Letterhead */}
-              <div className="text-center border-b-2 border-slate-800 pb-4">
-                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Republic of the Philippines</p>
-                <p className="text-xs text-slate-600">Province of Quezon</p>
-                <p className="text-sm font-bold text-slate-900 mt-1">MUNICIPALITY OF SARIAYA</p>
-                <p className="text-sm font-bold text-slate-900">Office of the Municipal Administrator</p>
-              </div>
+              <OfficialLetterhead />
 
               <div className="flex items-start justify-between mt-6 gap-4">
                 <div className="min-w-0">
@@ -194,7 +189,7 @@ export default function DocumentFormModal({ documentId, onClose, onManage, onRet
                     <p className="text-sm text-slate-400">No activity recorded yet.</p>
                   ) : (
                     <div className="border border-slate-200 rounded-lg overflow-hidden">
-                      <div className="max-h-72 overflow-y-auto overflow-x-auto">
+                      <div className="print-expand max-h-72 overflow-y-auto overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead className="bg-slate-100 sticky top-0">
                             <tr>
@@ -270,7 +265,7 @@ export default function DocumentFormModal({ documentId, onClose, onManage, onRet
                 onClick={() => window.print()}
                 className="flex-1 min-w-[10rem] flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl transition-colors"
               >
-                <PrinterIcon className="w-4 h-4" /> Print / Download for Client
+                <PrinterIcon className="w-4 h-4" /> Print
               </button>
               <button
                 onClick={onClose}

@@ -18,13 +18,13 @@ import { PrinterIcon } from '../Icons';
 // citizen." They never appear together since they live on different statuses.
 const NEXT_ACTIONS = {
   in_progress: [
-    { action: 'release', label: 'Release to Next Office' },
+    { action: 'release', label: 'Send to Next Office' },
     { action: 'return_to_office', label: 'Returned (send back for revision)' },
     { action: 'flagged_missing', label: 'Flag as Missing (not physically here)' },
   ],
   // Back at this office for revision: once fixed, it moves forward again.
   returned: [
-    { action: 'release', label: 'Corrected — Release to Next Office' },
+    { action: 'release', label: 'Corrected — Send to Next Office' },
     { action: 'return_to_office', label: 'Returned (send back for revision)' },
     { action: 'flagged_missing', label: 'Flag as Missing (not physically here)' },
   ],
@@ -121,6 +121,18 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
     : doc?.current_office;
   const sameOffice = (a, b) => (a || '').trim().toUpperCase() === (b || '').trim().toUpperCase();
   const canFlagMissing = sameOffice(user?.office, expectedHolder);
+  // Custody: only the office holding the document (received or created there)
+  // may work on it; only the office it is travelling to may receive it.
+  const holdsIt = Boolean(doc) && ['in_progress', 'returned', 'completed'].includes(doc.status)
+    && sameOffice(user?.office, doc.current_office);
+  const ACTION_ALLOWED = {
+    release: holdsIt,
+    return_to_office: holdsIt,
+    // An internal document may also be collected by the office that started it.
+    return: holdsIt || (doc?.document_type_scope === 'internal' && sameOffice(user?.office, route[0])),
+    receive: canFlagMissing,
+    flagged_missing: canFlagMissing,
+  };
   const missingReport = doc?.status === 'missing'
     ? [...(doc.logs || [])].reverse().find((l) => l.action === 'flagged_missing')
     : null;
@@ -128,7 +140,7 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
   const availableActions = doc
     ? (NEXT_ACTIONS[doc.status] || [])
         .filter((a) => a.action !== 'return_to_office' || doc.route_position > 0)
-        .filter((a) => a.action !== 'flagged_missing' || canFlagMissing)
+        .filter((a) => ACTION_ALLOWED[a.action] ?? true)
         .map((a) => (a.action === 'receive' && doc.is_returning) ? { ...a, label: 'Confirm Return Received' } : a)
         // Internal documents never go to a citizen — they finish back at the office that started them.
         .map((a) => (a.action === 'return' && isInternal) ? { ...a, label: 'Release to Originating Office' } : a)
@@ -321,6 +333,13 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
                   {submitting ? 'Updating…' : 'Apply update'}
                 </button>
               </form>
+            )}
+            {availableActions.length === 0 && !['released'].includes(doc.status) && (
+              <p className="mt-5 rounded-xl bg-slate-50 dark:bg-slate-800/60 p-4 text-sm text-slate-600 dark:text-slate-400">
+                {doc.status === 'in_transit'
+                  ? `Only ${expectedHolder} can receive this document once it physically arrives there.`
+                  : `Only ${doc.current_office}, which holds this document, can update it.`}
+              </p>
             )}
             <div className="mt-6 flex flex-col items-center bg-slate-50 dark:bg-slate-800/60 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl p-6">
                 {doc.qr_code ? (

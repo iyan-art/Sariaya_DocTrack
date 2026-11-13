@@ -222,9 +222,10 @@ export const fetchDocumentEvaluation = (id) => {
   return api.get(`/documents/${id}/evaluation/`);
 };
 
-// officeRatings: [{ office: <office id>, answers: [{ question, rating_value?, text_value? }, ...] }, ...]
-export const submitDocumentEvaluation = (id, officeRatings) => {
-  return api.post(`/documents/${id}/evaluation/`, { office_ratings: officeRatings });
+// One overall rating of the whole request:
+// answers: [{ question, rating_value? | text_value? | selected_option_ids? }, ...]
+export const submitDocumentEvaluation = (id, answers) => {
+  return api.post(`/documents/${id}/evaluation/`, { answers });
 };
 
 // A citizen sending a RELEASED document of theirs back to the office that
@@ -233,14 +234,14 @@ export const citizenReturnDocument = (id, notes) => {
   return api.patch(`/documents/${id}/citizen-return/`, { notes });
 };
 
-// Same per-office evaluation, but for a guest with no account — reached by
+// Same overall evaluation, but for a guest with no account — reached by
 // tracking number from the public Track page (see DocumentEvaluationModal).
 export const fetchPublicDocumentEvaluation = (trackingNumber) => {
   return api.get(`/documents/track/${encodeURIComponent(trackingNumber)}/evaluation/`);
 };
 
-export const submitPublicDocumentEvaluation = (trackingNumber, officeRatings) => {
-  return api.post(`/documents/track/${encodeURIComponent(trackingNumber)}/evaluation/`, { office_ratings: officeRatings });
+export const submitPublicDocumentEvaluation = (trackingNumber, answers) => {
+  return api.post(`/documents/track/${encodeURIComponent(trackingNumber)}/evaluation/`, { answers });
 };
 
 export const createDocument = (data) => {
@@ -341,8 +342,9 @@ export const updateDocumentType = (id, data) => {
   return api.patch(`/documents/types/${id}/`, data);
 };
 
-export const deleteDocumentType = (id) => {
-  return api.delete(`/documents/types/${id}/`);
+// Deleting important records needs the admin's password again (checked server-side).
+export const deleteDocumentType = (id, password) => {
+  return api.delete(`/documents/types/${id}/`, { data: { password } });
 };
 
 // Atomically replaces the full ordered step list for a document type.
@@ -371,8 +373,8 @@ export const updateOffice = (id, data) => {
   return api.patch(`/offices/${id}/`, data);
 };
 
-export const deleteOffice = (id) => {
-  return api.delete(`/offices/${id}/`);
+export const deleteOffice = (id, password) => {
+  return api.delete(`/offices/${id}/`, { data: { password } });
 };
 
 // --- Citizen Survey Engine (admin authoring) ---
@@ -390,8 +392,8 @@ export const updateSurvey = (id, data) => {
   return api.patch(`/documents/surveys/${id}/`, data);
 };
 
-export const deleteSurvey = (id) => {
-  return api.delete(`/documents/surveys/${id}/`);
+export const deleteSurvey = (id, password) => {
+  return api.delete(`/documents/surveys/${id}/`, { data: { password } });
 };
 
 // questions: [{ order, text, question_type, options? }, ...]

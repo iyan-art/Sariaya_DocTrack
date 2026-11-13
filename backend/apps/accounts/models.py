@@ -165,6 +165,11 @@ class AccessLog(models.Model):
         GUEST_DOCUMENTS_LINKED = 'guest_documents_linked', 'Guest Documents Linked'
         PROFILE_UPDATED = 'profile_updated', 'Profile Updated'
         PASSWORD_CHANGED = 'password_changed', 'Password Changed'
+        # An important record (document type, office, survey) deleted after
+        # the admin re-entered their password, or a deletion refused because
+        # the password was wrong.
+        RECORD_DELETED = 'record_deleted', 'Deleted Record'
+        DELETE_BLOCKED = 'delete_blocked', 'Deletion Blocked'
         OTHER = 'other', 'Other'
 
     # SET_NULL (not CASCADE) so deleting a user doesn't erase the audit trail,
@@ -183,6 +188,9 @@ class AccessLog(models.Model):
     # CASCADE-deletes with its Document and would vanish right along with
     # the very action it's supposed to record).
     detail = models.CharField(max_length=255, blank=True)
+    # The email typed on a failed sign-in — kept even when no account uses
+    # it, so the attempt shows who was tried instead of a blank row.
+    attempted_email = models.CharField(max_length=254, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:

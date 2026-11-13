@@ -3,6 +3,7 @@ import {
   fetchAllDocumentTypes, createDocumentType, updateDocumentType, deleteDocumentType,
 } from '../../api/axios';
 import { useToast } from '../../context/ToastContext';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import { extractErrorMessage } from '../../utils/apiError';
 import { ClipboardListIcon, PencilIcon, ArchiveIcon, RotateCcwIcon, TrashIcon } from '../../components/Icons';
 
@@ -86,18 +87,14 @@ export default function AdminDocumentTypeManager() {
     }
   };
 
-  const handleDelete = async (type) => {
-    if (!window.confirm(`Permanently delete "${type.name}"? This cannot be undone.`)) return;
-    try {
-      await deleteDocumentType(type.id);
-      showToast(`"${type.name}" deleted.`, 'success');
-      loadTypes();
-    } catch (err) {
-      showToast(
-        err.response?.data?.detail || 'Failed to delete — try archiving it instead.',
-        'error'
-      );
-    }
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const handleDelete = (type) => setDeleteTarget(type);
+  // Throws on refusal so ConfirmDeleteModal can show why and stay open.
+  const confirmDelete = async (password) => {
+    await deleteDocumentType(deleteTarget.id, password);
+    showToast(`"${deleteTarget.name}" deleted.`, 'success');
+    setDeleteTarget(null);
+    loadTypes();
   };
 
   return (
@@ -140,7 +137,7 @@ export default function AdminDocumentTypeManager() {
               <th className="text-left px-5 py-3">Steps</th>
               <th className="text-left px-5 py-3">Daily Cap</th>
               <th className="text-left px-5 py-3">Status</th>
-              <th className="text-right px-5 py-3">Actions</th>
+              <th className="text-center px-5 py-3">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -175,8 +172,8 @@ export default function AdminDocumentTypeManager() {
                       {t.is_active ? 'Active' : 'Archived'}
                     </span>
                   </td>
-                  <td className="rt-actions px-5 py-3">
-                    <div className="flex justify-end gap-1">
+                  <td className="rt-actions px-5 py-3 text-center">
+                    <div className="flex justify-center items-center gap-1">
                       <button onClick={() => openEditModal(t)} title="Edit" className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 p-1.5 rounded-lg transition-colors">
                         <PencilIcon className="w-4 h-4" />
                       </button>
@@ -262,6 +259,14 @@ export default function AdminDocumentTypeManager() {
             </form>
           </div>
         </div>
+      )}
+      {deleteTarget && (
+        <ConfirmDeleteModal
+          title={`Delete "${deleteTarget.name}"?`}
+          message="This permanently deletes the document type and cannot be undone. To only hide it, archive it instead."
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
       )}
     </div>
   );

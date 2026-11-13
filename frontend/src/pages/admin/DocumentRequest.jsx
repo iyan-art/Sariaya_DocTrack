@@ -14,6 +14,7 @@ import { TrashIcon } from '../../components/Icons';
 import { useToast } from '../../context/ToastContext';
 import { extractErrorMessage } from '../../utils/apiError';
 import { canDeleteDocument } from '../../utils/documentPermissions';
+import Pagination from '../../components/Pagination';
 
 // Matches the real Document.Status choices — not DocumentLog actions.
 const STATUS_TABS = [
@@ -54,7 +55,6 @@ export default function DocumentRequest() {
   }, []);
 
   const pageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(count / pageSize));
 
   const loadDocuments = useCallback(() => {
     setLoading(true);
@@ -198,7 +198,7 @@ export default function DocumentRequest() {
                     ) : '—'}
                   </td>
                   <td data-label="Releasing Office" className="px-5 py-3 text-slate-600 dark:text-slate-400 text-xs">{doc.origin_office || '—'}</td>
-                  <td className="rt-actions px-5 py-3">
+                  <td className="rt-actions px-5 py-3 text-center">
                     {canDeleteDocument(doc, user) && (
                       <button
                         onClick={(e) => { e.stopPropagation(); setDeleteTarget(doc); }}
@@ -216,17 +216,7 @@ export default function DocumentRequest() {
         </table>
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 text-sm">
-          <p className="text-slate-500 dark:text-slate-400">Page {page} of {totalPages}</p>
-          <div className="flex gap-2">
-            <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}
-              className="px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40">Previous</button>
-            <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}
-              className="px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40">Next</button>
-          </div>
-        </div>
-      )}
+      <Pagination page={page} pageSize={pageSize} count={count} onPageChange={setPage} />
 
       {showNewModal && (
         <NewDocumentModal

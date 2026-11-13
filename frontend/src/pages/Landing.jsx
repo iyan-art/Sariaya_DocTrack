@@ -1,4 +1,6 @@
-import LandingNavbar from '../components/landing/LandingNavbar';
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import LandingNavbar, { scrollToSection } from '../components/landing/LandingNavbar';
 import HeroSection from '../components/landing/HeroSection';
 import QuickActionsSection from '../components/landing/QuickActionsSection';
 import ServicesSection from '../components/landing/ServicesSection';
@@ -22,6 +24,18 @@ import ScrollToTopButton from '../components/ScrollToTopButton';
  * where it exists (document types, offices, announcements, events).
  */
 export default function Landing() {
+  const { pathname, hash } = useLocation();
+
+  // /login (after signing out, an expired session, or "Log in" elsewhere) and
+  // #access / #track links land on the sign-in and tracking section instead
+  // of the top of the page.
+  useEffect(() => {
+    const target = pathname === '/login' ? 'access' : (hash === '#access' || hash === '#track' ? hash.slice(1) : null);
+    if (!target) return undefined;
+    const timer = setTimeout(() => scrollToSection(target), 150);
+    return () => clearTimeout(timer);
+  }, [pathname, hash]);
+
   return (
     <div className="min-h-screen bg-white">
       <LandingNavbar />

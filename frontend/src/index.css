@@ -72,6 +72,47 @@ body {
   min-width: 0;
 }
 
+/* Tailwind's reset gives buttons the plain arrow cursor; anything clickable
+   shows the hand so it reads as clickable ("View Service", the logo, …). */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary,
+label:has(> input[type="checkbox"]),
+label:has(> input[type="radio"]),
+input[type="checkbox"],
+input[type="radio"] {
+  cursor: pointer;
+}
+
+/* Printing shows only the record itself: no sidebar, navigation or
+   scrollbars, and nothing cut off inside a scrolling box. */
+@media print {
+  aside,
+  nav {
+    display: none !important;
+  }
+
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  * {
+    scrollbar-width: none !important;
+  }
+
+  *::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .print-expand {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
+
 /* iOS Safari zooms the whole page when focusing an input below 16px. */
 @media (max-width: 63.98rem), (pointer: coarse) {
   input:not([type="checkbox"]):not([type="radio"]),
@@ -167,12 +208,12 @@ body {
 
   .responsive-table td.rt-actions {
     padding-top: 0.5rem;
-    text-align: right;
+    text-align: center;
   }
 
   .responsive-table td.rt-actions > div {
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: center;
     gap: 0.5rem;
   }
 

@@ -4,6 +4,7 @@ import AddEmployeeModal from '../../components/admin/AddEmployeeModal';
 import ResetPasswordModal from '../../components/admin/ResetPasswordModal';
 import ConfirmModal from '../../components/ConfirmModal';
 import { useToast } from '../../context/ToastContext';
+import Pagination from '../../components/Pagination';
 
 
 export default function Users() {
@@ -26,7 +27,6 @@ export default function Users() {
 
 
   const pageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(count / pageSize));
 
   const loadUsers = useCallback(() => {
     setLoading(true);
@@ -113,7 +113,7 @@ const handleConfirmDeactivate = async () => {
               {roleTab === 'employee' && <th className="text-left px-5 py-3">Office</th>}
               {roleTab === 'employee' && <th className="text-left px-5 py-3">Position</th>}
               <th className="text-left px-5 py-3">Status</th>
-              <th className="text-left px-5 py-3">Action</th>
+              <th className="text-center px-5 py-3">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -141,8 +141,8 @@ const handleConfirmDeactivate = async () => {
                       ● {u.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="rt-actions px-5 py-3">
-                    <div className="flex items-center gap-2">
+                  <td className="rt-actions px-5 py-3 text-center">
+                    <div className="flex justify-center items-center gap-2">
                       <button
                         onClick={() => setResetTarget(u)}
                         className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 rounded-lg px-3 py-1.5 transition-colors"
@@ -164,27 +164,7 @@ const handleConfirmDeactivate = async () => {
         </table>
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 text-sm">
-          <p className="text-slate-500 dark:text-slate-400">Page {page} of {totalPages}</p>
-          <div className="flex gap-2">
-            <button
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40"
-            >
-              Previous
-            </button>
-            <button
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+      <Pagination page={page} pageSize={pageSize} count={count} onPageChange={setPage} />
 
       {showAddModal && (
         <AddEmployeeModal
