@@ -1,4 +1,4 @@
-import { scrollToSection } from './LandingNavbar';
+import { scrollToSection, LOGIN_SECTION } from './LandingNavbar';
 
 const QUICK_LINKS = [
   { label: 'Home', href: 'hero' },
@@ -48,7 +48,7 @@ export default function LandingFooter() {
           <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Citizen Services</p>
           <ul className="space-y-2">
             <li>
-              <button onClick={() => scrollToSection('access')} className="text-sm text-slate-400 hover:text-white transition-colors">
+              <button onClick={() => scrollToSection(LOGIN_SECTION)} className="text-sm text-slate-400 hover:text-white transition-colors">
                 Request a Document
               </button>
             </li>

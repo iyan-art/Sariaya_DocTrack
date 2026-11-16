@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import LandingNavbar, { scrollToSection } from '../components/landing/LandingNavbar';
+import LandingNavbar, { scrollToSection, LOGIN_SECTION } from '../components/landing/LandingNavbar';
 import HeroSection from '../components/landing/HeroSection';
 import QuickActionsSection from '../components/landing/QuickActionsSection';
 import ServicesSection from '../components/landing/ServicesSection';
@@ -30,7 +30,7 @@ export default function Landing() {
   // #access / #track links land on the sign-in and tracking section instead
   // of the top of the page.
   useEffect(() => {
-    const target = pathname === '/login' ? 'access' : (hash === '#access' || hash === '#track' ? hash.slice(1) : null);
+    const target = pathname === '/login' ? LOGIN_SECTION : (['#access', '#track', `#${LOGIN_SECTION}`].includes(hash) ? hash.slice(1) : null);
     if (!target) return undefined;
     const timer = setTimeout(() => scrollToSection(target), 150);
     return () => clearTimeout(timer);

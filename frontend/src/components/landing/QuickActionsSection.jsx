@@ -30,7 +30,8 @@ export default function QuickActionsSection() {
             <PublicSurveyCard />
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl border-t-4 border-blue-600 p-8 sm:p-10">
+          {/* Every "Log In / Sign In" button scrolls here (on phones it sits below the tracking cards). */}
+          <div id="login-section" className="bg-white rounded-2xl shadow-xl border-t-4 border-blue-600 p-8 sm:p-10 scroll-mt-24">
             <div className="text-center mb-6">
               <p className="text-xs font-black uppercase tracking-widest text-blue-600">Access Sariaya DocTrack</p>
               <p className="text-sm text-slate-500 mt-1">

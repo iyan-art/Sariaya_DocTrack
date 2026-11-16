@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { scrollToSection } from './LandingNavbar';
+import { scrollToSection, LOGIN_SECTION } from './LandingNavbar';
 import InstallPWAButton from '../InstallPWAButton';
 
 // Drop real files at these exact paths in frontend/public/ to activate the
@@ -88,7 +88,7 @@ export default function HeroSection() {
 
             <div className="mt-9 flex flex-wrap gap-3">
               <button
-                onClick={() => scrollToSection('access')}
+                onClick={() => scrollToSection(LOGIN_SECTION)}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl px-6 py-3.5 transition-colors shadow-lg shadow-blue-600/30"
               >
                 Log In / Sign In

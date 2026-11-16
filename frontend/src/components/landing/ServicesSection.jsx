@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchPublicDocumentTypes } from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
-import { scrollToSection } from './LandingNavbar';
+import { scrollToSection, LOGIN_SECTION } from './LandingNavbar';
 import LoginRequiredModal from './LoginRequiredModal';
 import { FileTextIcon } from '../Icons';
 
@@ -76,7 +76,7 @@ export default function ServicesSection() {
         <LoginRequiredModal
           serviceName={loginFor.name}
           onClose={() => setLoginFor(null)}
-          onSignIn={() => { setLoginFor(null); scrollToSection('access'); }}
+          onSignIn={() => { setLoginFor(null); scrollToSection(LOGIN_SECTION); }}
         />
       )}
     </section>

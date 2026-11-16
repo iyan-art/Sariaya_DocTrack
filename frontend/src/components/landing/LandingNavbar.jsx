@@ -21,6 +21,9 @@ function scrollToSection(id) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// The sign-in form itself (QuickActionsSection), not the top of its section.
+const LOGIN_SECTION = 'login-section';
+
 /**
  * Fixed header for the redesigned public Landing page. Transparent over the
  * hero video at the top of the page; gains a solid white background + shadow
@@ -80,7 +83,7 @@ export default function LandingNavbar() {
 
         <div className="hidden xl:block">
           <button
-            onClick={() => handleNavClick('#access')}
+            onClick={() => handleNavClick('#login-section')}
             className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg px-5 py-2.5 transition-colors shadow-lg shadow-blue-600/20"
           >
             Log In / Sign In
@@ -109,7 +112,7 @@ export default function LandingNavbar() {
             </button>
           ))}
           <button
-            onClick={() => handleNavClick('#access')}
+            onClick={() => handleNavClick('#login-section')}
             className="block w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg px-4 py-3 text-center transition-colors"
           >
             Log In / Sign In
@@ -120,4 +123,4 @@ export default function LandingNavbar() {
   );
 }
 
-export { scrollToSection };
+export { scrollToSection, LOGIN_SECTION };
