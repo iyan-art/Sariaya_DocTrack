@@ -30,6 +30,7 @@ function formatDate(value) {
 export default function CitizenCommentsWidget({
   fetchComments = fetchSurveyComments,
   subtitle = "Written feedback from citizen evaluations — anonymous, so staff can see what's being said without seeing who said it.",
+  className = '',
 }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,11 +42,9 @@ export default function CitizenCommentsWidget({
   }, [fetchComments]);
 
   return (
-    <div className="mt-8 bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-800">
-      <h2 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
-        <StarIcon className="w-4 h-4 text-amber-500" filled /> Citizen Comments &amp; Suggestions
-      </h2>
-      <p className="text-xs text-slate-400 dark:text-slate-500 mb-5">{subtitle}</p>
+    <div className={`${className} bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800`}>
+      <h2 className="text-[15px] font-semibold text-slate-900 dark:text-slate-100">Citizen comments</h2>
+      <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5 mb-5">{subtitle}</p>
 
       {loading ? (
         <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">Loading…</p>

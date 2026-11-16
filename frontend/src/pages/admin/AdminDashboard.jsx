@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  AreaChart, Area, PieChart, Pie, Cell, Legend,
+  AreaChart, Area, PieChart, Pie, Cell,
 } from 'recharts';
 import { fetchDashboardStats } from '../../api/axios';
 import { useTheme } from '../../context/ThemeContext';
@@ -11,7 +11,7 @@ import CitizenCommentsWidget from '../../components/admin/CitizenCommentsWidget'
 import { formatHoursMinutes } from '../../utils/duration';
 import {
   Clock3Icon, FileTextIcon, BellIcon, TrendingUpIcon, TrendingDownIcon,
-  BarChart3Icon, ShieldCheckIcon, StarIcon,
+  ShieldCheckIcon, StarIcon,
 } from '../../components/Icons';
 
 const EMPTY_STATS = {
@@ -25,18 +25,89 @@ const EMPTY_STATS = {
   bottlenecks: [],
 };
 
-const STATUS_COLORS = { pending: '#f59e0b', completed: '#22c55e', released: '#6366f1', missing: '#ef4444' };
+const STATUS = [
+  { key: 'pending', label: 'Pending', color: '#f59e0b' },
+  { key: 'completed', label: 'Completed', color: '#22c55e' },
+  { key: 'released', label: 'Released', color: '#6366f1' },
+  { key: 'missing', label: 'Reported Missing', color: '#ef4444' },
+];
 
-function TrendBadge({ pct }) {
-  if (pct === null || pct === undefined) {
-    return <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">No prior data</span>;
-  }
+// One look for every panel on the page: same surface, border, radius,
+// padding and heading, so the grid reads as one designed system.
+const CARD = 'bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800';
+
+function Panel({ title, subtitle, action, className = '', children }) {
+  return (
+    <section className={`${CARD} p-5 sm:p-6 min-w-0 ${className}`}>
+      <header className="flex items-start justify-between gap-4 mb-5">
+        <div className="min-w-0">
+          <h2 className="text-[15px] font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
+          {subtitle && <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>}
+        </div>
+        {action}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+function PanelLink({ to, children }) {
+  return (
+    <Link to={to} className="shrink-0 text-[13px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
+      {children}
+    </Link>
+  );
+}
+
+function Kpi({ label, value, note, icon: Icon, tone }) {
+  return (
+    <div className={`${CARD} p-5 flex flex-col`}>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[13px] font-medium text-slate-500 dark:text-slate-400">{label}</p>
+        <span className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${tone}`}>
+          <Icon className="w-[18px] h-[18px]" />
+        </span>
+      </div>
+      <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">{value}</p>
+      <div className="mt-auto pt-3 text-xs text-slate-500 dark:text-slate-400">{note}</div>
+    </div>
+  );
+}
+
+function TrendNote({ pct }) {
+  if (pct === null || pct === undefined) return <span>No requests in the previous week to compare</span>;
   const up = pct >= 0;
   return (
-    <span className={`inline-flex items-center gap-1 text-xs font-black ${up ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-      {up ? <TrendingUpIcon className="w-3.5 h-3.5" /> : <TrendingDownIcon className="w-3.5 h-3.5" />}
-      {up ? '+' : ''}{pct}% this week
+    <span className="inline-flex items-center gap-1">
+      <span className={`inline-flex items-center gap-0.5 font-semibold ${up ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+        {up ? <TrendingUpIcon className="w-3.5 h-3.5" /> : <TrendingDownIcon className="w-3.5 h-3.5" />}
+        {up ? '+' : ''}{pct}%
+      </span>
+      new requests vs last week
     </span>
+  );
+}
+
+function OfficeRanking({ title, icon: Icon, tone, rows, loading }) {
+  return (
+    <div>
+      <p className={`text-[13px] font-semibold flex items-center gap-1.5 mb-2 ${tone}`}>
+        <Icon className="w-3.5 h-3.5" /> {title}
+      </p>
+      {rows.length === 0 ? (
+        <p className="text-[13px] text-slate-400 dark:text-slate-500 py-2">{loading ? 'Loading…' : 'Not enough data yet.'}</p>
+      ) : (
+        <ol className="divide-y divide-slate-100 dark:divide-slate-800">
+          {rows.map((o, i) => (
+            <li key={o.office} className="flex items-center gap-3 py-2 text-sm">
+              <span className="w-5 text-xs font-semibold text-slate-400 tabular-nums">{i + 1}</span>
+              <span className="flex-1 min-w-0 truncate text-slate-700 dark:text-slate-300">{o.office_name || o.office}</span>
+              <span className="shrink-0 font-medium text-slate-900 dark:text-slate-100 tabular-nums">{formatHoursMinutes(o.avg_hours)}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }
 
@@ -44,6 +115,7 @@ export default function AdminDashboard() {
   const { theme } = useTheme();
   const [stats, setStats] = useState(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
+  const [loadedAt, setLoadedAt] = useState(null);
   // Recharts renders raw SVG — these can't be themed via Tailwind's `dark:`
   // classes, so the grid/tick colors are picked in JS instead.
   const gridColor = theme === 'dark' ? '#1e293b' : '#f1f5f9';
@@ -51,319 +123,230 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchDashboardStats()
-      .then((res) => setStats({ ...EMPTY_STATS, ...res.data }))
+      .then((res) => { setStats({ ...EMPTY_STATS, ...res.data }); setLoadedAt(new Date()); })
       .finally(() => setLoading(false));
   }, []);
 
+  const show = (value) => (loading ? '—' : value);
   const maxTypeCount = Math.max(1, ...stats.by_type.map((t) => t.count));
-
-  const statusPieData = [
-    { name: 'Pending', key: 'pending', value: stats.pending },
-    { name: 'Completed', key: 'completed', value: stats.completed },
-    { name: 'Released', key: 'released', value: stats.released },
-    { name: 'Reported Missing', key: 'missing', value: stats.missing },
-  ].filter((d) => d.value > 0);
+  const statusTotal = STATUS.reduce((sum, s) => sum + (stats[s.key] || 0), 0);
+  const statusPieData = STATUS.map((s) => ({ name: s.label, key: s.key, value: stats[s.key] || 0 })).filter((d) => d.value > 0);
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Analytics &amp; KPI Dashboard</h1>
-      <p className="text-slate-500 dark:text-slate-400 text-sm">Real-time statistics of all municipal documents.</p>
-
-      {/* Top row — headline KPI cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-4">
-            <div className="bg-blue-500 w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg dark:shadow-none">
-              <FileTextIcon className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Total Documents Tracked</p>
-              <p className="text-2xl font-black text-slate-900 dark:text-slate-100">{loading ? '—' : stats.total}</p>
-            </div>
-          </div>
-          <div className="mt-3"><TrendBadge pct={stats.weekly_trend_pct} /></div>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Analytics &amp; KPI Dashboard</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">How documents are moving through the municipal offices.</p>
         </div>
-
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-800 flex items-center gap-4">
-          <div className="bg-indigo-500 w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg dark:shadow-none">
-            <Clock3Icon className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Avg. Processing Time</p>
-            <p className="text-2xl font-black text-slate-900 dark:text-slate-100">
-              {loading ? '—' : stats.avg_resolution_display || 'N/A'}
-            </p>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-800 flex items-center gap-4">
-          <div className="bg-red-500 w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg dark:shadow-none">
-            <BellIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Reported Missing Rate</p>
-            <p className="text-2xl font-black text-slate-900 dark:text-slate-100">{loading ? '—' : `${stats.missing_rate_pct}%`}</p>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-800 flex items-center gap-4">
-          <div className="bg-slate-800 w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg dark:shadow-none">
-            <ShieldCheckIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Security Logs Today</p>
-            <p className="text-2xl font-black text-slate-900 dark:text-slate-100">{loading ? '—' : stats.access_logs_today}</p>
-          </div>
-        </div>
+        {loadedAt && (
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            Updated {loadedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+          </p>
+        )}
       </div>
 
-      {/* Status breakdown strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mt-6">
-        {[
-          { label: 'Total', value: stats.total, color: 'text-slate-700 dark:text-slate-300' },
-          { label: 'Pending', value: stats.pending, color: 'text-amber-600 dark:text-amber-400' },
-          { label: 'Completed', value: stats.completed, color: 'text-green-600 dark:text-green-400' },
-          { label: 'Released', value: stats.released, color: 'text-indigo-600 dark:text-indigo-400' },
-          // Overdue: past their office's time limit (part of Pending). Missing:
-          // an office reported the paper never arrived.
-          { label: 'Overdue', value: stats.overdue, color: 'text-orange-600 dark:text-orange-400' },
-          { label: 'Reported Missing', value: stats.missing, color: 'text-red-600 dark:text-red-400' },
-        ].map((s) => (
-          <div key={s.label} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 text-center">
-            <p className={`text-2xl font-black ${s.color}`}>{loading ? '—' : s.value}</p>
-            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">{s.label}</p>
-          </div>
-        ))}
+      {/* Headline KPIs */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+        <Kpi label="Documents tracked" value={show(stats.total)} icon={FileTextIcon}
+          tone="bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400"
+          note={<TrendNote pct={stats.weekly_trend_pct} />} />
+        <Kpi label="Average processing time" value={show(stats.avg_resolution_display || 'N/A')} icon={Clock3Icon}
+          tone="bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400"
+          note="From request to completion, finished documents" />
+        <Kpi label="Overdue right now" value={show(stats.overdue)} icon={BellIcon}
+          tone="bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400"
+          note={`${stats.missing_rate_pct}% of all documents reported missing`} />
+        <Kpi label="Security events today" value={show(stats.access_logs_today)} icon={ShieldCheckIcon}
+          tone="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+          note={<Link to="/admin/access-logs" className="text-blue-600 dark:text-blue-400 hover:underline">Open access logs</Link>} />
       </div>
 
-      {/* Request Volume by Period */}
-      <div className="mt-8 bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-800">
-        <h2 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-5">
-          Request Volume by Period
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[
-            { label: 'Today', value: stats.by_period.daily },
-            { label: 'Last 7 Days', value: stats.by_period.weekly },
-            { label: 'Last 30 Days', value: stats.by_period.monthly },
-            { label: 'This Year', value: stats.by_period.yearly },
-          ].map((card) => (
-            <div key={card.label} className="bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/30 rounded-2xl p-5 text-center">
-              <p className="text-3xl font-black text-blue-700 dark:text-blue-400">{loading ? '—' : card.value}</p>
-              <p className="text-[10px] font-bold text-blue-500 dark:text-blue-400/70 uppercase tracking-widest mt-1">{card.label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Charts row 1 — office workload bar + scan timeline area */}
-      <div className="grid lg:grid-cols-2 gap-8 mt-8">
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-800">
-          <h2 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
-            <BarChart3Icon className="w-4 h-4" /> Document Volume by Office
-          </h2>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">Active documents currently sitting at each office.</p>
-          {stats.office_workload.length === 0 ? (
-            <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-16">No active documents right now.</p>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Status overview: one donut with its counts beside it */}
+        <Panel title="Status overview" subtitle="Every document by where it stands" className="lg:col-span-7">
+          {statusTotal === 0 ? (
+            <p className="text-sm text-slate-400 dark:text-slate-500 py-10 text-center">{loading ? 'Loading…' : 'No documents yet.'}</p>
           ) : (
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={stats.office_workload}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                <XAxis dataKey="office" tick={{ fontSize: 11, fill: tickColor }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} />
-                <Tooltip />
-                <Bar dataKey="count" fill="#3b82f6" radius={[6, 6, 0, 0]} name="Active documents" />
+            <div className="flex flex-col sm:flex-row items-center gap-6">
+              <div className="w-44 h-44 shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={statusPieData} dataKey="value" nameKey="name" innerRadius={52} outerRadius={80} paddingAngle={2} stroke="none">
+                      {statusPieData.map((d) => <Cell key={d.key} fill={STATUS.find((s) => s.key === d.key).color} />)}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <ul className="flex-1 w-full divide-y divide-slate-100 dark:divide-slate-800">
+                {STATUS.map((s) => (
+                  <li key={s.key} className="flex items-center gap-3 py-2.5 text-sm">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                    <span className="flex-1 text-slate-600 dark:text-slate-300">
+                      {s.label}
+                      {s.key === 'pending' && stats.overdue > 0 && (
+                        <span className="ml-2 text-xs text-orange-600 dark:text-orange-400">{stats.overdue} overdue</span>
+                      )}
+                    </span>
+                    <span className="font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{stats[s.key] || 0}</span>
+                    <span className="w-12 text-right text-xs text-slate-400 tabular-nums">
+                      {statusTotal ? Math.round(((stats[s.key] || 0) / statusTotal) * 100) : 0}%
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Panel>
+
+        <Panel title="New requests" subtitle="Filed in each period" className="lg:col-span-5">
+          <dl className="grid grid-cols-2 gap-3">
+            {[
+              ['Today', stats.by_period.daily],
+              ['Last 7 days', stats.by_period.weekly],
+              ['Last 30 days', stats.by_period.monthly],
+              ['This year', stats.by_period.yearly],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-xl bg-slate-50 dark:bg-slate-800/60 px-4 py-3.5">
+                <dt className="text-xs text-slate-500 dark:text-slate-400">{label}</dt>
+                <dd className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{show(value)}</dd>
+              </div>
+            ))}
+          </dl>
+        </Panel>
+
+        <Panel title="Workload by office" subtitle="Active documents sitting at each office now" className="lg:col-span-7">
+          {stats.office_workload.length === 0 ? (
+            <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-16">{loading ? 'Loading…' : 'No active documents right now.'}</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={stats.office_workload} margin={{ left: -18, right: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                <XAxis dataKey="office" tick={{ fontSize: 11, fill: tickColor }} axisLine={false} tickLine={false} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ fill: theme === 'dark' ? '#1e293b' : '#f8fafc' }} />
+                <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} name="Active documents" />
               </BarChart>
             </ResponsiveContainer>
           )}
-        </div>
+        </Panel>
 
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-800">
-          <h2 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
-            Processing Trend &amp; QR Scans
-          </h2>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">QR-verified movements per day, last {stats.scan_timeline.length || 14} days.</p>
-          {stats.scan_timeline.length === 0 ? (
-            <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-16">No scan activity recorded yet.</p>
+        <Panel title="Demand by document type" subtitle="All requests received" className="lg:col-span-5">
+          {stats.by_type.length === 0 ? (
+            <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">{loading ? 'Loading…' : 'No requests yet.'}</p>
           ) : (
-            <ResponsiveContainer width="100%" height={280}>
-              <AreaChart data={stats.scan_timeline}>
+            <ul className="space-y-3.5">
+              {stats.by_type.map((t) => (
+                <li key={t.name}>
+                  <div className="flex justify-between text-sm mb-1.5">
+                    <span className="text-slate-600 dark:text-slate-300 truncate pr-3">{t.name}</span>
+                    <span className="font-medium text-slate-900 dark:text-slate-100 tabular-nums">{t.count}</span>
+                  </div>
+                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5">
+                    <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${Math.max(3, (t.count / maxTypeCount) * 100)}%` }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+
+        <Panel title="QR-verified movements" subtitle={`Scans per day, last ${stats.scan_timeline.length || 14} days`} className="lg:col-span-7">
+          {stats.scan_timeline.length === 0 ? (
+            <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-16">{loading ? 'Loading…' : 'No scan activity recorded yet.'}</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={240}>
+              <AreaChart data={stats.scan_timeline} margin={{ left: -18, right: 4 }}>
                 <defs>
                   <linearGradient id="scanFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
                     <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: tickColor }} tickFormatter={(d) => d.slice(5)} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: tickColor }} tickFormatter={(d) => d.slice(5)} axisLine={false} tickLine={false} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} axisLine={false} tickLine={false} />
                 <Tooltip />
-                <Area type="monotone" dataKey="count" stroke="#3b82f6" fill="url(#scanFill)" name="QR scans" />
+                <Area type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2} fill="url(#scanFill)" name="QR scans" />
               </AreaChart>
             </ResponsiveContainer>
           )}
-        </div>
-      </div>
+        </Panel>
 
-      {/* Charts row 2 — status donut + demand by document type */}
-      <div className="grid lg:grid-cols-2 gap-8 mt-8">
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-800">
-          <h2 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">Document Status Breakdown</h2>
-          {statusPieData.length === 0 ? (
-            <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-16">No documents yet.</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={statusPieData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={95} paddingAngle={2}>
-                  {statusPieData.map((d) => <Cell key={d.key} fill={STATUS_COLORS[d.key]} />)}
-                </Pie>
-                <Tooltip />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 12, color: tickColor }} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </div>
+        <Panel title="Office speed" subtitle="Average time a document stays at each office"
+          action={<PanelLink to="/admin/heatmap">Heatmap →</PanelLink>} className="lg:col-span-5">
+          <div className="grid gap-5">
+            <OfficeRanking title="Fastest" icon={TrendingUpIcon} tone="text-green-700 dark:text-green-400" rows={stats.top5_fastest} loading={loading} />
+            <OfficeRanking title="Slowest" icon={TrendingDownIcon} tone="text-red-700 dark:text-red-400" rows={stats.top5_slowest} loading={loading} />
+          </div>
+        </Panel>
 
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-800">
-          <h2 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-5 flex items-center gap-2">
-            <BarChart3Icon className="w-4 h-4" /> Demand by Document Type
-          </h2>
-          {!loading && stats.by_type.length === 0 ? (
-            <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">No requests yet.</p>
+        <Panel title="Bottlenecks" subtitle="Active documents held past their step's time limit (SLA), most overdue first" className="lg:col-span-12">
+          {stats.bottlenecks.length === 0 ? (
+            <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">{loading ? 'Loading…' : 'Nothing is past its time limit right now.'}</p>
           ) : (
-            <div className="space-y-3">
-              {stats.by_type.map((t) => (
-                <div key={t.name}>
-                  <div className="flex justify-between text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                    <span>{t.name}</span>
-                    <span>{t.count}</span>
-                  </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5">
-                    <div
-                      className="bg-blue-600 h-2.5 rounded-full"
-                      style={{ width: `${Math.max(4, (t.count / maxTypeCount) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+            <div className="overflow-x-auto -mx-1">
+              <table className="responsive-table w-full text-sm">
+                <thead className="text-left text-xs text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                  <tr>
+                    <th className="font-medium py-2 px-1">Tracking #</th>
+                    <th className="font-medium py-2 px-1">Type</th>
+                    <th className="font-medium py-2 px-1">Office</th>
+                    <th className="font-medium py-2 px-1">Handler</th>
+                    <th className="font-medium py-2 px-1 text-right">Time at office</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {stats.bottlenecks.map((b) => (
+                    <tr key={b.id}>
+                      <td data-label="Tracking #" className="py-2.5 px-1 font-mono text-xs text-blue-600 dark:text-blue-400">{b.tracking_number}</td>
+                      <td data-label="Type" className="py-2.5 px-1 text-slate-700 dark:text-slate-300">{b.document_type_name}</td>
+                      <td data-label="Office" className="py-2.5 px-1 text-slate-600 dark:text-slate-400">{b.current_office}</td>
+                      <td data-label="Handler" className="py-2.5 px-1 text-slate-600 dark:text-slate-400">{b.handler || '—'}</td>
+                      <td data-label="Time at office" className="py-2.5 px-1 text-right">
+                        <span className="font-medium text-red-600 dark:text-red-400 tabular-nums">{formatHoursMinutes(b.dwell_hours)}</span>
+                        <span className="block text-[11px] text-slate-500 dark:text-slate-400">
+                          limit {formatHoursMinutes(b.sla_hours)} · over by {formatHoursMinutes(b.over_by_hours)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
+        </Panel>
+
+        {/* Citizen satisfaction — the Overall Experience Rating citizens give a
+            request once it is released, across every evaluation. */}
+        <Panel title="Citizen satisfaction" subtitle="Overall Experience Rating after release" className="lg:col-span-4">
+          {stats.satisfaction.avg_rating == null ? (
+            <p className="text-sm text-slate-400 dark:text-slate-500 py-6">{loading ? 'Loading…' : 'No citizen evaluations yet.'}</p>
+          ) : (
+            <div>
+              <p className="flex items-center gap-2 text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">
+                {stats.satisfaction.avg_rating}
+                <StarIcon className="w-7 h-7 text-amber-500" filled />
+              </p>
+              <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-1">
+                out of 5 · {stats.satisfaction.rating_count} star rating{stats.satisfaction.rating_count === 1 ? '' : 's'}
+              </p>
+              <div className="mt-4 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800">
+                <div className="h-1.5 rounded-full bg-amber-400" style={{ width: `${(stats.satisfaction.avg_rating / 5) * 100}%` }} />
+              </div>
+            </div>
+          )}
+        </Panel>
+
+        <div className="lg:col-span-8 min-w-0">
+          <SurveyAnalyticsWidget />
+        </div>
+
+        <div className="lg:col-span-12 min-w-0">
+          <CitizenCommentsWidget />
         </div>
       </div>
-
-      {/* Bottleneck / high-priority alert widget */}
-      <div className="mt-8 bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-800">
-        <h2 className="text-sm font-black text-red-600 dark:text-red-400 uppercase tracking-widest mb-1 flex items-center gap-2">
-          <BellIcon className="w-4 h-4" /> Bottleneck Alerts
-        </h2>
-        <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">
-          Active documents held longer than the time limit (SLA) set for their workflow step, most overdue first.
-        </p>
-        {stats.bottlenecks.length === 0 ? (
-          <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">No overdue documents right now — nice.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="responsive-table w-full text-sm">
-              <thead className="text-slate-400 dark:text-slate-500 text-xs uppercase">
-                <tr>
-                  <th className="text-left py-2 pr-4">Tracking #</th>
-                  <th className="text-left py-2 pr-4">Type</th>
-                  <th className="text-left py-2 pr-4">Office</th>
-                  <th className="text-left py-2 pr-4">Handler</th>
-                  <th className="text-left py-2">Time at Office</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {stats.bottlenecks.map((b) => (
-                  <tr key={b.id}>
-                    <td data-label="Tracking #" className="py-2.5 pr-4 font-mono text-blue-600 dark:text-blue-400 text-xs">{b.tracking_number}</td>
-                    <td data-label="Type" className="py-2.5 pr-4 text-slate-700 dark:text-slate-300 font-medium">{b.document_type_name}</td>
-                    <td data-label="Office" className="py-2.5 pr-4 text-slate-600 dark:text-slate-400">{b.current_office}</td>
-                    <td data-label="Handler" className="py-2.5 pr-4 text-slate-600 dark:text-slate-400">{b.handler || '—'}</td>
-                    <td data-label="Dwell Time" className="py-2.5">
-                      <span className="inline-flex text-xs font-black text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 px-2.5 py-1 rounded-full">
-                        {formatHoursMinutes(b.dwell_hours)}
-                      </span>
-                      <span className="block text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                        Limit {formatHoursMinutes(b.sla_hours)} · over by {formatHoursMinutes(b.over_by_hours)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      <div className="grid lg:grid-cols-2 gap-8 mt-8">
-        <SurveyAnalyticsWidget />
-
-        {/* Top 5 fastest / slowest offices */}
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-800">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Office Performance</h2>
-            <Link to="/admin/heatmap" className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
-              View full heatmap →
-            </Link>
-          </div>
-
-          <p className="text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-widest flex items-center gap-1.5 mb-3">
-            <TrendingUpIcon className="w-3.5 h-3.5" /> Top 5 Fastest
-          </p>
-          <div className="space-y-2 mb-6">
-            {stats.top5_fastest.length === 0 && !loading && (
-              <p className="text-xs text-slate-400 dark:text-slate-500">Not enough data yet.</p>
-            )}
-            {stats.top5_fastest.map((o) => (
-              <div key={o.office} className="flex justify-between items-center bg-green-50 dark:bg-green-500/10 border border-green-100 dark:border-green-500/30 rounded-xl px-4 py-2.5">
-                <span className="text-sm font-semibold text-green-900 dark:text-green-400">{o.office_name || o.office}</span>
-                <span className="text-sm font-black text-green-700 dark:text-green-400">{formatHoursMinutes(o.avg_hours)}</span>
-              </div>
-            ))}
-          </div>
-
-          <p className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-widest flex items-center gap-1.5 mb-3">
-            <TrendingDownIcon className="w-3.5 h-3.5" /> Top 5 Slowest
-          </p>
-          <div className="space-y-2">
-            {stats.top5_slowest.length === 0 && !loading && (
-              <p className="text-xs text-slate-400 dark:text-slate-500">Not enough data yet.</p>
-            )}
-            {stats.top5_slowest.map((o) => (
-              <div key={o.office} className="flex justify-between items-center bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/30 rounded-xl px-4 py-2.5">
-                <span className="text-sm font-semibold text-red-900 dark:text-red-400">{o.office_name || o.office}</span>
-                <span className="text-sm font-black text-red-700 dark:text-red-400">{formatHoursMinutes(o.avg_hours)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Citizen satisfaction — the Overall Experience Rating citizens give a
-          request once it is released, across every evaluation. */}
-      <div className="mt-8 bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-800">
-        <h2 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
-          <StarIcon className="w-4 h-4 text-amber-500" filled /> Citizen Satisfaction
-        </h2>
-        <p className="text-xs text-slate-400 dark:text-slate-500 mb-5">
-          Overall Experience Rating citizens give their whole transaction after their document is released.
-        </p>
-        {stats.satisfaction.avg_rating == null ? (
-          <p className="text-sm text-slate-400 dark:text-slate-500">{loading ? 'Loading…' : 'No citizen evaluations yet.'}</p>
-        ) : (
-          <div className="flex items-end gap-4 flex-wrap">
-            <p className="text-5xl font-black text-amber-600 dark:text-amber-400 flex items-center gap-2">
-              {stats.satisfaction.avg_rating} <StarIcon className="w-9 h-9" filled />
-            </p>
-            <p className="text-sm text-slate-500 dark:text-slate-400 pb-1.5">
-              out of 5 · from {stats.satisfaction.rating_count} star rating{stats.satisfaction.rating_count === 1 ? '' : 's'}
-            </p>
-          </div>
-        )}
-      </div>
-
-      <CitizenCommentsWidget />
     </div>
   );
 }

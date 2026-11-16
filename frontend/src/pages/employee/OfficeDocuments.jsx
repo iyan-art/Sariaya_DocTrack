@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { fetchDocuments, deleteDocument } from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { extractErrorMessage } from '../../utils/apiError';
 import { canDeleteDocument } from '../../utils/documentPermissions';
 import DocumentStatusBadge from "../../components/admin/DocumentStatusBadge";
 import StepStatusPill from '../../components/admin/StepStatusPill';
@@ -13,6 +12,7 @@ import NewRequestModal from '../../components/employee/NewRequestModal';
 import DocumentDetailModal from '../../components/admin/DocumentDetailModal';
 import DocumentFormModal from '../../components/admin/DocumentFormModal';
 import ConfirmModal from '../../components/ConfirmModal';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import { TrashIcon } from '../../components/Icons';
 import api from '../../api/axios';
 
@@ -27,7 +27,6 @@ export default function OfficeDocuments() {
   const [manageId, setManageId] = useState(null); // interactive status-transition modal
   const [confirmRelease, setConfirmRelease] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [deleting, setDeleting] = useState(false);
 
   // Quick-redirect target from NotificationBell ("?doc=123").
   useEffect(() => {
@@ -120,18 +119,12 @@ export default function OfficeDocuments() {
     }
   };
 
-  const handleConfirmDelete = async () => {
-    setDeleting(true);
-    try {
-      await deleteDocument(deleteTarget.id);
-      showToast(`${deleteTarget.tracking_number} deleted.`, 'success');
-      setDeleteTarget(null);
-      loadDocs();
-    } catch (err) {
-      showToast(extractErrorMessage(err, 'Failed to delete document request.'), 'error');
-    } finally {
-      setDeleting(false);
-    }
+  // Throws on refusal so ConfirmDeleteModal can show why and stay open.
+  const handleConfirmDelete = async (password) => {
+    await deleteDocument(deleteTarget.id, password);
+    showToast(`${deleteTarget.tracking_number} deleted.`, 'success');
+    setDeleteTarget(null);
+    loadDocs();
   };
 
   return (
@@ -281,11 +274,9 @@ export default function OfficeDocuments() {
         />
       )}
       {deleteTarget && (
-        <ConfirmModal
+        <ConfirmDeleteModal
           title="Delete this document request?"
           message={`${deleteTarget.tracking_number} (${deleteTarget.document_type_name}) will be permanently deleted. This cannot be undone.`}
-          confirmLabel={deleting ? 'Deleting…' : 'Delete'}
-          confirmColor="bg-red-600 hover:bg-red-700"
           onCancel={() => setDeleteTarget(null)}
           onConfirm={handleConfirmDelete}
         />

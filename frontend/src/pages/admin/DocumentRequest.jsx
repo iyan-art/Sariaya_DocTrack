@@ -9,10 +9,9 @@ import NearDueWarningBadge from '../../components/admin/NearDueWarningBadge';
 import NewDocumentModal from '../../components/admin/NewDocumentModal';
 import DocumentDetailModal from '../../components/admin/DocumentDetailModal';
 import DocumentFormModal from '../../components/admin/DocumentFormModal';
-import ConfirmModal from '../../components/ConfirmModal';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import { TrashIcon } from '../../components/Icons';
 import { useToast } from '../../context/ToastContext';
-import { extractErrorMessage } from '../../utils/apiError';
 import { canDeleteDocument } from '../../utils/documentPermissions';
 import Pagination from '../../components/Pagination';
 
@@ -39,7 +38,6 @@ export default function DocumentRequest() {
   const [selectedId, setSelectedId] = useState(null); // read-only form viewer
   const [manageId, setManageId] = useState(null); // interactive status-transition modal
   const [deleteTarget, setDeleteTarget] = useState(null); // document pending delete confirmation
-  const [deleting, setDeleting] = useState(false);
   const { showToast } = useToast();
 
   // Quick-redirect target from NotificationBell ("?doc=123") — open that
@@ -73,18 +71,12 @@ export default function DocumentRequest() {
     loadDocuments();
   }, [loadDocuments]);
 
-  const handleConfirmDelete = async () => {
-    setDeleting(true);
-    try {
-      await deleteDocument(deleteTarget.id);
-      showToast(`${deleteTarget.tracking_number} deleted.`, 'success');
-      setDeleteTarget(null);
-      loadDocuments();
-    } catch (err) {
-      showToast(extractErrorMessage(err, 'Failed to delete document request.'), 'error');
-    } finally {
-      setDeleting(false);
-    }
+  // Throws on refusal so ConfirmDeleteModal can show why and stay open.
+  const handleConfirmDelete = async (password) => {
+    await deleteDocument(deleteTarget.id, password);
+    showToast(`${deleteTarget.tracking_number} deleted.`, 'success');
+    setDeleteTarget(null);
+    loadDocuments();
   };
 
   const handleTabChange = (tab) => {
@@ -242,11 +234,9 @@ export default function DocumentRequest() {
       )}
 
       {deleteTarget && (
-        <ConfirmModal
+        <ConfirmDeleteModal
           title="Delete this document request?"
           message={`${deleteTarget.tracking_number} (${deleteTarget.document_type_name}) will be permanently deleted. This cannot be undone.`}
-          confirmLabel={deleting ? 'Deleting…' : 'Delete'}
-          confirmColor="bg-red-600 hover:bg-red-700"
           onCancel={() => setDeleteTarget(null)}
           onConfirm={handleConfirmDelete}
         />

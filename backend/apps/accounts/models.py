@@ -139,6 +139,7 @@ NOTIFICATION_PREFERENCES = {
         'returned_documents': 'Documents returned to my office',
         'bottleneck_alerts': 'Bottleneck alerts for overdue documents',
         'feedback_alerts': 'Urgent low-rating citizen feedback',
+        'suggestion_alerts': 'New Suggestion Box entries from citizens',
         'completed_documents': "Requests my office started that finished their route",
     },
     User.Role.CITIZEN: {},

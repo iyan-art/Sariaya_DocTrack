@@ -9,6 +9,7 @@ export function announceNotificationsChanged() {
 
 export const TYPE_STYLES = {
   document_forwarded: 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/30',
+  new_suggestion: 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-500/30',
   suggestion_reply: 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/30',
   document_missing: 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/30',
   document_returned: 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/30',
@@ -40,6 +41,9 @@ const DOCUMENT_PAGES = {
 export function notificationTarget(role, notification) {
   if (notification.notification_type === 'suggestion_reply' && role === 'citizen') {
     return '/citizen/suggestions';
+  }
+  if (notification.notification_type === 'new_suggestion' && role === 'admin') {
+    return '/admin/suggestions';
   }
   if (notification.related_document && DOCUMENT_PAGES[role]) {
     return `${DOCUMENT_PAGES[role]}?doc=${notification.related_document}`;

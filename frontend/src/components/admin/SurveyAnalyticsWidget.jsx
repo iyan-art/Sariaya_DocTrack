@@ -18,12 +18,13 @@ export default function SurveyAnalyticsWidget() {
   }, []);
 
   return (
-    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-800">
-      <div className="flex items-center justify-between mb-5">
-        <h2 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-2">
-          <StarIcon className="w-4 h-4" filled /> Citizen Survey Results
-        </h2>
-        <Link to="/admin/surveys" className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
+    <div className="h-full bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800">
+      <div className="flex items-start justify-between gap-4 mb-5">
+        <div>
+          <h2 className="text-[15px] font-semibold text-slate-900 dark:text-slate-100">Survey results</h2>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Responses to the active citizen surveys</p>
+        </div>
+        <Link to="/admin/surveys" className="shrink-0 text-[13px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
           Manage surveys →
         </Link>
       </div>

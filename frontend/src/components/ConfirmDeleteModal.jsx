@@ -3,12 +3,12 @@ import PasswordInput from './PasswordInput';
 import { extractErrorMessage } from '../utils/apiError';
 
 /**
- * Deleting an important record asks for the admin's password again (the
+ * Every delete asks for the signed-in user's password again (the
  * server checks it and logs the attempt). `onConfirm(password)` performs
  * the delete and returns its promise; any refusal — a wrong password, or a
  * record still in use — is shown here and the dialog stays open.
  */
-export default function ConfirmDeleteModal({ title, message, onConfirm, onCancel }) {
+export default function ConfirmDeleteModal({ title, message, onConfirm, onCancel, confirmLabel = 'Delete', busyLabel = 'Deleting…' }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -64,7 +64,7 @@ export default function ConfirmDeleteModal({ title, message, onConfirm, onCancel
             disabled={busy || !password}
             className="flex-1 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium py-2.5 text-sm transition-colors"
           >
-            {busy ? 'Deleting…' : 'Delete'}
+            {busy ? busyLabel : confirmLabel}
           </button>
         </div>
       </form>

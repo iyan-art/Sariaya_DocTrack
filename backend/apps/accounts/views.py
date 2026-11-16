@@ -60,11 +60,12 @@ def _login_failure_reason(user, email, password):
 
 def password_confirmation_failed(request, record):
     """
-    Deleting an important record (a document type, an office, a survey)
-    needs the admin's password typed again — a second check on top of the
-    signed-in session, so an unattended, signed-in screen can't be used to
-    wipe configuration. Returns a 403 Response when the password is missing
-    or wrong (and logs the blocked attempt), else None.
+    Every delete in the system (document requests, document types, offices,
+    surveys, landing-page items) needs the user's password typed again — a
+    second check on top of the signed-in session, so an unattended,
+    signed-in screen can't be used to wipe records. Returns a 403 Response
+    when the password is missing or wrong (and logs the blocked attempt),
+    else None.
     """
     password = request.data.get('password', '') if hasattr(request.data, 'get') else ''
     if password and request.user.check_password(password):

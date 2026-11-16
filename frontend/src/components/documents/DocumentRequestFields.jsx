@@ -3,6 +3,12 @@ import { blockInvalidNumberKeys, numberFieldError } from '../../utils/positiveNu
 
 // Fallback for a document type with no request_fields configured yet
 // (e.g. one an admin just created) — better than showing nothing.
+// Address-like fields (any key with "address" or "location") show the
+// expected format unless the field defines its own placeholder/help text.
+const ADDRESS_PLACEHOLDER = 'e.g. 123 Rizal St., Brgy. Poblacion, Sariaya, Quezon';
+const ADDRESS_HELP = 'Format: House No./Street, Barangay, Municipality/City, Province';
+const isAddressField = (f) => ['text', 'textarea', undefined].includes(f.type) && /address|location/i.test(f.key);
+
 const GENERIC_FALLBACK_FIELDS = [
   { key: 'purpose', label: 'Purpose', type: 'text', required: true },
   { key: 'contact_no', label: 'Contact Number', type: 'tel', required: true },
@@ -41,7 +47,7 @@ export default function DocumentRequestFields({ fields, value, onChange }) {
               required={f.required}
               value={value[f.key] || ''}
               onChange={(e) => onChange(f.key, e.target.value)}
-              placeholder={f.placeholder}
+              placeholder={f.placeholder || (isAddressField(f) ? ADDRESS_PLACEHOLDER : undefined)}
               rows={2}
               className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -75,7 +81,7 @@ export default function DocumentRequestFields({ fields, value, onChange }) {
                 required={f.required}
                 value={value[f.key] || ''}
                 onChange={(e) => onChange(f.key, e.target.value)}
-                placeholder={f.placeholder || (f.type === 'tel' ? '09XXXXXXXXX' : undefined)}
+                placeholder={f.placeholder || (f.type === 'tel' ? '09XXXXXXXXX' : isAddressField(f) ? ADDRESS_PLACEHOLDER : undefined)}
                 // Quantities and amounts are always greater than zero; counts are whole numbers.
                 {...(f.type === 'number' && {
                   min: f.integer ? 1 : 0.01,
@@ -98,7 +104,9 @@ export default function DocumentRequestFields({ fields, value, onChange }) {
             <p role="alert" className="text-xs text-red-600 dark:text-red-400 mt-1">{error}</p>
           )}
 
-          {f.help_text && <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{f.help_text}</p>}
+          {(f.help_text || isAddressField(f)) && (
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">{f.help_text || ADDRESS_HELP}</p>
+          )}
         </div>
         );
       })}

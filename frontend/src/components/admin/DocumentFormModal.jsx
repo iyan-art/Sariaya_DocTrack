@@ -190,7 +190,7 @@ export default function DocumentFormModal({ documentId, onClose, onManage, onRet
                   ) : (
                     <div className="border border-slate-200 rounded-lg overflow-hidden">
                       <div className="print-expand max-h-72 overflow-y-auto overflow-x-auto">
-                        <table className="w-full text-sm">
+                        <table className="history-table w-full text-sm">
                           <thead className="bg-slate-100 sticky top-0">
                             <tr>
                               <th className="text-left px-3 py-2 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">Action</th>

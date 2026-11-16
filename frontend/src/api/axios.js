@@ -89,7 +89,7 @@ export const fetchManagedContent = (kind) => api.get(MANAGED_CONTENT[kind]);
 export const saveManagedContent = (kind, id, formData) => (
   id ? api.patch(`${MANAGED_CONTENT[kind]}${id}/`, formData) : api.post(MANAGED_CONTENT[kind], formData)
 );
-export const deleteManagedContent = (kind, id) => api.delete(`${MANAGED_CONTENT[kind]}${id}/`);
+export const deleteManagedContent = (kind, id, password) => api.delete(`${MANAGED_CONTENT[kind]}${id}/`, { data: { password } });
 export const fetchPublicOffices = () => api.get('/offices/public/');
 export const fetchPublicDocumentTypes = () => api.get('/documents/types/public/');
 
@@ -194,8 +194,8 @@ export const fetchDocumentDetail = (id) => {
 
 // Staff/admin delete — only while the document is still untouched at its
 // origin office, unless the caller is an admin (server-side override).
-export const deleteDocument = (id) => {
-  return api.delete(`/documents/${id}/`);
+export const deleteDocument = (id, password) => {
+  return api.delete(`/documents/${id}/`, { data: { password } });
 };
 
 // --- Citizen "My Documents" (view/print/download own requests only, no edit) ---
@@ -211,8 +211,8 @@ export const fetchMyDocumentDetail = (id) => {
 
 // Citizen cancelling their own request — same "still untouched" rule as
 // deleteDocument above, no admin override on this endpoint.
-export const deleteMyDocument = (id) => {
-  return api.delete(`/documents/mine/${id}/`);
+export const deleteMyDocument = (id, password) => {
+  return api.delete(`/documents/mine/${id}/`, { data: { password } });
 };
 
 // Per-office citizen evaluation of a RELEASED document — see

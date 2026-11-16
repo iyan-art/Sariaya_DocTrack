@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { useState } from 'react';
 import { CameraIcon, ScanLineIcon } from './Icons';
 import { extractTrackingNumber } from '../utils/trackingNumber';
+import useRearCameraScanner from '../utils/useRearCameraScanner';
 
 /**
- * Guest-facing QR scan modal — same Html5QrcodeScanner engine as
+ * Guest-facing QR scan modal — same rear-camera scanner as
  * EmployeeQRScanner, but simpler: no auth-gated qrScanResolve() call, since
  * a guest doesn't need staff scan context. Just decodes the tracking number
  * client-side and hands it back to the parent via onScanned(), which
@@ -16,28 +16,8 @@ import { extractTrackingNumber } from '../utils/trackingNumber';
 export default function ScanTrackingModal({ onScanned, onClose, title = 'Scan Tracking Number' }) {
   const [attempt, setAttempt] = useState(0);
 
-  useEffect(() => {
-    const scanner = new Html5QrcodeScanner('landing-qr-reader', {
-      fps: 10,
-      qrbox: { width: 250, height: 250 },
-    });
-
-    scanner.render(onScanSuccess, onScanError);
-
-    async function onScanSuccess(decodedText) {
-      await scanner.clear();
-      onScanned(extractTrackingNumber(decodedText));
-    }
-
-    function onScanError() {
-      // Fires continuously while no code is in frame — ignore.
-    }
-
-    return () => {
-      scanner.clear().catch(() => {});
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attempt]);
+  // Opens the phone's rear camera directly — no camera picker in between.
+  const cameraError = useRearCameraScanner('landing-qr-reader', (text) => onScanned(extractTrackingNumber(text)), attempt);
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 overlay-fade-in">
@@ -55,6 +35,11 @@ export default function ScanTrackingModal({ onScanned, onClose, title = 'Scan Tr
             <span className="text-slate-400 dark:text-slate-500">Ilagay ang QR code sa loob ng frame.</span>
           </p>
           <div id="landing-qr-reader" className="overflow-hidden rounded-2xl bg-slate-50 dark:bg-slate-800 min-h-[280px]"></div>
+          {cameraError && (
+            <p role="alert" className="rounded-2xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+              {cameraError}
+            </p>
+          )}
           <button
             type="button"
             onClick={() => setAttempt((a) => a + 1)}

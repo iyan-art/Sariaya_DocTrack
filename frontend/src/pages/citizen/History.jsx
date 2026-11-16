@@ -11,7 +11,7 @@ import StatusLegend from '../../components/admin/StatusLegend';
 import NearDueWarningBadge from '../../components/admin/NearDueWarningBadge';
 import DocumentFormModal from '../../components/admin/DocumentFormModal';
 import ReturnDocumentModal from '../../components/citizen/ReturnDocumentModal';
-import ConfirmModal from '../../components/ConfirmModal';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import { EyeIcon, FileTextIcon, ArrowRightLeftIcon, TrashIcon, BellIcon } from '../../components/Icons';
 
 // Citizen-facing request history — view/print/download only. No onManage
@@ -29,7 +29,6 @@ export default function History() {
   const [selectedId, setSelectedId] = useState(null);
   const [returningDoc, setReturningDoc] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
-  const [cancelling, setCancelling] = useState(false);
   const [expeditingId, setExpeditingId] = useState(null);
 
   const loadDocs = () => {
@@ -41,18 +40,12 @@ export default function History() {
       .finally(() => setLoading(false));
   };
 
-  const handleConfirmCancel = async () => {
-    setCancelling(true);
-    try {
-      await deleteMyDocument(cancelTarget.id);
-      showToast(`${cancelTarget.tracking_number} cancelled.`, 'success');
-      setCancelTarget(null);
-      loadDocs();
-    } catch (err) {
-      showToast(extractErrorMessage(err, 'Failed to cancel this request.'), 'error');
-    } finally {
-      setCancelling(false);
-    }
+  // Throws on refusal so ConfirmDeleteModal can show why and stay open.
+  const handleConfirmCancel = async (password) => {
+    await deleteMyDocument(cancelTarget.id, password);
+    showToast(`${cancelTarget.tracking_number} cancelled.`, 'success');
+    setCancelTarget(null);
+    loadDocs();
   };
 
   useEffect(() => { loadDocs(); }, []);
@@ -189,11 +182,11 @@ export default function History() {
         />
       )}
       {cancelTarget && (
-        <ConfirmModal
+        <ConfirmDeleteModal
           title="Cancel this request?"
           message={`${cancelTarget.tracking_number} (${cancelTarget.document_type_name}) will be permanently cancelled. This cannot be undone.`}
-          confirmLabel={cancelling ? 'Cancelling…' : 'Cancel Request'}
-          confirmColor="bg-red-600 hover:bg-red-700"
+          confirmLabel="Cancel Request"
+          busyLabel="Cancelling…"
           onCancel={() => setCancelTarget(null)}
           onConfirm={handleConfirmCancel}
         />

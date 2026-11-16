@@ -4,6 +4,7 @@ import {
   deleteDocumentType, saveWorkflowSteps, fetchOffices,
 } from '../../api/axios';
 import { useToast } from '../../context/ToastContext';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import { ClipboardListIcon, FileTextIcon } from '../../components/Icons';
 import { Link } from 'react-router-dom';
 
@@ -93,16 +94,15 @@ export default function AdminWorkflowBuilder() {
     }
   };
 
-  const handleDeleteType = async () => {
-    if (!window.confirm(`Delete "${details.name}"? This cannot be undone.`)) return;
-    try {
-      await deleteDocumentType(selectedId);
-      showToast('Document type deleted.', 'success');
-      setSelectedId(null);
-      loadTypes(false);
-    } catch (err) {
-      showToast(err.response?.data?.detail || 'Failed to delete document type.', 'error');
-    }
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const handleDeleteType = () => setConfirmingDelete(true);
+  // Throws on refusal so ConfirmDeleteModal can show why and stay open.
+  const confirmDeleteType = async (password) => {
+    await deleteDocumentType(selectedId, password);
+    showToast('Document type deleted.', 'success');
+    setConfirmingDelete(false);
+    setSelectedId(null);
+    loadTypes(false);
   };
 
   // --- Step editing (client-side array; step_number is renumbered from
@@ -413,6 +413,14 @@ export default function AdminWorkflowBuilder() {
           </div>
         )}
       </div>
+      {confirmingDelete && (
+        <ConfirmDeleteModal
+          title={`Delete "${details.name}"?`}
+          message="This permanently deletes the document type and its workflow. To only hide it, archive it instead."
+          onConfirm={confirmDeleteType}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
     </div>
   );
 }

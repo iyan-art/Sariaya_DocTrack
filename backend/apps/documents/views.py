@@ -29,7 +29,7 @@ from .permissions import IsStaffUser
 from apps.accounts.permissions import IsAdmin
 from .services import release_document, receive_document, return_document, citizen_return_document, mark_corrected, release_final, flag_missing, mark_found, resolve_office, advance_processing_stage, can_delete_document, holds_document, expedite_document, notify_citizen
 from .sla_scan import run_overdue_scan, run_overdue_alert_scan
-from .services import DEFAULT_FALLBACK_SLA_HOURS
+from .services import DEFAULT_FALLBACK_SLA_HOURS, notify_admins
 from .qr_services import resolve_and_verify, enforce_scope_access, build_scan_context, generate_qr_code
 from .storage import database_storage
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -179,6 +179,15 @@ class AnnouncementManageDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdmin]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     queryset = Announcement.objects.all()
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        refused = password_confirmation_failed(request, f'"{instance.title}"')
+        if refused:
+            return refused
+        response = super().destroy(request, *args, **kwargs)
+        log_record_deleted(request, f'landing page item "{instance.title}"')
+        return response
 
     def perform_destroy(self, instance):
         image_name = instance.image.name if instance.image else ''
@@ -390,6 +399,9 @@ class DocumentDetailView(generics.RetrieveDestroyAPIView):
                 {"detail": "This document can no longer be deleted — it has already been processed by an office."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        refused = password_confirmation_failed(request, f'document request {document.tracking_number}')
+        if refused:
+            return refused
         _delete_document_and_log(request, document)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -442,6 +454,9 @@ class MyDocumentDetailView(generics.RetrieveDestroyAPIView):
                 {"detail": "This request can no longer be cancelled — it has already been processed by an office."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        refused = password_confirmation_failed(request, f'request {document.tracking_number}')
+        if refused:
+            return refused
         _delete_document_and_log(request, document)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -1920,7 +1935,17 @@ class CitizenSuggestionListCreateView(generics.ListCreateAPIView):
         return CitizenSuggestion.objects.filter(respondent=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(respondent=self.request.user)
+        suggestion = serializer.save(respondent=self.request.user)
+        # Every admin hears about it right away so it gets a reply.
+        notify_admins(
+            title=f"New suggestion: {suggestion.subject}"[:200],
+            message=(
+                f"{self.request.user.full_name} sent a suggestion ({suggestion.get_category_display()}): "
+                f"{suggestion.message[:300]}"
+            ),
+            notification_type=Notification.NotificationType.NEW_SUGGESTION,
+            sender=self.request.user,
+        )
 
 
 class AdminSuggestionPagination(PageNumberPagination):

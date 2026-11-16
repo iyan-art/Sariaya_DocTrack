@@ -1,19 +1,32 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { fetchPublicDocumentTypes } from '../../api/axios';
+import { useAuth } from '../../context/AuthContext';
 import { scrollToSection } from './LandingNavbar';
+import LoginRequiredModal from './LoginRequiredModal';
 import { FileTextIcon } from '../Icons';
+
+const HOME_PAGES = { admin: '/admin/dashboard', employee: '/employee/dashboard', citizen: '/citizen/home' };
 
 /**
  * Citizen Services — one card per real, currently-active EXTERNAL document
  * type (fetched live, never hardcoded), so this list can never drift from
  * what the system actually offers. There's no per-service detail page or
  * self-service request form in this system (requests are filed by staff on
- * a citizen's behalf), so "View Service" is honest about where that
- * actually happens today: signing in.
+ * a citizen's behalf), so "View Service" leads to the portal: a signed-in
+ * user goes to their home page, anyone else gets a "sign in first" popup.
  */
 export default function ServicesSection() {
   const [types, setTypes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loginFor, setLoginFor] = useState(null); // service the visitor picked before signing in
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const viewService = (type) => {
+    if (user) navigate(HOME_PAGES[user.role] || '/');
+    else setLoginFor(type);
+  };
 
   useEffect(() => {
     fetchPublicDocumentTypes()
@@ -49,7 +62,7 @@ export default function ServicesSection() {
                   {t.description || 'Request and track your document.'}
                 </p>
                 <button
-                  onClick={() => scrollToSection('access')}
+                  onClick={() => viewService(t)}
                   className="mt-5 text-sm font-bold text-blue-600 hover:text-blue-800 text-left"
                 >
                   View Service →
@@ -59,6 +72,13 @@ export default function ServicesSection() {
           </div>
         )}
       </div>
+      {loginFor && (
+        <LoginRequiredModal
+          serviceName={loginFor.name}
+          onClose={() => setLoginFor(null)}
+          onSignIn={() => { setLoginFor(null); scrollToSection('access'); }}
+        />
+      )}
     </section>
   );
 }

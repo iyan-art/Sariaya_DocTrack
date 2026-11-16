@@ -95,6 +95,7 @@ export default function Dashboard() {
       </div>
 
       <CitizenCommentsWidget
+        className="mt-8"
         fetchComments={fetchMyOfficeComments}
         subtitle="Written feedback from citizens your office has served — anonymous, so you can see what's being said without seeing who said it."
       />

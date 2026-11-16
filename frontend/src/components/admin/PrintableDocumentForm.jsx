@@ -102,7 +102,7 @@ export default function PrintableDocumentForm({ document, onClose }) {
             {steps.length === 0 ? (
               <p className="text-sm text-slate-400">No routing steps configured.</p>
             ) : (
-              <table className="w-full text-sm border border-slate-200 rounded-lg overflow-hidden">
+              <table className="route-table w-full text-sm border border-slate-200 rounded-lg overflow-hidden">
                 <thead className="bg-slate-50">
                   <tr>
                     <th className="text-left px-3 py-2 text-[10px] font-black text-slate-400 uppercase w-10">✓</th>

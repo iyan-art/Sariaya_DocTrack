@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { deleteManagedContent, fetchManagedContent, mediaUrl, saveManagedContent } from '../../api/axios';
 import { useToast } from '../../context/ToastContext';
-import ConfirmModal from '../../components/ConfirmModal';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import LandingContentForm from '../../components/admin/LandingContentForm';
 import { CalendarIcon, MapPinIcon, NewspaperIcon } from '../../components/Icons';
 
@@ -71,16 +71,12 @@ export default function AdminLandingContent() {
     }
   };
 
-  const confirmDelete = async () => {
-    const item = deleting;
+  // Throws on refusal so ConfirmDeleteModal can show why and stay open.
+  const confirmDelete = async (password) => {
+    await deleteManagedContent(kind, deleting.id, password);
+    showToast(`"${deleting.title}" deleted.`, 'success');
     setDeleting(null);
-    try {
-      await deleteManagedContent(kind, item.id);
-      showToast(`"${item.title}" deleted.`, 'success');
-      load();
-    } catch {
-      showToast('Failed to delete this item.', 'error');
-    }
+    load();
   };
 
   const Placeholder = kind === 'news' ? NewspaperIcon : CalendarIcon;
@@ -178,10 +174,9 @@ export default function AdminLandingContent() {
         />
       )}
       {deleting && (
-        <ConfirmModal
+        <ConfirmDeleteModal
           title="Delete permanently?"
           message={`"${deleting.title}" and its picture will be deleted. To only hide it from the landing page, archive it instead.`}
-          confirmLabel="Delete"
           onCancel={() => setDeleting(null)}
           onConfirm={confirmDelete}
         />

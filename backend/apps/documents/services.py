@@ -20,6 +20,7 @@ PREFERENCE_FOR_NOTIFICATION = {
     Notification.NotificationType.DOCUMENT_RETURNED: 'returned_documents',
     Notification.NotificationType.BOTTLENECK_ALERT: 'bottleneck_alerts',
     Notification.NotificationType.SYSTEM_ALERT: 'feedback_alerts',
+    Notification.NotificationType.NEW_SUGGESTION: 'suggestion_alerts',
     Notification.NotificationType.DOCUMENT_COMPLETED: 'completed_documents',
 }
 

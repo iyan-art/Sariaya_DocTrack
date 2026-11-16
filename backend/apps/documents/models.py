@@ -828,6 +828,8 @@ class Notification(models.Model):
         DOCUMENT_MISSING = 'document_missing', 'Document Missing'
         # The LGU replied to a citizen's Suggestion Box entry.
         SUGGESTION_REPLY = 'suggestion_reply', 'Suggestion Reply'
+        # A citizen sent a new Suggestion Box entry (to every admin).
+        NEW_SUGGESTION = 'new_suggestion', 'New Suggestion'
 
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications',

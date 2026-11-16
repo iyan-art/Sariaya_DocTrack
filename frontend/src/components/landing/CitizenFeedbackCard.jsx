@@ -11,7 +11,7 @@ import { StarIcon, CameraIcon } from '../Icons';
  * Citizen Feedback card — reuses the existing per-office evaluation
  * workflow (DocumentEvaluationModal, already shared with the public Track
  * page) rather than a new survey system. Accepts a tracking number either
- * typed manually or scanned via the same Html5QrcodeScanner-backed modal
+ * typed manually or scanned via the same rear-camera scanner-backed modal
  * used elsewhere on this page.
  */
 export default function CitizenFeedbackCard() {

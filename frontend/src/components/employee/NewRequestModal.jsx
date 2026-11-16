@@ -11,16 +11,10 @@ import PrintableQRSlip from '../admin/PrintableQRSlip';
 import PrintableDocumentForm from '../admin/PrintableDocumentForm';
 import { PrinterIcon } from '../Icons';
 
-const PURPOSE_OPTIONS = [
-  { value: 'external', label: 'External Documents', hint: 'For citizens' },
-  { value: 'internal', label: 'Internal Documents', hint: 'Municipal / internal use' },
-];
-
 export default function NewRequestModal({ onClose, onCreated }) {
   const { user } = useAuth();
   const { showToast } = useToast();
   const [types, setTypes] = useState([]);
-  const [purpose, setPurpose] = useState('');
   const [selectedTypeId, setSelectedTypeId] = useState('');
   const [loading, setLoading] = useState(false);
   const [created, setCreated] = useState(null);
@@ -43,41 +37,17 @@ export default function NewRequestModal({ onClose, onCreated }) {
     setFormData({});
   }, [selectedTypeId]);
 
-  // Document Purpose (DocumentType.scope) gates which types are even
-  // selectable — the same type name (e.g. "Mayor's Permit") can exist as
-  // both an internal and an external row, each its own independent entry.
-  // Only types whose workflow starts at this user's office (see can_create).
-  const typesForPurpose = types.filter((t) => t.scope === purpose && t.can_create);
-  const notAllowedCount = types.filter((t) => t.scope === purpose && !t.can_create).length;
-
-  // If the purpose changes and the previously-selected type no longer
-  // belongs to it, drop the selection rather than silently submitting a
-  // type that doesn't match what's now showing in the dropdown.
-  useEffect(() => {
-    if (selectedTypeId && !typesForPurpose.some((t) => String(t.id) === String(selectedTypeId))) {
-      setSelectedTypeId('');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [purpose]);
-
-  // Internal Documents have no citizen at all — the requester is whoever's
-  // logged in. Auto-fill (and lock) name/email from the staff/admin's own
-  // account, and drop any citizen account link that might still be set from
-  // a previous External selection. Switching back to External clears the
-  // auto-filled values so they don't get mistaken for real citizen info.
-  useEffect(() => {
-    if (purpose === 'internal') {
-      setCitizen(null);
-      setGuestName(user?.full_name || '');
-      setGuestEmail(user?.email || '');
-    } else if (purpose === 'external') {
-      setGuestName('');
-      setGuestEmail('');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [purpose]);
+  // Internal vs External is never asked: it comes from the chosen document
+  // type itself (DocumentType.scope). Only types whose workflow starts at
+  // this user's office can be created (see can_create).
+  const creatableTypes = types.filter((t) => t.can_create);
+  const externalTypes = creatableTypes.filter((t) => t.scope === 'external');
+  const internalTypes = creatableTypes.filter((t) => t.scope === 'internal');
+  const notAllowedCount = types.length - creatableTypes.length;
 
   const selectedType = types.find((t) => String(t.id) === String(selectedTypeId));
+  // Internal documents belong to the office that files them: no citizen, no guest details.
+  const isInternal = selectedType?.scope === 'internal';
   const limitReached = selectedType?.daily_limit != null && selectedType.requests_today >= selectedType.daily_limit;
   const contactNumberInvalid = Boolean(selectedTypeId) && hasInvalidContactNumber(selectedType?.request_fields, formData);
   const numberInvalid = Boolean(selectedTypeId) && hasInvalidNumber(selectedType?.request_fields, formData);
@@ -90,9 +60,8 @@ export default function NewRequestModal({ onClose, onCreated }) {
     if (contactNumberInvalid || numberInvalid) return;
 
     const nextFieldErrors = {};
-    if (!purpose) nextFieldErrors.purpose = 'Please select Internal or External Documents.';
-    if (!citizen && !guestName.trim()) nextFieldErrors.guest_name = "Please enter the requestor's name.";
-    if (!citizen && !guestEmail.trim()) nextFieldErrors.guest_email = "Please enter the requestor's email address.";
+    if (!isInternal && !citizen && !guestName.trim()) nextFieldErrors.guest_name = "Please enter the requestor's name.";
+    if (!isInternal && !citizen && !guestEmail.trim()) nextFieldErrors.guest_email = "Please enter the requestor's email address.";
     if (!selectedTypeId) nextFieldErrors.document_type = 'Please select a document type.';
 
     if (Object.keys(nextFieldErrors).length > 0) {
@@ -108,7 +77,7 @@ export default function NewRequestModal({ onClose, onCreated }) {
       const res = await createDocument({
         document_type: selectedTypeId,
         form_data: formData,
-        ...(citizen ? { requested_by: citizen.id } : { guest_name: guestName, guest_email: guestEmail }),
+        ...(isInternal ? {} : citizen ? { requested_by: citizen.id } : { guest_name: guestName, guest_email: guestEmail }),
       });
       showToast('Document request created successfully.', 'success');
       setCreated(res.data);
@@ -184,40 +153,6 @@ export default function NewRequestModal({ onClose, onCreated }) {
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           <div className="flex-1 overflow-y-auto px-8 py-4 space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
-                Document Purpose
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                {PURPOSE_OPTIONS.map(({ value, label, hint }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setPurpose(value)}
-                    className={`rounded-xl py-3 text-sm font-bold border-2 transition-colors ${
-                      purpose === value
-                        ? 'border-blue-600 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400'
-                        : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
-                    }`}
-                  >
-                    {label}
-                    <span className="block text-[10px] font-normal opacity-70">{hint}</span>
-                  </button>
-                ))}
-              </div>
-              {fieldErrors.purpose && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{fieldErrors.purpose}</p>}
-            </div>
-
-            <CitizenPicker
-              value={citizen}
-              onChange={setCitizen}
-              guestName={guestName}
-              onGuestNameChange={setGuestName}
-              guestEmail={guestEmail}
-              onGuestEmailChange={setGuestEmail}
-              errors={fieldErrors}
-              readOnly={purpose === 'internal'}
-            />
 
             <div>
               <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Select Document Type</label>
@@ -225,21 +160,29 @@ export default function NewRequestModal({ onClose, onCreated }) {
                 className="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
                 value={selectedTypeId}
                 onChange={(e) => setSelectedTypeId(e.target.value)}
-                disabled={!purpose}
                 required
               >
-                <option value="">{purpose ? '-- Choose Option --' : '-- Select a document purpose first --'}</option>
-                {typesForPurpose.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                <option value="">Select a document type…</option>
+                {externalTypes.length > 0 && (
+                  <optgroup label="For citizens (External)">
+                    {externalTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </optgroup>
+                )}
+                {internalTypes.length > 0 && (
+                  <optgroup label="Internal office documents">
+                    {internalTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </optgroup>
+                )}
               </select>
               {fieldErrors.document_type && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{fieldErrors.document_type}</p>}
-              {purpose && typesForPurpose.length === 0 && (
+              {creatableTypes.length === 0 && (
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                   {notAllowedCount > 0
-                    ? `None of the ${purpose} document types start at your office (${user?.office || 'none assigned'}). Only the office at Step 1 of a workflow can create its requests.`
-                    : `No ${purpose} document types yet — an admin needs to create one in Workflow Builder first.`}
+                    ? `None of the document types start at your office (${user?.office || 'none assigned'}). Only the office at Step 1 of a workflow can create its requests.`
+                    : 'No document types yet — an admin needs to create one in Workflow Builder first.'}
                 </p>
               )}
-              {purpose && typesForPurpose.length > 0 && notAllowedCount > 0 && (
+              {creatableTypes.length > 0 && notAllowedCount > 0 && (
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                   Showing only the document types that start at your office.
                 </p>
@@ -252,6 +195,22 @@ export default function NewRequestModal({ onClose, onCreated }) {
                 </p>
               )}
             </div>
+
+            {selectedType && (isInternal ? (
+              <p className="text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-lg px-3 py-2">
+                <span className="font-bold">Internal document</span> — requested by your office ({user?.office || '—'}) as {user?.full_name}.
+              </p>
+            ) : (
+              <CitizenPicker
+                value={citizen}
+                onChange={setCitizen}
+                guestName={guestName}
+                onGuestNameChange={setGuestName}
+                guestEmail={guestEmail}
+                onGuestEmailChange={setGuestEmail}
+                errors={fieldErrors}
+              />
+            ))}
 
             {selectedTypeId && (
               <div className="border-t border-slate-100 dark:border-slate-800 pt-6 mt-6 animate-in fade-in duration-500">
