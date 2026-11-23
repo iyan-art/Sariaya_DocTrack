@@ -274,7 +274,7 @@ export default function AdminDashboard() {
           )}
         </Panel>
 
-        <Panel title="Office speed" subtitle="Average time a document stays at each office"
+        <Panel title="Office speed" subtitle={`Average time a document stays at each office · ranks offices with ${stats.ranking_min_documents ?? 3}+ documents`}
           action={<PanelLink to="/admin/heatmap">Heatmap →</PanelLink>} className="lg:col-span-5">
           <div className="grid gap-5">
             <OfficeRanking title="Fastest" icon={TrendingUpIcon} tone="text-green-700 dark:text-green-400" rows={stats.top5_fastest} loading={loading} />

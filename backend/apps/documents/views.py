@@ -1080,6 +1080,29 @@ def _evaluations_for_office(office):
     return _release_evaluations().filter(Q(office=office) | Q(office__isnull=True, document_id__in=handled))
 
 
+# An office needs this many timed hand-offs before it is ranked, so one
+# document can't make it the fastest or slowest office.
+MIN_DOCUMENTS_FOR_RANKING = 3
+
+
+def _speed_rankings(office_stats):
+    """
+    Top 5 Fastest / Slowest for the admin dashboard, from _office_speed_stats()
+    (already sorted fastest first). Only offices with at least
+    MIN_DOCUMENTS_FOR_RANKING timed documents are ranked, and no office is in
+    both lists: with fewer than 10 ranked offices the faster half goes to
+    Fastest and the slower half to Slowest (an odd middle one counts as fast).
+    """
+    ranked = [row for row in office_stats if row['count'] >= MIN_DOCUMENTS_FOR_RANKING]
+    fastest_count = min(5, (len(ranked) + 1) // 2)
+    slowest_count = min(5, len(ranked) - fastest_count)
+    return {
+        "top5_fastest": ranked[:fastest_count],
+        "top5_slowest": list(reversed(ranked))[:slowest_count],
+        "ranking_min_documents": MIN_DOCUMENTS_FOR_RANKING,
+    }
+
+
 def _office_speed_stats():
     """
     Shared by AdminDashboardStatsView and HeatmapDataView: average time a
@@ -1268,8 +1291,7 @@ class AdminDashboardStatsView(APIView):
             "weekly_trend_pct": weekly_trend_pct,
             "by_period": by_period,
             "by_type": by_type,
-            "top5_fastest": office_stats[:5],
-            "top5_slowest": list(reversed(office_stats))[:5],
+            **_speed_rankings(office_stats),
             "satisfaction": satisfaction,
             "office_workload": office_workload,
             "avg_resolution_hours": avg_resolution_hours,
