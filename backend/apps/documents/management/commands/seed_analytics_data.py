@@ -314,6 +314,7 @@ class Command(BaseCommand):
             qr_verified=random.random() < 0.7,
             duration_at_office=timedelta(hours=dwell_hours),
             duration_office=offices[from_code],
+            duration_sla_hours=max(1, round(OFFICE_SPEED_HOURS[from_code][1])),  # as its WorkflowStep
             notes='Returned to origin office.' if is_final_leg else 'Received via QR scan.',
         )
         DocumentLog.objects.filter(pk=receive_log.pk).update(timestamp=clock)

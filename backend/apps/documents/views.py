@@ -1087,13 +1087,18 @@ MIN_DOCUMENTS_FOR_RANKING = 3
 
 def _speed_rankings(office_stats):
     """
-    Top 5 Fastest / Slowest for the admin dashboard, from _office_speed_stats()
-    (already sorted fastest first). Only offices with at least
-    MIN_DOCUMENTS_FOR_RANKING timed documents are ranked, and no office is in
-    both lists: with fewer than 10 ranked offices the faster half goes to
-    Fastest and the slower half to Slowest (an odd middle one counts as fast).
+    Top 5 Fastest / Slowest for the admin dashboard, ranked by the average
+    share of their SLA offices use (avg_sla_pct), not raw hours, so an office
+    whose work legitimately takes longer is not called slow for it. Only
+    offices with at least MIN_DOCUMENTS_FOR_RANKING timed documents are
+    ranked, and no office is in both lists: with fewer than 10 ranked offices
+    the faster half goes to Fastest and the slower half to Slowest (an odd
+    middle one counts as fast).
     """
-    ranked = [row for row in office_stats if row['count'] >= MIN_DOCUMENTS_FOR_RANKING]
+    ranked = sorted(
+        (row for row in office_stats if row['count'] >= MIN_DOCUMENTS_FOR_RANKING),
+        key=lambda row: (row['avg_sla_pct'], row['avg_hours']),
+    )
     fastest_count = min(5, (len(ranked) + 1) // 2)
     slowest_count = min(5, len(ranked) - fastest_count)
     return {
@@ -1105,27 +1110,42 @@ def _speed_rankings(office_stats):
 
 def _office_speed_stats():
     """
-    Shared by AdminDashboardStatsView and HeatmapDataView: average time a
-    document stays with an office (from arriving there until the next office
-    receives it), grouped by the office that held it, fastest first.
+    Shared by the Heatmap, the admin dashboard's Top 5 and each office's own
+    dashboard. For every office, over the documents it held (from arriving
+    there until the next office received them):
+      avg_hours     average time it kept a document
+      avg_sla_pct   average share of the step's time limit (SLA) it used;
+                    1 hr 50 min of a 2-hr SLA is 92%, 11 hrs of 12 is 92%
+      over_sla      how many of those documents went past the SLA
+    Sorted by avg_sla_pct, best first.
     """
-    stats = (
+    rows = (
         DocumentLog.objects
         .exclude(duration_at_office__isnull=True)
         .exclude(duration_office__isnull=True)
-        .values('duration_office__code', 'duration_office__name')
-        .annotate(avg_time=Avg('duration_at_office'), doc_count=Count('id'))
-        .order_by('avg_time')
+        .values_list('duration_office__code', 'duration_office__name', 'duration_at_office', 'duration_sla_hours')
     )
-    return [
+    offices = {}
+    for code, name, duration, sla_hours in rows:
+        hours = duration.total_seconds() / 3600
+        share = hours / (sla_hours or DEFAULT_FALLBACK_SLA_HOURS)
+        entry = offices.setdefault(code, {"name": name, "hours": 0.0, "share": 0.0, "count": 0, "over": 0})
+        entry["hours"] += hours
+        entry["share"] += share
+        entry["count"] += 1
+        entry["over"] += share > 1
+    stats = [
         {
-            "office": item['duration_office__code'],
-            "office_name": item['duration_office__name'],
-            "avg_hours": round(item['avg_time'].total_seconds() / 3600, 2),
-            "count": item['doc_count'],
+            "office": code,
+            "office_name": entry["name"],
+            "avg_hours": round(entry["hours"] / entry["count"], 2),
+            "avg_sla_pct": round(entry["share"] / entry["count"] * 100),
+            "over_sla": entry["over"],
+            "count": entry["count"],
         }
-        for item in stats
+        for code, entry in offices.items()
     ]
+    return sorted(stats, key=lambda row: (row["avg_sla_pct"], row["avg_hours"]))
 
 
 class AdminDashboardStatsView(APIView):
@@ -1406,12 +1426,13 @@ class MyOfficePerformanceView(APIView):
         if not office:
             return Response({
                 "office": None, "office_name": None,
-                "avg_hours": None, "count": 0,
+                "avg_hours": None, "avg_sla_pct": None, "over_sla": 0, "count": 0,
                 "avg_rating": None, "rating_count": 0,
             })
 
         row = next((r for r in _office_speed_stats() if r['office'] == office.code), None) or {
-            "office": office.code, "office_name": office.name, "avg_hours": None, "count": 0,
+            "office": office.code, "office_name": office.name, "avg_hours": None,
+            "avg_sla_pct": None, "over_sla": 0, "count": 0,
         }
         # How citizens rated the transactions this office took part in.
         return Response({**row, **_satisfaction(_evaluations_for_office(office))})

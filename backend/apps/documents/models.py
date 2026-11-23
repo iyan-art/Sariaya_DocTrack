@@ -405,6 +405,9 @@ class DocumentLog(models.Model):
     duration_office = models.ForeignKey(
         Office, on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
     )
+    # The time limit (WorkflowStep.max_hours_allowed) of the step duration_office
+    # was working on, so speed analytics judge each office against its own SLA.
+    duration_sla_hours = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ['timestamp']

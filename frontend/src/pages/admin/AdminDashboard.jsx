@@ -102,7 +102,10 @@ function OfficeRanking({ title, icon: Icon, tone, rows, loading }) {
             <li key={o.office} className="flex items-center gap-3 py-2 text-sm">
               <span className="w-5 text-xs font-semibold text-slate-400 tabular-nums">{i + 1}</span>
               <span className="flex-1 min-w-0 truncate text-slate-700 dark:text-slate-300">{o.office_name || o.office}</span>
-              <span className="shrink-0 font-medium text-slate-900 dark:text-slate-100 tabular-nums">{formatHoursMinutes(o.avg_hours)}</span>
+              <span className="shrink-0 text-right">
+                <span className="block font-medium text-slate-900 dark:text-slate-100 tabular-nums">{o.avg_sla_pct}% of SLA</span>
+                <span className="block text-[11px] text-slate-400 dark:text-slate-500">avg {formatHoursMinutes(o.avg_hours)}</span>
+              </span>
             </li>
           ))}
         </ol>
@@ -274,7 +277,7 @@ export default function AdminDashboard() {
           )}
         </Panel>
 
-        <Panel title="Office speed" subtitle={`Average time a document stays at each office · ranks offices with ${stats.ranking_min_documents ?? 3}+ documents`}
+        <Panel title="Office speed" subtitle={`Average share of each step's time limit (SLA) an office uses · ranks offices with ${stats.ranking_min_documents ?? 3}+ documents`}
           action={<PanelLink to="/admin/heatmap">Heatmap →</PanelLink>} className="lg:col-span-5">
           <div className="grid gap-5">
             <OfficeRanking title="Fastest" icon={TrendingUpIcon} tone="text-green-700 dark:text-green-400" rows={stats.top5_fastest} loading={loading} />

@@ -52,6 +52,12 @@ export default function Dashboard() {
           ) : (
             <>
               <p className="text-3xl font-black text-indigo-700 dark:text-indigo-400">{formatHoursMinutes(stats.avg_hours)}</p>
+              {stats.avg_sla_pct != null && (
+                <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 mt-1">
+                  Uses {stats.avg_sla_pct}% of the time limit (SLA) on average
+                  {stats.over_sla > 0 && ` · ${stats.over_sla} went over`}
+                </p>
+              )}
               <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-2">
                 Based on {stats.count} document{stats.count === 1 ? '' : 's'} processed
               </p>

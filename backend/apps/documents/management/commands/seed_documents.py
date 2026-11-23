@@ -26,6 +26,7 @@ from apps.documents.models import (
     Document, DocumentLog, DocumentType, MissingDocumentAlert, Notification, RequestStatusHistory,
 )
 from apps.documents.qr_services import generate_qr_code
+from apps.documents.durations import format_hours_minutes
 from apps.documents.services import resolve_office
 
 # Stored in form_data so --clear can find seeded requests; the document views
@@ -230,7 +231,7 @@ class Command(BaseCommand):
             receiver = pick(next_position)
             qr = random.random() < 0.85
             events.append((clock, 'received', {
-                'by': receiver, 'sender': sender, 'at': next_position, 'held_at': position, 'qr': qr,
+                'by': receiver, 'sender': sender, 'at': next_position, 'held_at': position, 'sla': sla[position], 'qr': qr,
                 'duration': clock - entered_at, 'final': next_position == last,
                 'note': f"Received via QR scan by {receiver.full_name} ({receiver.employee_id})." if qr else '',
             }))
@@ -258,7 +259,7 @@ class Command(BaseCommand):
                 events.append((clock, 'return_initiated', {'by': handler, 'at': position, 'note': reason}))
                 clock += random.uniform(0.2, 1.0)
                 receiver = pick(previous)
-                events.append((clock, 'return_received', {'by': receiver, 'sender': handler, 'at': previous, 'held_at': position, 'duration': clock - entered_at}))
+                events.append((clock, 'return_received', {'by': receiver, 'sender': handler, 'at': previous, 'held_at': position, 'sla': sla[position], 'duration': clock - entered_at}))
                 entered_at, position, handler = clock, previous, receiver
                 hold(0.1, 0.5)
             if position == target:
@@ -365,7 +366,7 @@ class Command(BaseCommand):
             action = DocumentLog.Action.RETURNED if data['final'] else DocumentLog.Action.RECEIVED
             log(action, office=office, sender=data['sender'], acted_by=data['by'], qr_verified=data['qr'],
                 duration_at_office=timedelta(hours=data['duration']), duration_office=offices[data['held_at']],
-                notes=data['note'])
+                duration_sla_hours=round(data['sla']), notes=data['note'])
             if citizen:
                 title = 'Ready for pickup' if data['final'] else f"Received at {office.name}"
                 notify(citizen, title, f"Your {name} request ({document.tracking_number}) "
@@ -376,7 +377,7 @@ class Command(BaseCommand):
         elif kind == 'return_received':
             log(DocumentLog.Action.RETURN_RECEIVED, office=office, sender=data['sender'], acted_by=data['by'],
                 qr_verified=True, duration_at_office=timedelta(hours=data['duration']),
-                duration_office=offices[data['held_at']])
+                duration_office=offices[data['held_at']], duration_sla_hours=round(data['sla']))
         elif kind == 'stage':
             stage(data['stage'], data['by'])
         elif kind == 'released_to_citizen':
@@ -394,12 +395,12 @@ class Command(BaseCommand):
             )
             MissingDocumentAlert.objects.filter(pk=alert.pk).update(raised_at=when)
         elif kind == 'follow_up':
-            dwell, sla = round(data['dwell'], 1), data['sla']
+            dwell, sla = format_hours_minutes(data['dwell']), format_hours_minutes(data['sla'])
             log(DocumentLog.Action.EXPEDITE_REQUESTED, office=office, acted_by=data['by'],
-                notes=f"Citizen requested a follow-up — document has been at {office.code} for {dwell}h (SLA: {sla}h).")
+                notes=f"Citizen requested a follow-up — document has been at {office.code} for {dwell} (SLA: {sla}).")
             for staff in User.objects.filter(role=User.Role.EMPLOYEE, is_active=True):
                 if resolve_office(staff.office) == office:
                     notify(staff, f"Follow-Up Requested: {document.tracking_number}",
                            f"The citizen who requested {document.tracking_number} ({name}) has flagged it as delayed — "
-                           f"it's been at your office for {dwell}h (expected: {sla}h). Please review.",
+                           f"it's been at your office for {dwell} (expected: {sla}). Please review.",
                            Notification.NotificationType.EXPEDITE_REQUEST, sender=data['by'])

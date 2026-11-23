@@ -418,6 +418,12 @@ def return_document(document, returning_user, notes='', destination='previous'):
     return document
 
 
+def step_sla_hours(document, position):
+    """The time limit, in hours, of the route step at `position` (0-based)."""
+    step = document.document_type.steps.filter(step_number=position + 1).first()
+    return step.max_hours_allowed if step else DEFAULT_FALLBACK_SLA_HOURS
+
+
 def receive_document(document, scanning_user, scanning_office, notes='', qr_verified=False):
     """
     Receiving office scans IN, completing the leg started by release_document()
@@ -448,6 +454,7 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
         now = timezone.now()
         time_spent = now - document.entered_current_office_at
         held_by = resolve_office(document.current_office)  # the office returning it
+        held_sla = step_sla_hours(document, document.route_position)
         previous_handler = document.current_handler
 
         document.route_position = target_position
@@ -468,6 +475,7 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
             qr_verified=qr_verified,
             duration_at_office=time_spent,
         duration_office=held_by,
+        duration_sla_hours=held_sla,
             notes=notes,
         )
         return document
@@ -491,6 +499,7 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
     now = timezone.now()
     time_spent = now - document.entered_current_office_at
     held_by = resolve_office(document.current_office)  # the office that sent it
+    held_sla = step_sla_hours(document, document.route_position)
     previous_handler = document.current_handler
 
     document.route_position = next_position
@@ -519,6 +528,7 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
         qr_verified=qr_verified,
         duration_at_office=time_spent,
         duration_office=held_by,
+        duration_sla_hours=held_sla,
         notes=notes,
     )
 
