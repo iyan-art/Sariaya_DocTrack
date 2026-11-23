@@ -399,6 +399,12 @@ class DocumentLog(models.Model):
     notes = models.TextField(blank=True)
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
     duration_at_office = models.DurationField(null=True, blank=True)
+    # The office that HELD the document for duration_at_office. A receive log's
+    # `office` is the office receiving it, but the time it measures was spent at
+    # the office before it, so speed analytics (Heatmap, Top 5) group by this.
+    duration_office = models.ForeignKey(
+        Office, on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
+    )
 
     class Meta:
         ordering = ['timestamp']

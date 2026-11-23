@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.utils import timezone
 
+from .durations import format_hours_minutes
 from .models import EmailNotificationLog
 
 # settings.TIME_ZONE is UTC, but email readers need the wall-clock time here.
@@ -66,9 +67,7 @@ def _format_duration(hours):
     SLA of 1h or 4h, common for same-office quick steps) — always with the
     precise hour figure alongside so nothing is lost to rounding.
     """
-    if hours >= 24:
-        return f"{hours / 24:.1f} day(s) ({hours:.1f} hour(s))"
-    return f"{hours:.1f} hour(s)"
+    return format_hours_minutes(hours)
 
 
 def _resolve_citizen_recipient(document):
@@ -108,7 +107,7 @@ def send_overdue_warning_email(document, staff_user, sla_hours, dwell_hours, due
         f"Current Office: {document.current_office}\n"
         f"Received by Office: {_format_local(document.entered_current_office_at)}\n"
         f"Due Date: {_format_local(due_at)}\n"
-        f"Applicable SLA: {sla_hours} hour(s)\n"
+        f"Applicable SLA: {format_hours_minutes(sla_hours)}\n"
         f"Elapsed Processing Time: {_format_duration(dwell_hours)}\n"
         f"Status: Overdue by {_format_duration(overdue_by_hours)}\n\n"
         f"Required Action: Please log in to the system to review and process this request.\n"
@@ -141,7 +140,7 @@ def send_due_soon_email(document, staff_user, sla_hours, dwell_hours, due_at):
         f"Current Office: {document.current_office}\n"
         f"Received by Office: {_format_local(document.entered_current_office_at)}\n"
         f"Due Date: {_format_local(due_at)}\n"
-        f"Applicable SLA: {sla_hours} hour(s)\n"
+        f"Applicable SLA: {format_hours_minutes(sla_hours)}\n"
         f"Time Remaining: {_format_duration(remaining_hours)}\n\n"
         f"Required Action: Please log in to the system to review and process this request "
         f"before it becomes overdue.\n"

@@ -286,24 +286,12 @@ class Command(BaseCommand):
             document.save()
 
     def _do_hop(self, document, position, from_code, to_code, offices, employees_by_office, handler, clock, is_final_leg):
-        # HeatmapDataView (and any Top-5-fastest/slowest view built the same
-        # way) groups by the RECEIVING log's `office` FK while averaging
-        # that same row's `duration_at_office` — which actually records time
-        # spent at the office being LEFT (see services.py::receive_document,
-        # the real code this mirrors). So to make an office's own average
-        # come out fast/slow, the random range must be keyed by `to_code`
-        # (the office this row's `office` field will point to), not
-        # `from_code`, even though `from_code` is what the duration is
-        # conceptually "about".
-        speed_lo, speed_hi = OFFICE_SPEED_HOURS[to_code]
+        # Time spent at `from_code` before `to_code` receives it — credited to
+        # from_code (duration_office), exactly as services.receive_document does.
+        speed_lo, speed_hi = OFFICE_SPEED_HOURS[from_code]
         dwell_hours = random.uniform(speed_lo, speed_hi)
         # Occasionally overshoot on purpose, so some documents render as
-        # SLA-delayed even before the hourly missing-document sweep would
-        # formally flag them. Scaled off this office's OWN range (not the
-        # step's max_hours_allowed, which belongs to `from_code` and can be
-        # wildly larger/smaller) — otherwise a single hop out of a slow
-        # office could inject a 100+ hour outlier into a fast office's
-        # average and wreck the intended fastest/slowest ranking.
+        # SLA-delayed even before the scheduled check formally flags them.
         if random.random() < 0.25:
             dwell_hours = speed_hi * random.uniform(1.5, 2.5)
 
@@ -325,6 +313,7 @@ class Command(BaseCommand):
             office=offices[to_code], sender=handler, acted_by=new_handler,
             qr_verified=random.random() < 0.7,
             duration_at_office=timedelta(hours=dwell_hours),
+            duration_office=offices[from_code],
             notes='Returned to origin office.' if is_final_leg else 'Received via QR scan.',
         )
         DocumentLog.objects.filter(pk=receive_log.pk).update(timestamp=clock)

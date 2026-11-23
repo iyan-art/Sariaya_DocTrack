@@ -14,6 +14,7 @@ from datetime import timedelta
 from django.db.models import F, Q
 from django.utils import timezone
 
+from .durations import format_hours_minutes
 from .models import Document, DocumentLog, EmailNotificationLog, MissingDocumentAlert, Notification
 from .notifications import send_overdue_warning_email, send_due_soon_email
 from .services import _office_name, notify_admins, notify_citizen, resolve_office, responsible_employees
@@ -101,7 +102,7 @@ def run_overdue_scan():
                 message=(
                     f"Document {document.tracking_number} ({document.document_type.name}) has "
                     f"exceeded its allowed processing time at {document.current_office} "
-                    f"({round(dwell_hours, 1)}h elapsed, SLA: {sla_hours}h)."
+                    f"({format_hours_minutes(dwell_hours)} elapsed, SLA: {format_hours_minutes(sla_hours)})."
                 ),
                 notification_type=Notification.NotificationType.BOTTLENECK_ALERT,
                 related_document=document,
@@ -179,14 +180,14 @@ def run_overdue_alert_scan(hours=DEFAULT_OVERDUE_ALERT_HOURS):
             document=document,
             kind=MissingDocumentAlert.Kind.OVERDUE,
             days_delayed=(now - document.entered_current_office_at).days,
-            notes=f"At '{document.current_office}' for over {hours}h.",
+            notes=f"At '{document.current_office}' for over {format_hours_minutes(hours)}.",
         )
         DocumentLog.objects.create(
             document=document,
             action=DocumentLog.Action.FLAGGED_OVERDUE,
             office=resolve_office(document.current_office),
             acted_by=None,  # the scheduled check, not a staff member
-            notes=f"Flagged Overdue by the scheduled SLA check: over {hours}h at '{document.current_office}'.",
+            notes=f"Flagged Overdue by the scheduled SLA check: over {format_hours_minutes(hours)} at '{document.current_office}'.",
         )
         alerts_created += 1
 

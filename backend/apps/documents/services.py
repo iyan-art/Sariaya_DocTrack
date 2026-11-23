@@ -4,6 +4,7 @@ from django.db.models.functions import Trim, Upper
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from apps.accounts.models import User
+from .durations import format_hours_minutes
 from .models import Document, DocumentLog, EmailNotificationLog, MissingDocumentAlert, Notification, Office, RequestStatusHistory
 from .notifications import send_ready_for_release_email, send_ready_for_release_staff_email
 
@@ -446,6 +447,7 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
 
         now = timezone.now()
         time_spent = now - document.entered_current_office_at
+        held_by = resolve_office(document.current_office)  # the office returning it
         previous_handler = document.current_handler
 
         document.route_position = target_position
@@ -465,6 +467,7 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
             acted_by=scanning_user,
             qr_verified=qr_verified,
             duration_at_office=time_spent,
+        duration_office=held_by,
             notes=notes,
         )
         return document
@@ -487,6 +490,7 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
 
     now = timezone.now()
     time_spent = now - document.entered_current_office_at
+    held_by = resolve_office(document.current_office)  # the office that sent it
     previous_handler = document.current_handler
 
     document.route_position = next_position
@@ -514,6 +518,7 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
         acted_by=scanning_user,
         qr_verified=qr_verified,
         duration_at_office=time_spent,
+        duration_office=held_by,
         notes=notes,
     )
 
@@ -841,15 +846,15 @@ def expedite_document(document, citizen_user):
         action=DocumentLog.Action.EXPEDITE_REQUESTED,
         office=resolve_office(document.current_office),
         acted_by=citizen_user,
-        notes=f"Citizen requested a follow-up — document has been at {document.current_office} for {round(dwell_hours, 1)}h (SLA: {sla_hours}h).",
+        notes=f"Citizen requested a follow-up — document has been at {document.current_office} for {format_hours_minutes(dwell_hours)} (SLA: {format_hours_minutes(sla_hours)}).",
     )
     notify_office(
         document.current_office,
         title=f"Follow-Up Requested: {document.tracking_number}",
         message=(
             f"The citizen who requested {document.tracking_number} ({document.document_type.name}) "
-            f"has flagged it as delayed — it's been at your office for {round(dwell_hours, 1)}h "
-            f"(expected: {sla_hours}h). Please review."
+            f"has flagged it as delayed — it's been at your office for {format_hours_minutes(dwell_hours)} "
+            f"(expected: {format_hours_minutes(sla_hours)}). Please review."
         ),
         notification_type=Notification.NotificationType.EXPEDITE_REQUEST,
         sender=citizen_user, related_document=document,

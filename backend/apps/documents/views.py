@@ -10,6 +10,7 @@ from django.http import FileResponse, Http404, HttpResponse
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from django.shortcuts import get_object_or_404
 
+from .durations import format_hours_minutes
 from .models import (
     Document, DocumentType, WorkflowStep, Office, DocumentLog, MissingDocumentAlert,
     Survey, SurveyQuestion, SurveyQuestionOption, SurveyAnswer, SurveyResponse,
@@ -1081,21 +1082,22 @@ def _evaluations_for_office(office):
 
 def _office_speed_stats():
     """
-    Shared by AdminDashboardStatsView and HeatmapDataView: average
-    duration_at_office per office, grouped by office code, fastest first.
+    Shared by AdminDashboardStatsView and HeatmapDataView: average time a
+    document stays with an office (from arriving there until the next office
+    receives it), grouped by the office that held it, fastest first.
     """
     stats = (
         DocumentLog.objects
         .exclude(duration_at_office__isnull=True)
-        .exclude(office__isnull=True)
-        .values('office__code', 'office__name')
+        .exclude(duration_office__isnull=True)
+        .values('duration_office__code', 'duration_office__name')
         .annotate(avg_time=Avg('duration_at_office'), doc_count=Count('id'))
         .order_by('avg_time')
     )
     return [
         {
-            "office": item['office__code'],
-            "office_name": item['office__name'],
+            "office": item['duration_office__code'],
+            "office_name": item['duration_office__name'],
             "avg_hours": round(item['avg_time'].total_seconds() / 3600, 2),
             "count": item['doc_count'],
         }
@@ -1197,10 +1199,7 @@ class AdminDashboardStatsView(APIView):
         avg_resolution_hours = round(avg_resolution.total_seconds() / 3600, 1) if avg_resolution else None
         avg_resolution_display = None
         if avg_resolution_hours is not None:
-            avg_resolution_display = (
-                f"{round(avg_resolution_hours / 24, 1)} days" if avg_resolution_hours >= 24
-                else f"{avg_resolution_hours} hours"
-            )
+            avg_resolution_display = format_hours_minutes(avg_resolution.total_seconds() / 3600)
 
         # Peak scan activity — QR-verified movements per day, most recent
         # `scan_days` days (default 14).

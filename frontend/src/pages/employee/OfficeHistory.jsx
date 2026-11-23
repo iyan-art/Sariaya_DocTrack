@@ -4,6 +4,7 @@ import { useToast } from '../../context/ToastContext';
 import DocumentFormModal from '../../components/admin/DocumentFormModal';
 import { CheckCircle2Icon, Clock3Icon } from '../../components/Icons';
 import Pagination from '../../components/Pagination';
+import { formatHoursMinutes } from '../../utils/duration';
 
 const PAGE_SIZE = 15; // matches OfficeHistoryPagination on the backend
 const SCOPES = [
@@ -14,13 +15,6 @@ const SCOPES = [
 
 function formatWhen(iso) {
   return iso ? new Date(iso).toLocaleString() : '—';
-}
-
-function formatHours(hours) {
-  if (hours == null) return '—';
-  if (hours < 1) return `${Math.max(1, Math.round(hours * 60))}m`;
-  if (hours < 24) return `${hours.toFixed(1)}h`;
-  return `${(hours / 24).toFixed(1)}d`;
 }
 
 /**
@@ -128,7 +122,7 @@ export default function OfficeHistory() {
                       )}
                     </td>
                     <td data-label="Time here" className="px-5 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      {formatHours(doc.visits.reduce((sum, v) => sum + (v.hours_in_office || 0), 0))}
+                      {formatHoursMinutes(doc.visits.reduce((sum, v) => sum + (v.hours_in_office || 0), 0))}
                     </td>
                     <td data-label="Now" className="px-5 py-3 text-xs">
                       {doc.in_custody ? (

@@ -230,7 +230,7 @@ class Command(BaseCommand):
             receiver = pick(next_position)
             qr = random.random() < 0.85
             events.append((clock, 'received', {
-                'by': receiver, 'sender': sender, 'at': next_position, 'qr': qr,
+                'by': receiver, 'sender': sender, 'at': next_position, 'held_at': position, 'qr': qr,
                 'duration': clock - entered_at, 'final': next_position == last,
                 'note': f"Received via QR scan by {receiver.full_name} ({receiver.employee_id})." if qr else '',
             }))
@@ -258,7 +258,7 @@ class Command(BaseCommand):
                 events.append((clock, 'return_initiated', {'by': handler, 'at': position, 'note': reason}))
                 clock += random.uniform(0.2, 1.0)
                 receiver = pick(previous)
-                events.append((clock, 'return_received', {'by': receiver, 'sender': handler, 'at': previous, 'duration': clock - entered_at}))
+                events.append((clock, 'return_received', {'by': receiver, 'sender': handler, 'at': previous, 'held_at': position, 'duration': clock - entered_at}))
                 entered_at, position, handler = clock, previous, receiver
                 hold(0.1, 0.5)
             if position == target:
@@ -364,7 +364,8 @@ class Command(BaseCommand):
         elif kind == 'received':
             action = DocumentLog.Action.RETURNED if data['final'] else DocumentLog.Action.RECEIVED
             log(action, office=office, sender=data['sender'], acted_by=data['by'], qr_verified=data['qr'],
-                duration_at_office=timedelta(hours=data['duration']), notes=data['note'])
+                duration_at_office=timedelta(hours=data['duration']), duration_office=offices[data['held_at']],
+                notes=data['note'])
             if citizen:
                 title = 'Ready for pickup' if data['final'] else f"Received at {office.name}"
                 notify(citizen, title, f"Your {name} request ({document.tracking_number}) "
@@ -374,7 +375,8 @@ class Command(BaseCommand):
             log(DocumentLog.Action.RETURN_INITIATED, office=office, sender=data['by'], acted_by=data['by'], notes=data['note'])
         elif kind == 'return_received':
             log(DocumentLog.Action.RETURN_RECEIVED, office=office, sender=data['sender'], acted_by=data['by'],
-                qr_verified=True, duration_at_office=timedelta(hours=data['duration']))
+                qr_verified=True, duration_at_office=timedelta(hours=data['duration']),
+                duration_office=offices[data['held_at']])
         elif kind == 'stage':
             stage(data['stage'], data['by'])
         elif kind == 'released_to_citizen':

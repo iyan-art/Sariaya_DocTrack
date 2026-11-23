@@ -59,14 +59,20 @@ export default function Heatmap() {
 
       {/* Legend */}
       {!loading && data.length > 0 && (
+        // Each end of the scale shows the fastest / slowest office's average.
         <div className="mt-6 flex items-center gap-3">
-          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Fast</span>
+          <div className="shrink-0 text-right">
+            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Fast</p>
+            <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">{formatHoursMinutes(min)}</p>
+          </div>
           <div
-            className="h-3 flex-1 max-w-xs rounded-full"
+            className="h-3 flex-1 min-w-12 max-w-xs rounded-full"
             style={{ background: 'linear-gradient(to right, hsl(120,85%,55%), hsl(60,85%,55%), hsl(0,85%,55%))' }}
           />
-          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Slow</span>
-          <span className="text-xs text-slate-400 dark:text-slate-500 ml-4">{min}h – {max}h avg</span>
+          <div className="shrink-0">
+            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Slow</p>
+            <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">{formatHoursMinutes(max)}</p>
+          </div>
         </div>
       )}
 
