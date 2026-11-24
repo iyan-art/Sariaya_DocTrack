@@ -254,6 +254,11 @@ else:
 #   during a live demo to see an overdue email sooner.
 # - CRON_SECRET: enables POST /api/documents/sla-scan/cron/ for an external
 #   cron service, for a host that sleeps when idle (Render's free plan).
+# - OVERDUE_EMAILS_EXTERNAL: set to true on a host that cannot send email
+#   (Render's free plan blocks SMTP). The web server then leaves the overdue
+#   and approaching-due-date email scan to the GitHub Actions job
+#   (.github/workflows/overdue-emails.yml), which runs it with Gmail SMTP.
 SLA_SCHEDULER_ENABLED = os.environ.get('SLA_SCHEDULER_ENABLED', 'true').lower() == 'true'
 SLA_SCAN_INTERVAL_SECONDS = int(os.environ.get('SLA_SCAN_INTERVAL_SECONDS', '900'))
 CRON_SECRET = os.environ.get('CRON_SECRET', '')
+OVERDUE_EMAILS_EXTERNAL = os.environ.get('OVERDUE_EMAILS_EXTERNAL', 'false').lower() == 'true'

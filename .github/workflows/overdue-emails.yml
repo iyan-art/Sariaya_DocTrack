@@ -1,0 +1,58 @@
+# Overdue alert emails, sent from GitHub's servers instead of Render.
+#
+# Render's free plan blocks outbound SMTP, so the web server there cannot
+# send email. Every 15 minutes this job connects straight to the production
+# database and runs the same overdue scan (apps/documents/sla_scan.py),
+# sending the emails through Gmail SMTP. On Render, set
+# OVERDUE_EMAILS_EXTERNAL=true so the web server leaves this scan to the job.
+#
+# Repository secrets (Settings > Secrets and variables > Actions):
+#   DATABASE_URL         the Supabase *Session pooler* connection string
+#   SECRET_KEY           same value as on Render
+#   EMAIL_HOST_USER      the Gmail address
+#   EMAIL_HOST_PASSWORD  its 16-character app password
+#   DEFAULT_FROM_EMAIL   e.g. Sariaya DocTrack <address@gmail.com>
+#   FRONTEND_BASE_URL    the deployed frontend, for the link in the email
+name: Overdue alert emails
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'  # GitHub may start it a few minutes late
+  workflow_dispatch:         # "Run workflow" button, for testing
+
+concurrency:
+  group: overdue-emails
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      EMAIL_HOST_USER: ${{ secrets.EMAIL_HOST_USER }}
+      EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
+      DEFAULT_FROM_EMAIL: ${{ secrets.DEFAULT_FROM_EMAIL }}
+      FRONTEND_BASE_URL: ${{ secrets.FRONTEND_BASE_URL }}
+      SLA_SCHEDULER_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Check the secrets are set
+        # Without them Django would fall back to SQLite and the console email
+        # backend, and record emails as sent that never left.
+        run: |
+          for name in DATABASE_URL SECRET_KEY EMAIL_HOST_USER EMAIL_HOST_PASSWORD FRONTEND_BASE_URL; do
+            if [ -z "${!name}" ]; then echo "Missing repository secret: $name"; exit 1; fi
+          done
+      - name: Send overdue and approaching-due-date emails
+        run: python manage.py check_overdue_documents

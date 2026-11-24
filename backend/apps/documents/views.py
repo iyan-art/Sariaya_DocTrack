@@ -31,7 +31,7 @@ from .serializers import (
 from .permissions import IsStaffUser
 from apps.accounts.permissions import IsAdmin
 from .services import release_document, receive_document, return_document, citizen_return_document, mark_corrected, release_final, flag_missing, mark_found, resolve_office, advance_processing_stage, can_delete_document, holds_document, expedite_document, notify_citizen
-from .sla_scan import run_overdue_scan, run_overdue_alert_scan, run_scheduled_scans
+from .sla_scan import run_overdue_alert_scan, run_scheduled_scans, run_server_overdue_scan
 from .services import DEFAULT_FALLBACK_SLA_HOURS, notify_admins
 from .qr_services import resolve_and_verify, enforce_scope_access, build_scan_context, generate_qr_code
 from .storage import database_storage
@@ -2096,7 +2096,7 @@ class RunSlaScanView(APIView):
     permission_classes = [IsAdmin]
 
     def post(self, request):
-        overdue_result = run_overdue_scan()
+        overdue_result = run_server_overdue_scan()
         overdue_alert_result = run_overdue_alert_scan()
         return Response({'overdue': overdue_result, 'overdue_alerts': overdue_alert_result})
 

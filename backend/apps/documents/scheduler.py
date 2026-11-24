@@ -41,7 +41,14 @@ def _run_forever():
             close_old_connections()
             # Slightly under the interval, so normal timer drift never skips a run.
             result = run_scheduled_scans(min_interval_seconds=interval * 0.9)
-            if result:
+            if result and result['overdue'].get('skipped'):
+                alerts = result['overdue_alerts']
+                logger.info(
+                    "SLA scan: overdue emails left to the GitHub Actions job; %s document(s) past the "
+                    "48h overdue ceiling (%s new alert(s)).",
+                    alerts['total_stuck'], alerts['alerts_created'],
+                )
+            elif result:
                 overdue, alerts = result['overdue'], result['overdue_alerts']
                 logger.info(
                     "SLA scan: %s document(s) overdue (%s email(s) sent), %s approaching due date "

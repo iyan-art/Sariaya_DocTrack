@@ -11,6 +11,7 @@ with each other.
 """
 from datetime import timedelta
 
+from django.conf import settings
 from django.db.models import F, Q
 from django.utils import timezone
 
@@ -55,6 +56,18 @@ def claim_scheduled_run(name, min_interval_seconds):
     )
 
 
+def run_server_overdue_scan():
+    """
+    run_overdue_scan() as the web server runs it (scheduler, cron endpoint,
+    "Run Scan Now"). Skipped when OVERDUE_EMAILS_EXTERNAL is set: that host
+    cannot send email, so a scan there would only record failed sends and
+    use up the retries meant for the GitHub Actions job that can send them.
+    """
+    if settings.OVERDUE_EMAILS_EXTERNAL:
+        return {'skipped': True, 'detail': 'Overdue emails are sent by the GitHub Actions job.'}
+    return run_overdue_scan()
+
+
 def run_scheduled_scans(min_interval_seconds):
     """
     The automatic run of both scans (background scheduler and cron endpoint).
@@ -62,7 +75,39 @@ def run_scheduled_scans(min_interval_seconds):
     """
     if not claim_scheduled_run('sla_scan', min_interval_seconds):
         return None
-    return {'overdue': run_overdue_scan(), 'overdue_alerts': run_overdue_alert_scan()}
+    return {'overdue': run_server_overdue_scan(), 'overdue_alerts': run_overdue_alert_scan()}
+
+
+# A send that failed (no internet, mail server down) is tried again on the
+# next scans, up to this many attempts per person per stay at an office.
+MAX_EMAIL_ATTEMPTS = 3
+
+
+def _episode_emails(document, kind):
+    """Emails of this kind about the document since it arrived at its current office."""
+    return EmailNotificationLog.objects.filter(
+        document=document, notification_type=kind, sent_at__gte=document.entered_current_office_at,
+    )
+
+
+def _still_to_email(document, kind):
+    """
+    The office's employees who should get this email now: they want overdue
+    alerts, have not received it during this stay, and have not already
+    failed MAX_EMAIL_ATTEMPTS times. One email per person per stay; a failed
+    send does not count as received, so it is retried.
+    """
+    logs = _episode_emails(document, kind)
+    received = set(logs.filter(status=EmailNotificationLog.Status.SENT).values_list('recipient_id', flat=True))
+    failures = {}
+    for recipient_id in logs.filter(status=EmailNotificationLog.Status.FAILED).values_list('recipient_id', flat=True):
+        failures[recipient_id] = failures.get(recipient_id, 0) + 1
+    return [
+        staff for staff in responsible_employees(document)
+        if staff.wants_notification('overdue_alerts')
+        and staff.id not in received
+        and failures.get(staff.id, 0) < MAX_EMAIL_ATTEMPTS
+    ]
 
 
 def run_overdue_scan():
@@ -109,21 +154,15 @@ def run_overdue_scan():
 
         if dwell_hours >= sla_hours:  # reached or past its SLA = Overdue
             documents_overdue += 1
-            already_warned = EmailNotificationLog.objects.filter(
-                document=document,
-                notification_type=EmailNotificationLog.NotificationType.OVERDUE_WARNING,
-                sent_at__gte=document.entered_current_office_at,
-            ).exists()
-            if already_warned:
-                continue
-            for staff in responsible_employees(document):
-                if not staff.wants_notification('overdue_alerts'):
-                    continue
+            kind = EmailNotificationLog.NotificationType.OVERDUE_WARNING
+            first_time = not _episode_emails(document, kind).exists()
+            for staff in _still_to_email(document, kind):
                 send_overdue_warning_email(document, staff, sla_hours, dwell_hours, due_at)
                 overdue_emails_sent += 1
+            if not first_time:
+                continue
 
-            # Admin-facing in-app bottleneck alert — gated by the same
-            # already_warned check above, so it fires once per overdue
+            # Admin-facing in-app bottleneck alert — once per overdue
             # episode (re-arms once the document moves on), not every scan.
             notify_admins(
                 title=f"Bottleneck: {document.tracking_number}",
@@ -147,16 +186,7 @@ def run_overdue_scan():
 
         elif dwell_hours >= sla_hours * DUE_SOON_THRESHOLD_RATIO:
             documents_due_soon += 1
-            already_notified = EmailNotificationLog.objects.filter(
-                document=document,
-                notification_type=EmailNotificationLog.NotificationType.DUE_SOON,
-                sent_at__gte=document.entered_current_office_at,
-            ).exists()
-            if already_notified:
-                continue
-            for staff in responsible_employees(document):
-                if not staff.wants_notification('overdue_alerts'):
-                    continue
+            for staff in _still_to_email(document, EmailNotificationLog.NotificationType.DUE_SOON):
                 send_due_soon_email(document, staff, sla_hours, dwell_hours, due_at)
                 due_soon_emails_sent += 1
 
