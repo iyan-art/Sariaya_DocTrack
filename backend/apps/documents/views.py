@@ -32,7 +32,7 @@ from .permissions import IsStaffUser
 from apps.accounts.permissions import IsAdmin
 from .services import release_document, receive_document, return_document, citizen_return_document, mark_corrected, release_final, flag_missing, mark_found, resolve_office, advance_processing_stage, can_delete_document, holds_document, expedite_document, notify_citizen
 from .sla_scan import run_overdue_alert_scan, run_scheduled_scans, run_server_overdue_scan
-from .services import DEFAULT_FALLBACK_SLA_HOURS, notify_admins
+from .services import DEFAULT_FALLBACK_SLA_HOURS, in_transit_since, notify_admins
 from .qr_services import resolve_and_verify, enforce_scope_access, build_scan_context, generate_qr_code
 from .storage import database_storage
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -1285,7 +1285,9 @@ class AdminDashboardStatsView(APIView):
                 # Travelling: measured against the step it is headed to.
                 position = doc.return_target_position if doc.is_returning else doc.route_position + 1
             sla_hours = steps[position].max_hours_allowed if position < len(steps) else DEFAULT_FALLBACK_SLA_HOURS
-            dwell_hours = (now - doc.entered_current_office_at).total_seconds() / 3600
+            # Travelling time counts from when it was sent, as in the overdue email.
+            since = in_transit_since(doc) if doc.status == 'in_transit' else doc.entered_current_office_at
+            dwell_hours = (now - since).total_seconds() / 3600
             if dwell_hours < sla_hours:
                 continue
             bottlenecks.append({

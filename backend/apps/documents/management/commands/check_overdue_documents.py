@@ -21,7 +21,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         result = run_overdue_scan()
         self.stdout.write(self.style.SUCCESS(
-            f"Overdue SLA scan complete: {result['documents_overdue']} document(s) past SLA "
+            f"Overdue SLA scan complete: {result['documents_overdue']} document(s) past SLA, "
+            f"{result['documents_not_received']} of them sent but not yet received "
             f"({result['emails_sent']} new warning email(s) sent), "
             f"{result['documents_due_soon']} document(s) approaching due date "
             f"({result['due_soon_emails_sent']} new heads-up email(s) sent)."

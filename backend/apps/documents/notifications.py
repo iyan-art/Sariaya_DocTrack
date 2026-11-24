@@ -140,6 +140,48 @@ def send_overdue_warning_email(document, staff_user, sla_hours, dwell_hours, due
     )
 
 
+def send_not_received_email(document, staff_user, destination, sent_at, sla_hours, transit_hours, due_at):
+    """
+    Overdue alert for a document sent to the staff member's office that the
+    office has not received (scanned in) within that step's SLA — see
+    sla_scan.run_overdue_scan(). Logged as an overdue warning.
+    """
+    overdue_by_hours = transit_hours - sla_hours
+    title = _document_title(document)
+    subject = f"[URGENT / OVERDUE] Document Tracking No. {document.tracking_number} - Action Required"
+    body = (
+        f"Good day, {staff_user.full_name}.\n\n"
+        f"A document was sent to your office but has not been received yet, and it has "
+        f"passed its processing time limit (SLA). Please locate the document and receive it "
+        f"(scan it in) right away.\n\n"
+        f"Document Type: {document.document_type.name}\n"
+        + (f"Document Title / Purpose: {title}\n" if title else "")
+        + f"Tracking Code: {document.tracking_number}\n"
+        f"Citizen/Requester: {_requester_display_name(document)}\n"
+        f"Sent by: {document.current_office}\n"
+        f"Sent to: {destination}\n"
+        f"Sent on: {_format_local(sent_at)}\n"
+        f"Due: {_format_local(due_at)}\n\n"
+        f"Time Elapsed: {_format_duration(transit_hours)}\n"
+        f"SLA Threshold: {format_hours_minutes(sla_hours)}\n"
+        f"Status: "
+        + (f"Not received, overdue by {_format_duration(overdue_by_hours)}" if overdue_by_hours >= 1 / 60
+           else "Not received, SLA limit reached")
+        + "\n\n"
+        f"Open the document here:\n{document_portal_link(document)}\n\n"
+        f"This is an automated alert from Sariaya DocTrack. You will not get another "
+        f"alert for this document until it is received.\n"
+    )
+    _send_and_log(
+        document=document,
+        recipient_user=staff_user,
+        recipient_email=staff_user.email,
+        notification_type=EmailNotificationLog.NotificationType.OVERDUE_WARNING,
+        subject=subject,
+        body=body,
+    )
+
+
 def send_due_soon_email(document, staff_user, sla_hours, dwell_hours, due_at):
     """
     A milder heads-up sent once a document is approaching (but hasn't yet

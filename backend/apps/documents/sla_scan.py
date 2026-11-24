@@ -17,8 +17,11 @@ from django.utils import timezone
 
 from .durations import format_hours_minutes
 from .models import Document, DocumentLog, EmailNotificationLog, MissingDocumentAlert, Notification, ScheduledTaskRun
-from .notifications import send_overdue_warning_email, send_due_soon_email
-from .services import _office_name, notify_admins, notify_citizen, resolve_office, responsible_employees
+from .notifications import send_due_soon_email, send_not_received_email, send_overdue_warning_email
+from .services import (
+    _office_name, in_transit_destination, in_transit_since, notify_admins, notify_citizen, office_employees,
+    resolve_office, responsible_employees,
+)
 
 # Only used if a document's route_position has somehow drifted out of range
 # for its DocumentType's WorkflowStep rows — a data-integrity edge case, not
@@ -83,31 +86,61 @@ def run_scheduled_scans(min_interval_seconds):
 MAX_EMAIL_ATTEMPTS = 3
 
 
-def _episode_emails(document, kind):
-    """Emails of this kind about the document since it arrived at its current office."""
+def _episode_emails(document, kind, since=None):
+    """Emails of this kind about the document since `since` (default: its arrival at its current office)."""
     return EmailNotificationLog.objects.filter(
-        document=document, notification_type=kind, sent_at__gte=document.entered_current_office_at,
+        document=document, notification_type=kind,
+        sent_at__gte=since or document.entered_current_office_at,
     )
 
 
-def _still_to_email(document, kind):
+def _still_to_email(document, kind, staff=None, since=None):
     """
-    The office's employees who should get this email now: they want overdue
-    alerts, have not received it during this stay, and have not already
-    failed MAX_EMAIL_ATTEMPTS times. One email per person per stay; a failed
-    send does not count as received, so it is retried.
+    The employees who should get this email now: by default the document's
+    current office (`staff` overrides that), keeping those who want overdue
+    alerts, have not received it since `since`, and have not already failed
+    MAX_EMAIL_ATTEMPTS times. One email per person per stay; a failed send
+    does not count as received, so it is retried.
     """
-    logs = _episode_emails(document, kind)
+    logs = _episode_emails(document, kind, since)
     received = set(logs.filter(status=EmailNotificationLog.Status.SENT).values_list('recipient_id', flat=True))
     failures = {}
     for recipient_id in logs.filter(status=EmailNotificationLog.Status.FAILED).values_list('recipient_id', flat=True):
         failures[recipient_id] = failures.get(recipient_id, 0) + 1
     return [
-        staff for staff in responsible_employees(document)
-        if staff.wants_notification('overdue_alerts')
-        and staff.id not in received
-        and failures.get(staff.id, 0) < MAX_EMAIL_ATTEMPTS
+        person for person in (responsible_employees(document) if staff is None else staff)
+        if person.wants_notification('overdue_alerts')
+        and person.id not in received
+        and failures.get(person.id, 0) < MAX_EMAIL_ATTEMPTS
     ]
+
+
+def _scan_not_received(now):
+    """
+    In Transit documents (sent, not yet received) past the SLA of the step
+    they are headed to, counted from when they were sent: emails the staff
+    of the office that has to receive them, once per trip. Returns
+    (documents, emails sent).
+    """
+    documents = emails = 0
+    kind = EmailNotificationLog.NotificationType.OVERDUE_WARNING
+    in_transit = Document.objects.filter(status=Document.Status.IN_TRANSIT).select_related('document_type')
+    for document in in_transit:
+        position, destination = in_transit_destination(document)
+        if destination is None:
+            continue
+        steps = list(document.document_type.steps.all())
+        sla_hours = steps[position].max_hours_allowed if position < len(steps) else DEFAULT_FALLBACK_SLA_HOURS
+        sent_at = in_transit_since(document)
+        transit_hours = (now - sent_at).total_seconds() / 3600
+        if transit_hours < sla_hours:
+            continue
+        documents += 1
+        due_at = sent_at + timedelta(hours=sla_hours)
+        for staff in _still_to_email(document, kind, staff=office_employees(destination), since=sent_at):
+            send_not_received_email(document, staff, destination, sent_at, sla_hours, transit_hours, due_at)
+            emails += 1
+    return documents, emails
 
 
 def run_overdue_scan():
@@ -122,6 +155,9 @@ def run_overdue_scan():
       overdue episode; or
     - within DUE_SOON_THRESHOLD_RATIO of its SLA but not past it yet: sends
       a milder Approaching Due Date heads-up instead, also once per episode.
+
+    In Transit documents (sent but not received) are checked too, against
+    the SLA of the step they are headed to: see _scan_not_received().
 
     "Once per episode" means skipped if we've already sent that
     notification type since this document arrived at its current office.
@@ -190,9 +226,12 @@ def run_overdue_scan():
                 send_due_soon_email(document, staff, sla_hours, dwell_hours, due_at)
                 due_soon_emails_sent += 1
 
+    documents_not_received, not_received_emails_sent = _scan_not_received(now)
+
     return {
-        'documents_overdue': documents_overdue,
-        'emails_sent': overdue_emails_sent,
+        'documents_overdue': documents_overdue + documents_not_received,
+        'emails_sent': overdue_emails_sent + not_received_emails_sent,
+        'documents_not_received': documents_not_received,
         'documents_due_soon': documents_due_soon,
         'due_soon_emails_sent': due_soon_emails_sent,
     }

@@ -180,6 +180,35 @@ def responsible_employees(document):
     return list(recipients.values())
 
 
+def in_transit_destination(document):
+    """Route position and office code an In Transit document is headed to."""
+    position = document.return_target_position if document.is_returning else document.route_position + 1
+    route = document.document_type.route
+    return position, (route[position] if position < len(route) else None)
+
+
+def in_transit_since(document):
+    """
+    When an In Transit document was sent (released or returned) toward the
+    next office. Its time in transit counts from here, not from when the
+    sending office received it, so the sender's own time is not charged to
+    the office that has yet to receive it.
+    """
+    sent = document.logs.filter(
+        action__in=[DocumentLog.Action.RELEASED, DocumentLog.Action.RETURN_INITIATED],
+        timestamp__gte=document.entered_current_office_at,
+    ).order_by('-timestamp').first()
+    return sent.timestamp if sent else document.entered_current_office_at
+
+
+def office_employees(office_code):
+    """Every active Employee assigned to one office."""
+    return [
+        staff for staff in User.objects.filter(role=User.Role.EMPLOYEE, is_active=True)
+        if _same_office(staff.office, office_code)
+    ]
+
+
 def _notify_office_ready(document):
     """Emails the office's employees that the document is ready for release, once each per round."""
     already_notified = set(
