@@ -866,3 +866,16 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.recipient} — {self.title}"
+
+
+class ScheduledTaskRun(models.Model):
+    """
+    When a scheduled job (the SLA/overdue scan) last ran. Several server
+    processes may each run the scheduler; claim_scheduled_run() lets only
+    one of them run the job per interval.
+    """
+    name = models.CharField(max_length=50, unique=True)
+    last_run_at = models.DateTimeField()
+
+    def __str__(self):
+        return f"{self.name} @ {self.last_run_at:%Y-%m-%d %H:%M}"

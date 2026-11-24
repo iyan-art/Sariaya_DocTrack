@@ -10,6 +10,8 @@ from django.http import FileResponse, Http404, HttpResponse
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from django.shortcuts import get_object_or_404
 
+from django.conf import settings
+from django.utils.crypto import constant_time_compare
 from .durations import format_hours_minutes
 from .models import (
     Document, DocumentType, WorkflowStep, Office, DocumentLog, MissingDocumentAlert,
@@ -29,7 +31,7 @@ from .serializers import (
 from .permissions import IsStaffUser
 from apps.accounts.permissions import IsAdmin
 from .services import release_document, receive_document, return_document, citizen_return_document, mark_corrected, release_final, flag_missing, mark_found, resolve_office, advance_processing_stage, can_delete_document, holds_document, expedite_document, notify_citizen
-from .sla_scan import run_overdue_scan, run_overdue_alert_scan
+from .sla_scan import run_overdue_scan, run_overdue_alert_scan, run_scheduled_scans
 from .services import DEFAULT_FALLBACK_SLA_HOURS, notify_admins
 from .qr_services import resolve_and_verify, enforce_scope_access, build_scan_context, generate_qr_code
 from .storage import database_storage
@@ -1175,7 +1177,7 @@ class AdminDashboardStatsView(APIView):
                   .select_related('document_type').prefetch_related('document_type__steps')):
             steps = list(d.document_type.steps.all())
             sla_hours = steps[d.route_position].max_hours_allowed if d.route_position < len(steps) else DEFAULT_FALLBACK_SLA_HOURS
-            if (now - d.entered_current_office_at).total_seconds() / 3600 > sla_hours:
+            if (now - d.entered_current_office_at).total_seconds() / 3600 >= sla_hours:
                 overdue += 1
 
         week_start = now - timedelta(days=7)
@@ -1284,7 +1286,7 @@ class AdminDashboardStatsView(APIView):
                 position = doc.return_target_position if doc.is_returning else doc.route_position + 1
             sla_hours = steps[position].max_hours_allowed if position < len(steps) else DEFAULT_FALLBACK_SLA_HOURS
             dwell_hours = (now - doc.entered_current_office_at).total_seconds() / 3600
-            if dwell_hours <= sla_hours:
+            if dwell_hours < sla_hours:
                 continue
             bottlenecks.append({
                 "id": doc.id,
@@ -2097,6 +2099,30 @@ class RunSlaScanView(APIView):
         overdue_result = run_overdue_scan()
         overdue_alert_result = run_overdue_alert_scan()
         return Response({'overdue': overdue_result, 'overdue_alerts': overdue_alert_result})
+
+
+class SlaScanCronView(APIView):
+    """
+    POST /api/documents/sla-scan/cron/   header  X-Cron-Secret: <CRON_SECRET>
+    For an external cron service (e.g. every 15 minutes): runs the overdue
+    scans that send the overdue alert emails. Needed where the host sleeps
+    when idle (Render's free plan) and the in-process scheduler stops with
+    it; the request also wakes the server. Disabled (404) until CRON_SECRET
+    is set. Skips the scans when they already ran within the last minute.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        secret = getattr(settings, 'CRON_SECRET', '')
+        if not secret:
+            raise Http404
+        if not constant_time_compare(request.headers.get('X-Cron-Secret', ''), secret):
+            return Response({'detail': 'Invalid cron secret.'}, status=status.HTTP_403_FORBIDDEN)
+        result = run_scheduled_scans(min_interval_seconds=60)
+        if result is None:
+            return Response({'skipped': True, 'detail': 'The scans already ran within the last minute.'})
+        return Response(result)
 
 
 class NotificationPagination(PageNumberPagination):

@@ -15,7 +15,7 @@ from django.db.models import F, Q
 from django.utils import timezone
 
 from .durations import format_hours_minutes
-from .models import Document, DocumentLog, EmailNotificationLog, MissingDocumentAlert, Notification
+from .models import Document, DocumentLog, EmailNotificationLog, MissingDocumentAlert, Notification, ScheduledTaskRun
 from .notifications import send_overdue_warning_email, send_due_soon_email
 from .services import _office_name, notify_admins, notify_citizen, resolve_office, responsible_employees
 
@@ -35,6 +35,34 @@ DEFAULT_OVERDUE_ALERT_HOURS = 48
 # run_overdue_scan()). 0.8 of a 4h SLA is 3.2h in, i.e. an 0.8h/48min
 # window to react before it tips into Overdue.
 DUE_SOON_THRESHOLD_RATIO = 0.8
+
+
+def claim_scheduled_run(name, min_interval_seconds):
+    """
+    True for the one caller allowed to run job `name` now: it last ran at
+    least `min_interval_seconds` ago (or never). The claim is a single
+    conditional UPDATE, so two server processes asking at the same moment
+    can't both win, and a job never runs twice in one interval.
+    """
+    now = timezone.now()
+    run, created = ScheduledTaskRun.objects.get_or_create(name=name, defaults={'last_run_at': now})
+    if created:
+        return True
+    return bool(
+        ScheduledTaskRun.objects
+        .filter(pk=run.pk, last_run_at__lte=now - timedelta(seconds=min_interval_seconds))
+        .update(last_run_at=now)
+    )
+
+
+def run_scheduled_scans(min_interval_seconds):
+    """
+    The automatic run of both scans (background scheduler and cron endpoint).
+    Returns None when another process already ran them within the interval.
+    """
+    if not claim_scheduled_run('sla_scan', min_interval_seconds):
+        return None
+    return {'overdue': run_overdue_scan(), 'overdue_alerts': run_overdue_alert_scan()}
 
 
 def run_overdue_scan():
@@ -79,7 +107,7 @@ def run_overdue_scan():
         dwell_hours = (now - document.entered_current_office_at).total_seconds() / 3600
         due_at = document.entered_current_office_at + timedelta(hours=sla_hours)
 
-        if dwell_hours > sla_hours:
+        if dwell_hours >= sla_hours:  # reached or past its SLA = Overdue
             documents_overdue += 1
             already_warned = EmailNotificationLog.objects.filter(
                 document=document,

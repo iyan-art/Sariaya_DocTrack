@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
 export default function ProtectedRoute({ allowedRoles }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   const { showToast } = useToast();
 
   const wrongRole = !loading && !!user && allowedRoles && !allowedRoles.includes(user.role);
@@ -28,7 +29,9 @@ export default function ProtectedRoute({ allowedRoles }) {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    // Remember the page (e.g. a document link from an overdue email) so
+    // signing in goes straight back to it.
+    return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />;
   }
 
   if (wrongRole) {

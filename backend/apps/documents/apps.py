@@ -15,14 +15,15 @@ class DocumentsConfig(AppConfig):
         # just the one serving live traffic.
         from . import signals  # noqa: F401
 
-        # AppConfig.ready() fires for every management command (migrate,
-        # makemigrations, shell, tests...), not just `runserver` — and under
-        # the dev autoreloader it fires twice (the parent watcher process,
-        # then the reloaded child that actually serves requests; only the
-        # child sets RUN_MAIN). Gating on both means the SLA/email
-        # background scheduler starts exactly once, and only in the process
-        # that's actually going to serve traffic.
-        if 'runserver' not in sys.argv or os.environ.get('RUN_MAIN') != 'true':
+        # The SLA/email background scheduler starts only in a process that
+        # serves traffic: a gunicorn worker (production), or runserver's
+        # reloaded child (it sets RUN_MAIN; its parent only watches files).
+        # Never for migrate, shell, tests or other management commands.
+        from django.conf import settings
+        if not settings.SLA_SCHEDULER_ENABLED:
             return
-        from . import scheduler
-        scheduler.start()
+        under_gunicorn = 'gunicorn' in os.path.basename(sys.argv[0] if sys.argv else '')
+        under_runserver = 'runserver' in sys.argv and os.environ.get('RUN_MAIN') == 'true'
+        if under_gunicorn or under_runserver:
+            from . import scheduler
+            scheduler.start()

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { extractErrorMessage } from '../../utils/apiError';
 import PasswordInput from '../PasswordInput';
@@ -77,6 +77,7 @@ export default function QuickActionsSection() {
 function LoginForm({ onSwitch }) {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -89,7 +90,11 @@ function LoginForm({ onSwitch }) {
     setLoading(true);
     try {
       const user = await login(form.email, form.password);
-      if (user.role === 'admin') navigate('/admin/dashboard');
+      // Back to the page that asked for sign-in (e.g. a document link in
+      // an overdue email), if it belongs to this user's role.
+      const from = location.state?.from;
+      if (typeof from === 'string' && from.startsWith(`/${user.role}/`)) navigate(from, { replace: true });
+      else if (user.role === 'admin') navigate('/admin/dashboard');
       else if (user.role === 'employee') navigate('/employee/dashboard');
       // linkedGuestDocuments (Automatic Guest-to-User Account Linking)
       // only ever has anything for citizens — Home.jsx reads this via

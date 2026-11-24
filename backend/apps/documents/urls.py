@@ -10,7 +10,7 @@ from .views import (
     MySurveyCommentsView,
     MyDocumentListView, MyDocumentDetailView, DocumentEvaluationView, PublicDocumentEvaluationView,
     DocumentStageUpdateView, DocumentCitizenReturnView, DocumentExpediteView,
-    EmailNotificationLogListView, RunSlaScanView,
+    EmailNotificationLogListView, RunSlaScanView, SlaScanCronView,
     AnnouncementListView, EventListView, PublicDocumentTypeListView, OfficeHistoryView,
     AnnouncementManageListView, AnnouncementManageDetailView, EventManageListView, EventManageDetailView,
 )
@@ -66,4 +66,5 @@ urlpatterns = [
     path('my-office-comments/', MySurveyCommentsView.as_view(), name='my-office-comments'),
     path('email-notifications/', EmailNotificationLogListView.as_view(), name='email-notification-log-list'),
     path('email-notifications/run-scan/', RunSlaScanView.as_view(), name='email-notification-run-scan'),
+    path('sla-scan/cron/', SlaScanCronView.as_view(), name='sla-scan-cron'),
 ]

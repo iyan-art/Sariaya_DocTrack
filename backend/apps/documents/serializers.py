@@ -508,7 +508,7 @@ class DocumentSerializer(serializers.ModelSerializer):
                     statuses.append('active')
                 else:
                     dwell_hours = (timezone.now() - obj.entered_current_office_at).total_seconds() / 3600
-                    if dwell_hours > step.max_hours_allowed:
+                    if dwell_hours >= step.max_hours_allowed:
                         statuses.append('delayed')
                     elif dwell_hours >= step.max_hours_allowed * DUE_SOON_THRESHOLD_RATIO:
                         statuses.append('near_due')

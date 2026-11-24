@@ -845,7 +845,7 @@ def expedite_document(document, citizen_user):
         sla_hours = DEFAULT_FALLBACK_SLA_HOURS
     dwell_hours = (timezone.now() - document.entered_current_office_at).total_seconds() / 3600
 
-    if dwell_hours <= sla_hours:
+    if dwell_hours < sla_hours:
         raise ValidationError(
             "This document is still within its expected processing time — "
             "a follow-up can only be requested once it's running late."

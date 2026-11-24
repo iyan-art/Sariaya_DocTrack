@@ -89,28 +89,46 @@ def _resolve_citizen_recipient(document):
     return None
 
 
+def document_portal_link(document):
+    """Opens this document's record in the staff portal (signing in first if needed)."""
+    return f"{settings.FRONTEND_BASE_URL.rstrip('/')}/employee/documents?doc={document.id}"
+
+
+def _document_title(document):
+    """A request has no title field; its purpose (when the form asks) describes it."""
+    purpose = (document.form_data or {}).get('purpose')
+    return str(purpose).strip() if purpose else ''
+
+
 def send_overdue_warning_email(document, staff_user, sla_hours, dwell_hours, due_at):
     """
-    Staff-facing SLA breach warning for one document sitting past its
-    current step's configured SLA — see sla_scan.run_overdue_scan(), the
-    only caller (shared by the check_overdue_documents management command,
-    the background scheduler, and the admin 'Run Scan Now' action).
+    Staff-facing alert for one document that has reached or passed its
+    current step's SLA — see sla_scan.run_overdue_scan(), the only caller
+    (shared by the background scheduler, the check_overdue_documents
+    command, the cron endpoint and the admin 'Run Scan Now' action).
     """
     overdue_by_hours = dwell_hours - sla_hours
-    subject = f"Overdue Document Warning — {document.tracking_number}"
+    title = _document_title(document)
+    subject = f"[URGENT / OVERDUE] Document Tracking No. {document.tracking_number} - Action Required"
     body = (
-        f"You have a document/request that requires your attention.\n\n"
-        f"Document: {document.document_type.name}\n"
-        f"Reference No.: {document.tracking_number}\n"
+        f"Good day, {staff_user.full_name}.\n\n"
+        f"A document at your office has reached its processing time limit (SLA) "
+        f"and needs action right away.\n\n"
+        f"Document Type: {document.document_type.name}\n"
+        + (f"Document Title / Purpose: {title}\n" if title else "")
+        + f"Tracking Code: {document.tracking_number}\n"
         f"Citizen/Requester: {_requester_display_name(document)}\n"
-        f"Date Submitted: {_format_local(document.created_at)}\n"
         f"Current Office: {document.current_office}\n"
         f"Received by Office: {_format_local(document.entered_current_office_at)}\n"
-        f"Due Date: {_format_local(due_at)}\n"
-        f"Applicable SLA: {format_hours_minutes(sla_hours)}\n"
-        f"Elapsed Processing Time: {_format_duration(dwell_hours)}\n"
-        f"Status: Overdue by {_format_duration(overdue_by_hours)}\n\n"
-        f"Required Action: Please log in to the system to review and process this request.\n"
+        f"Due: {_format_local(due_at)}\n\n"
+        f"Time Elapsed: {_format_duration(dwell_hours)}\n"
+        f"SLA Threshold: {format_hours_minutes(sla_hours)}\n"
+        f"Status: "
+        + (f"Overdue by {_format_duration(overdue_by_hours)}" if overdue_by_hours >= 1 / 60 else "SLA limit reached")
+        + "\n\n"
+        f"Open and process the document here:\n{document_portal_link(document)}\n\n"
+        f"This is an automated alert from Sariaya DocTrack. You will not get another "
+        f"overdue alert for this document while it stays at your office.\n"
     )
     _send_and_log(
         document=document,
@@ -142,8 +160,8 @@ def send_due_soon_email(document, staff_user, sla_hours, dwell_hours, due_at):
         f"Due Date: {_format_local(due_at)}\n"
         f"Applicable SLA: {format_hours_minutes(sla_hours)}\n"
         f"Time Remaining: {_format_duration(remaining_hours)}\n\n"
-        f"Required Action: Please log in to the system to review and process this request "
-        f"before it becomes overdue.\n"
+        f"Required Action: Please review and process this request before it becomes overdue:\n"
+        f"{document_portal_link(document)}\n"
     )
     _send_and_log(
         document=document,

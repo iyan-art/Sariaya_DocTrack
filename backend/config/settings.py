@@ -247,8 +247,13 @@ else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
     DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@sariaya-doctrack.local')
 
-# How often (in seconds) the in-process background scheduler
-# (apps/documents/scheduler.py) re-runs the overdue/missing SLA scans while
-# `runserver` is up. 900s = 15 minutes; lower this during a live demo to see
-# an overdue warning email fire sooner without waiting.
-SLA_SCAN_INTERVAL_SECONDS = 900
+# Overdue alert emails (apps/documents/sla_scan.py, scheduler.py):
+# - SLA_SCHEDULER_ENABLED: run the scans automatically inside the web server
+#   (runserver and gunicorn). Default on.
+# - SLA_SCAN_INTERVAL_SECONDS: how often. 900 = every 15 minutes; lower it
+#   during a live demo to see an overdue email sooner.
+# - CRON_SECRET: enables POST /api/documents/sla-scan/cron/ for an external
+#   cron service, for a host that sleeps when idle (Render's free plan).
+SLA_SCHEDULER_ENABLED = os.environ.get('SLA_SCHEDULER_ENABLED', 'true').lower() == 'true'
+SLA_SCAN_INTERVAL_SECONDS = int(os.environ.get('SLA_SCAN_INTERVAL_SECONDS', '900'))
+CRON_SECRET = os.environ.get('CRON_SECRET', '')
