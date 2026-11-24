@@ -1,5 +1,6 @@
 import { CONTACT_NUMBER_ERROR, isInvalidContactNumber } from '../../utils/contactNumber';
 import { blockInvalidNumberKeys, numberFieldError } from '../../utils/positiveNumber';
+import AddressAutocomplete from './AddressAutocomplete';
 
 // Fallback for a document type with no request_fields configured yet
 // (e.g. one an admin just created) — better than showing nothing.
@@ -8,6 +9,12 @@ import { blockInvalidNumberKeys, numberFieldError } from '../../utils/positiveNu
 const ADDRESS_PLACEHOLDER = 'e.g. 123 Rizal St., Brgy. Poblacion, Sariaya, Quezon';
 const ADDRESS_HELP = 'Format: House No./Street, Barangay, Municipality/City, Province';
 const isAddressField = (f) => ['text', 'textarea', undefined].includes(f.type) && /address|location/i.test(f.key);
+// Fields naming a place (addresses, plus place of birth/death/marriage)
+// suggest barangays, towns and provinces as the user types.
+const isPlaceField = (f) => ['text', 'textarea', undefined].includes(f.type)
+  && !f.prefix && !f.suffix && /address|location|place|barangay/i.test(f.key);
+const SUGGESTION_HELP = 'Start typing a barangay or town to see suggestions.';
+const FIELD_CLASS = 'w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 
 const GENERIC_FALLBACK_FIELDS = [
   { key: 'purpose', label: 'Purpose', type: 'text', required: true },
@@ -42,7 +49,16 @@ export default function DocumentRequestFields({ fields, value, onChange }) {
             )}
           </label>
 
-          {f.type === 'textarea' ? (
+          {isPlaceField(f) ? (
+            <AddressAutocomplete
+              multiline={f.type === 'textarea'}
+              required={f.required}
+              value={value[f.key]}
+              onChange={(text) => onChange(f.key, text)}
+              placeholder={f.placeholder || (isAddressField(f) ? ADDRESS_PLACEHOLDER : undefined)}
+              className={FIELD_CLASS}
+            />
+          ) : f.type === 'textarea' ? (
             <textarea
               required={f.required}
               value={value[f.key] || ''}
@@ -104,8 +120,11 @@ export default function DocumentRequestFields({ fields, value, onChange }) {
             <p role="alert" className="text-xs text-red-600 dark:text-red-400 mt-1">{error}</p>
           )}
 
-          {(f.help_text || isAddressField(f)) && (
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">{f.help_text || ADDRESS_HELP}</p>
+          {(f.help_text || isAddressField(f) || isPlaceField(f)) && (
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+              {f.help_text || (isAddressField(f) ? ADDRESS_HELP : '')}
+              {isPlaceField(f) && `${f.help_text || isAddressField(f) ? ' ' : ''}${SUGGESTION_HELP}`}
+            </p>
           )}
         </div>
         );
