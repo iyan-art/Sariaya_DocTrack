@@ -72,7 +72,9 @@ export default function OfflineStatusBadge() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 max-w-[92vw] bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-100 dark:border-slate-800 z-20 overflow-hidden">
+        // Phones: full width under the top bar (anchored to the badge it would
+        // run off the left edge). Larger screens: a dropdown under the badge.
+        <div className="fixed left-4 right-4 top-[4.5rem] sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-100 dark:border-slate-800 z-30 overflow-hidden">
           <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-100 dark:border-slate-800">
             <div>
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</p>

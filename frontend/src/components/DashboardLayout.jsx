@@ -208,7 +208,7 @@ export default function DashboardLayout() {
       <div className="flex-1 flex flex-col min-w-0">
 
         {/* TOPBAR */}
-        <header className="h-16 sm:h-20 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between px-2 sm:px-8 sticky top-0 z-10">
+        <header className="h-16 sm:h-20 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between px-2 sm:px-8 sticky top-0 z-[15]">
           <button
             onClick={() => setSidebarOpen(true)}
             aria-label="Open menu"
