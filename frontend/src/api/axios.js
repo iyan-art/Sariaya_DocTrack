@@ -294,6 +294,10 @@ export const transferDocument = (payload) => {
   return api.post('/documents/transfer/', payload);
 };
 
+// Uploads scans queued while offline (context/OfflineSyncContext.jsx).
+// actions: [{ client_id, qr_payload, action, notes, scanned_at }]
+export const syncOfflineActions = (actions) => api.post('/documents/offline-sync/', { actions });
+
 // Role-aware "what is this QR code" lookup — resolves a scanned/typed
 // payload to a document without performing any transfer. Staff get scan
 // context (suggested action, dwell time, previous-office duration) for the

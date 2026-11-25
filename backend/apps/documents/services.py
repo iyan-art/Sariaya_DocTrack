@@ -1,3 +1,5 @@
+import contextlib
+import contextvars
 import re
 
 from django.db.models.functions import Trim, Upper
@@ -453,6 +455,25 @@ def step_sla_hours(document, position):
     return step.max_hours_allowed if step else DEFAULT_FALLBACK_SLA_HOURS
 
 
+# When an action is being recorded for, if not now: an offline scan synced
+# later is recorded at the time it was scanned (see offline_sync.py).
+_action_time = contextvars.ContextVar('action_time', default=None)
+
+
+def action_time():
+    return _action_time.get() or timezone.now()
+
+
+@contextlib.contextmanager
+def recorded_at(moment):
+    """Inside this block, transfers are recorded as happening at `moment`."""
+    token = _action_time.set(moment)
+    try:
+        yield
+    finally:
+        _action_time.reset(token)
+
+
 def receive_document(document, scanning_user, scanning_office, notes='', qr_verified=False):
     """
     Receiving office scans IN, completing the leg started by release_document()
@@ -480,7 +501,7 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
                 f"office required for this step ('{expected_office}')."
             )
 
-        now = timezone.now()
+        now = action_time()
         time_spent = now - document.entered_current_office_at
         held_by = resolve_office(document.current_office)  # the office returning it
         held_sla = step_sla_hours(document, document.route_position)
@@ -525,7 +546,7 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
             f"office required for this step ('{expected_office}')."
         )
 
-    now = timezone.now()
+    now = action_time()
     time_spent = now - document.entered_current_office_at
     held_by = resolve_office(document.current_office)  # the office that sent it
     held_sla = step_sla_hours(document, document.route_position)

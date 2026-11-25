@@ -879,3 +879,31 @@ class ScheduledTaskRun(models.Model):
 
     def __str__(self):
         return f"{self.name} @ {self.last_run_at:%Y-%m-%d %H:%M}"
+
+class OfflineSyncAction(models.Model):
+    """
+    One scan a staff device recorded while offline and uploaded later
+    (OfflineSyncView). The device gives every scan its own client_id and
+    resends it until it gets an answer, so a scan whose answer was lost on
+    the way back is recognised and never applied twice.
+    """
+    class Outcome(models.TextChoices):
+        APPLIED = 'applied', 'Applied'
+        REJECTED = 'rejected', 'Rejected'
+
+    client_id = models.CharField(max_length=64, unique=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='offline_sync_actions')
+    document = models.ForeignKey(Document, null=True, blank=True, on_delete=models.SET_NULL, related_name='offline_sync_actions')
+    tracking_number = models.CharField(max_length=64, blank=True)
+    action = models.CharField(max_length=20)
+    scanned_at = models.DateTimeField(help_text="When the scan was made on the device.")
+    recorded_at = models.DateTimeField(help_text="The time the scan was recorded as: the device time, or the server time when the device time could not be used.")
+    synced_at = models.DateTimeField(auto_now_add=True)
+    outcome = models.CharField(max_length=10, choices=Outcome.choices)
+    detail = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-synced_at']
+
+    def __str__(self):
+        return f"{self.tracking_number} {self.action} ({self.outcome})"

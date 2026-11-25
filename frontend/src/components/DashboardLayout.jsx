@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import NotificationBell from './NotificationBell';
+import OfflineStatusBadge from './OfflineStatusBadge';
 import ScrollToTopButton from './ScrollToTopButton';
 import UserAvatar from './UserAvatar';
 import {
@@ -228,6 +229,8 @@ export default function DashboardLayout() {
             >
               {theme === 'dark' ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
             </button>
+
+            <OfflineStatusBadge />
 
             <NotificationBell />
 

@@ -8,11 +8,15 @@ export function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   if (!import.meta.env.PROD) return;
 
-  window.addEventListener('load', () => {
+  const register = () => {
     navigator.serviceWorker.register('/sw.js').catch((err) => {
       console.error('Service worker registration failed:', err);
     });
-  });
+  };
+  // This runs from a React effect, which is usually after the page's load
+  // event has already fired; waiting for it then would never register.
+  if (document.readyState === 'complete') register();
+  else window.addEventListener('load', register, { once: true });
 }
 
 // Not called anywhere yet, but kept alongside register() — the standard

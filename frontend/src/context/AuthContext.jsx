@@ -33,6 +33,16 @@ function isTokenExpired(token) {
   return !payload?.exp || Date.now() >= payload.exp * 1000;
 }
 
+const SAVED_PROFILE_KEY = 'offline_profile';
+
+function readSavedProfile() {
+  try {
+    return JSON.parse(localStorage.getItem(SAVED_PROFILE_KEY) || 'null');
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }) {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);   // { id, email, role, full_name, ... } — null until a session is confirmed
@@ -63,12 +73,31 @@ export function AuthProvider({ children }) {
     // resolves), so it's deliberately NOT special-cased away here.
     api.get('/accounts/me/')
       .then((res) => setUser(res.data))
-      .catch(() => {
+      .catch((error) => {
+        // No answer at all (offline, server unreachable) is not a rejected
+        // session: keep it, so staff can keep scanning offline, on the
+        // profile saved the last time this device was online.
+        const savedProfile = readSavedProfile();
+        if (!error.response && savedProfile) {
+          setUser(savedProfile);
+          return;
+        }
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
       })
       .finally(() => setLoading(false));
   }, []);
+
+  // The signed-in user's own profile, saved for opening the app offline.
+  // logout() clears it along with the rest of localStorage.
+  useEffect(() => {
+    if (!user) return;
+    try {
+      localStorage.setItem(SAVED_PROFILE_KEY, JSON.stringify(user));
+    } catch {
+      // storage full or blocked: offline start-up just won't be available
+    }
+  }, [user]);
 
   // Silently re-fetches the current user's own profile — used to pick up
   // changes made elsewhere (an admin editing this user's office/position in

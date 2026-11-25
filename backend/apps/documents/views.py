@@ -34,6 +34,7 @@ from .services import release_document, receive_document, return_document, citiz
 from .sla_scan import run_overdue_alert_scan, run_scheduled_scans, run_server_overdue_scan
 from .services import DEFAULT_FALLBACK_SLA_HOURS, in_transit_since, notify_admins
 from .qr_services import resolve_and_verify, enforce_scope_access, build_scan_context, generate_qr_code
+from .offline_sync import MAX_BATCH, sync_offline_actions
 from .storage import database_storage
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
@@ -2101,6 +2102,29 @@ class RunSlaScanView(APIView):
         overdue_result = run_server_overdue_scan()
         overdue_alert_result = run_overdue_alert_scan()
         return Response({'overdue': overdue_result, 'overdue_alerts': overdue_alert_result})
+
+
+class OfflineSyncView(APIView):
+    """
+    POST /api/documents/offline-sync/
+    Body: { "actions": [ { client_id, qr_payload, action, notes, scanned_at }, ... ] }
+    action: 'receive' | 'release' | 'return_to_office' (notes = the reason).
+
+    Uploads the scans a staff device queued while offline. Each one runs
+    through the same rules as an online scan (see offline_sync.py) and gets
+    its own result, so one rejected scan doesn't block the others:
+      { "results": [ { client_id, outcome: 'applied' | 'rejected', detail, tracking_number } ] }
+    Sending the same client_id again returns its first result.
+    """
+    permission_classes = [IsStaffUser]
+
+    def post(self, request):
+        actions = request.data.get('actions')
+        if not isinstance(actions, list) or not all(isinstance(item, dict) for item in actions):
+            return Response({"detail": "Send a list of actions."}, status=status.HTTP_400_BAD_REQUEST)
+        if len(actions) > MAX_BATCH:
+            return Response({"detail": f"Send at most {MAX_BATCH} actions at a time."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"results": sync_offline_actions(request.user, actions)})
 
 
 class SlaScanCronView(APIView):

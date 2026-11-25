@@ -12,17 +12,23 @@ import { CameraIcon, ScanLineIcon } from '../Icons';
  * open the Receive/Return confirmation modal. This component never performs
  * a transfer itself; it only identifies what was scanned.
  */
-export default function EmployeeQRScanner({ onResolved, onError }) {
+export default function EmployeeQRScanner({ onResolved, onError, onOffline }) {
   const [loading, setLoading] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
   const handleDecoded = async (decodedText) => {
+    // No connection: the scan is saved on the device instead (OfflineScanModal).
+    if (onOffline && !navigator.onLine) {
+      onOffline(decodedText);
+      return;
+    }
     setLoading(true);
     try {
       const res = await qrScanResolve(decodedText);
       onResolved(res.data, decodedText);
     } catch (err) {
-      onError(err.response?.data?.detail || 'Could not read that QR code.');
+      if (onOffline && !err.response) onOffline(decodedText); // the server could not be reached
+      else onError(err.response?.data?.detail || 'Could not read that QR code.');
     } finally {
       setLoading(false);
     }

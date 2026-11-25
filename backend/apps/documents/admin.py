@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     Document, DocumentType, WorkflowStep, Office, DocumentLog, MissingDocumentAlert,
-    EmailNotificationLog, Announcement, Event,
+    EmailNotificationLog, Announcement, Event, OfflineSyncAction,
 )
 
 @admin.register(Announcement)
@@ -68,3 +68,10 @@ class EmailNotificationLogAdmin(admin.ModelAdmin):
     list_display = ('document', 'recipient_email', 'notification_type', 'status', 'sent_at')
     list_filter = ('notification_type', 'status')
     search_fields = ('recipient_email',)
+
+@admin.register(OfflineSyncAction)
+class OfflineSyncActionAdmin(admin.ModelAdmin):
+    list_display = ('tracking_number', 'action', 'user', 'scanned_at', 'recorded_at', 'synced_at', 'outcome')
+    list_filter = ('outcome', 'action')
+    search_fields = ('tracking_number', 'client_id')
+    readonly_fields = [f.name for f in OfflineSyncAction._meta.fields]
