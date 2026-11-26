@@ -1,3 +1,4 @@
+import { slaUsage } from '../../utils/slaUsage';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -103,7 +104,12 @@ function OfficeRanking({ title, icon: Icon, tone, rows, loading }) {
               <span className="w-5 text-xs font-semibold text-slate-400 tabular-nums">{i + 1}</span>
               <span className="flex-1 min-w-0 truncate text-slate-700 dark:text-slate-300">{o.office_name || o.office}</span>
               <span className="shrink-0 text-right">
-                <span className="block font-medium text-slate-900 dark:text-slate-100 tabular-nums">{o.avg_sla_pct}% of SLA</span>
+                <span className={`block font-medium tabular-nums ${slaUsage(o.avg_sla_pct)?.over ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-slate-100'}`}>
+                  {slaUsage(o.avg_sla_pct)?.label}
+                </span>
+                {slaUsage(o.avg_sla_pct)?.over && (
+                  <span className="block text-[11px] font-semibold text-red-500 dark:text-red-400">{slaUsage(o.avg_sla_pct).overBy}</span>
+                )}
                 <span className="block text-[11px] text-slate-400 dark:text-slate-500">avg {formatHoursMinutes(o.avg_hours)}</span>
               </span>
             </li>

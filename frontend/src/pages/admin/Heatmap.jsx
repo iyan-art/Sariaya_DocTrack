@@ -1,3 +1,4 @@
+import { slaUsage } from '../../utils/slaUsage';
 import { useState, useEffect } from 'react';
 import { fetchHeatmapData } from '../../api/axios';
 import { useTheme } from '../../context/ThemeContext';
@@ -105,9 +106,15 @@ export default function Heatmap() {
                   <p className="text-xs font-black uppercase tracking-widest" style={{ color: color.text }}>
                     {o.office_name || o.office}
                   </p>
-                  <p className="text-2xl font-black mt-3" style={{ color: color.text }}>
-                    {o.avg_sla_pct}% <span className="text-sm font-bold">of SLA</span>
-                  </p>
+                  {o.avg_sla_pct > 100 ? (
+                    <p className="text-2xl font-black mt-3" style={{ color: color.text }}>
+                      Over SLA <span className="text-sm font-bold">({o.avg_sla_pct}% · {slaUsage(o.avg_sla_pct).overBy})</span>
+                    </p>
+                  ) : (
+                    <p className="text-2xl font-black mt-3" style={{ color: color.text }}>
+                      {o.avg_sla_pct}% <span className="text-sm font-bold">of SLA</span>
+                    </p>
+                  )}
                   <p className="text-xs font-semibold mt-1" style={{ color: color.text }}>
                     Average {formatHoursMinutes(o.avg_hours)}
                   </p>

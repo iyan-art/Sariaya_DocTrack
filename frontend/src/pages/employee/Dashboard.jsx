@@ -1,3 +1,4 @@
+import { slaUsage } from '../../utils/slaUsage';
 import { useState, useEffect } from 'react';
 import { fetchMyOfficePerformance, fetchMyOfficeComments } from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
@@ -54,7 +55,9 @@ export default function Dashboard() {
               <p className="text-3xl font-black text-indigo-700 dark:text-indigo-400">{formatHoursMinutes(stats.avg_hours)}</p>
               {stats.avg_sla_pct != null && (
                 <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 mt-1">
-                  Uses {stats.avg_sla_pct}% of the time limit (SLA) on average
+                  {stats.avg_sla_pct > 100
+                    ? `Over the time limit (SLA) on average: ${stats.avg_sla_pct}% (${slaUsage(stats.avg_sla_pct).overBy})`
+                    : `Uses ${stats.avg_sla_pct}% of the time limit (SLA) on average`}
                   {stats.over_sla > 0 && ` · ${stats.over_sla} went over`}
                 </p>
               )}
