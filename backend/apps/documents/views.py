@@ -30,7 +30,7 @@ from .serializers import (
 )
 from .permissions import IsStaffUser
 from apps.accounts.permissions import IsAdmin
-from .services import release_document, receive_document, return_document, citizen_return_document, mark_corrected, release_final, flag_missing, mark_found, resolve_office, advance_processing_stage, can_delete_document, holds_document, expedite_document, notify_citizen
+from .services import release_document, receive_document, return_document, complete_document, citizen_return_document, mark_corrected, release_final, flag_missing, mark_found, resolve_office, advance_processing_stage, can_delete_document, holds_document, expedite_document, notify_citizen
 from .sla_scan import run_overdue_alert_scan, run_scheduled_scans, run_server_overdue_scan
 from .services import DEFAULT_FALLBACK_SLA_HOURS, in_transit_since, notify_admins
 from .qr_services import resolve_and_verify, enforce_scope_access, build_scan_context, generate_qr_code
@@ -820,6 +820,8 @@ class DocumentScanView(APIView):
                 )
             elif action == 'mark_corrected':
                 updated = mark_corrected(document, correcting_user=request.user, notes=notes)
+            elif action == 'complete':
+                updated = complete_document(document, completing_user=request.user, notes=notes)
             else:
                 office = request.data.get('office') or request.user.office
                 if not office:
@@ -880,11 +882,21 @@ class DocumentTransferView(APIView):
             if action == 'release':
                 updated = release_document(document, releasing_user=request.user, notes=notes, qr_verified=True)
                 next_office = document.document_type.route[document.route_position + 1]
-                message = f"{updated.tracking_number} released — awaiting receipt at {next_office}."
+                message = f"{updated.tracking_number} sent to {next_office} — awaiting receipt."
+            elif action == 'complete':
+                updated = complete_document(document, completing_user=request.user, notes=notes, qr_verified=True)
+                message = f"{updated.tracking_number} completed — ready for pickup at {updated.current_office}."
+                ready_email_status = getattr(updated, 'ready_email_status', None)
+                if ready_email_status == 'sent':
+                    message += " The citizen was emailed that it is ready for pickup."
+                elif ready_email_status == 'skipped':
+                    message += " No email on file for this citizen — please contact them directly."
+                elif ready_email_status == 'failed':
+                    message += " The ready-for-pickup email failed to send — please follow up."
             elif action == 'return':
                 updated, email_status = release_final(document, releasing_user=request.user, notes=notes, qr_verified=True)
                 message = (
-                    f"{updated.tracking_number} released to its originating office." if updated.is_internal
+                    f"{updated.tracking_number}: transaction completed." if updated.is_internal
                     else f"{updated.tracking_number} released to the citizen."
                 )
                 if email_status == 'sent':
@@ -1233,7 +1245,7 @@ class AdminDashboardStatsView(APIView):
         # which just reflects whenever the row was last touched.
         completion_log = DocumentLog.objects.filter(
             document=OuterRef('pk'),
-            action__in=[DocumentLog.Action.RETURNED, DocumentLog.Action.RELEASED_TO_CITIZEN, DocumentLog.Action.RELEASED_TO_ORIGIN],
+            action__in=[DocumentLog.Action.RETURNED, DocumentLog.Action.COMPLETED, DocumentLog.Action.RELEASED_TO_CITIZEN, DocumentLog.Action.RELEASED_TO_ORIGIN],
         ).order_by('-timestamp')
         resolved_docs = (
             Document.objects.filter(status__in=['completed', 'released'])

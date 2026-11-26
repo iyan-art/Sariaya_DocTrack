@@ -6,7 +6,7 @@ import { ArrowRightLeftIcon, CheckCircle2Icon } from '../Icons';
 
 const ACTIONS = [
   { value: 'receive', label: 'Receive at my office', verb: 'Received' },
-  { value: 'release', label: 'Forward to next office', verb: 'Released' },
+  { value: 'release', label: 'Send to next office', verb: 'Sent' },
   { value: 'return_to_office', label: 'Return to previous office', verb: 'Returned' },
 ];
 

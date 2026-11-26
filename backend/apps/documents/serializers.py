@@ -10,7 +10,7 @@ from .models import (
     EmailNotificationLog, Announcement, Event,
     Notification,
 )
-from .services import EMPLOYEE_ID_RE, can_originate, originating_office, resolve_office, release_document
+from .services import EMPLOYEE_ID_RE, can_originate, originating_office, resolve_office
 from .qr_services import generate_qr_code
 from .sla_scan import DUE_SOON_THRESHOLD_RATIO
 from .validators import number_field_error
@@ -322,10 +322,10 @@ class OfficeHistorySerializer(serializers.ModelSerializer):
         DocumentLog.Action.CITIZEN_RETURN_INITIATED: 'Returned by requester for correction',
     }
     DEPARTURES = {
-        DocumentLog.Action.RELEASED: 'Forwarded',
+        DocumentLog.Action.RELEASED: 'Sent to next office',
         DocumentLog.Action.RETURN_INITIATED: 'Returned to previous office',
         DocumentLog.Action.RELEASED_TO_CITIZEN: 'Released to requester',
-        DocumentLog.Action.RELEASED_TO_ORIGIN: 'Released to originating office',
+        DocumentLog.Action.RELEASED_TO_ORIGIN: 'Transaction completed',
     }
 
     document_type_name = serializers.CharField(source='document_type.name', read_only=True)
@@ -381,6 +381,28 @@ class OfficeHistorySerializer(serializers.ModelSerializer):
         )
 
 
+def document_status_label(document):
+    """
+    The status as people read it: Processing at the office holding it, Sent
+    to the office that has to receive it ("Sent", not "Released": Released
+    is only the final hand-over), then Ready for Pickup at its final office
+    once that office marks it complete.
+    """
+    if document.status == 'in_progress':
+        return f"Processing at {document.current_office}"
+    if document.status == 'returned':
+        return f"Returned to {document.current_office}"
+    if document.status == 'in_transit':
+        if document.is_returning:
+            return f"Being Returned to {document.return_target_office}"
+        return f"Sent to {document.incoming_office or document.current_office}"
+    if document.status == 'completed':
+        return f"Ready for Pickup at {document.current_office}"
+    if document.status == 'released':
+        return document.status_display
+    return document.get_status_display()
+
+
 class DocumentSerializer(serializers.ModelSerializer):
     """
     Used for listing/retrieving documents. Shows CURRENT state at a glance —
@@ -400,6 +422,7 @@ class DocumentSerializer(serializers.ModelSerializer):
     current_step_number = serializers.IntegerField(read_only=True)
     requested_by_name = serializers.SerializerMethodField()
     status_label = serializers.SerializerMethodField()
+    next_office_name = serializers.SerializerMethodField()
     processing_stage_label = serializers.CharField(source='get_processing_stage_display', read_only=True)
     dwell_display = serializers.SerializerMethodField()
     step_statuses = serializers.SerializerMethodField()
@@ -414,7 +437,8 @@ class DocumentSerializer(serializers.ModelSerializer):
             'document_type_steps', 'route',
             'form_data', 'requested_by', 'requested_by_name', 'guest_name', 'guest_email', 'origin_office',
             'route_position', 'current_step_number', 'current_office', 'current_office_detail',
-            'status', 'status_label', 'is_returning', 'return_target_office', 'was_returned', 'processing_stage', 'processing_stage_label',
+            'status', 'status_label', 'is_returning', 'return_target_office', 'next_office', 'next_office_name',
+            'incoming_office', 'was_returned', 'processing_stage', 'processing_stage_label',
             'step_statuses', 'current_handler',
             'created_at', 'updated_at', 'entered_current_office_at', 'dwell_display', 'qr_code',
             'released_at', 'released_by_name',
@@ -456,22 +480,13 @@ class DocumentSerializer(serializers.ModelSerializer):
         return OfficeSerializer(office).data if office else None
 
     def get_status_label(self, obj):
-        if obj.status == 'in_progress':
-            return f"At {obj.current_office}"
-        if obj.status == 'returned':
-            return f"Returned to {obj.current_office}"
-        if obj.status == 'in_transit':
-            route = obj.document_type.route
-            if obj.is_returning:
-                return f"Being Returned to {obj.return_target_office}"
-            next_office = route[obj.route_position + 1] if obj.route_position + 1 < len(route) else obj.current_office
-            # "Sent", not "Released": Released is only the final hand-over.
-            return f"Sent to {next_office}"
-        if obj.status == 'completed':
-            return f"Ready at {obj.origin_office}"
-        if obj.status == 'released':
-            return obj.status_display
-        return obj.get_status_display()
+        return document_status_label(obj)
+
+    def get_next_office_name(self, obj):
+        """Full name of the office a "Send" goes to, for the "Send to …" button."""
+        code = obj.next_office
+        office = resolve_office(code) if code else None
+        return office.name if office else code
 
     def get_dwell_display(self, obj):
         # Live — how long the document has sat at its CURRENT office, not a
@@ -617,22 +632,7 @@ class PublicDocumentTrackingSerializer(serializers.ModelSerializer):
         }
 
     def get_status_label(self, obj):
-        if obj.status == 'in_progress':
-            return f"At {obj.current_office}"
-        if obj.status == 'returned':
-            return f"Returned to {obj.current_office}"
-        if obj.status == 'in_transit':
-            route = obj.document_type.route
-            if obj.is_returning:
-                return f"Being Returned to {obj.return_target_office}"
-            next_office = route[obj.route_position + 1] if obj.route_position + 1 < len(route) else obj.current_office
-            # "Sent", not "Released": Released is only the final hand-over.
-            return f"Sent to {next_office}"
-        if obj.status == 'completed':
-            return f"Ready at {obj.origin_office}"
-        if obj.status == 'released':
-            return obj.status_display
-        return obj.get_status_display()
+        return document_status_label(obj)
 
     def get_total_steps(self, obj):
         return len(obj.document_type.route)
@@ -833,31 +833,9 @@ class CreateDocumentSerializer(serializers.ModelSerializer):
         )
         generate_qr_code(document)
 
-        # Auto-forward: if the creator IS staff at the document's own
-        # origin office, immediately release it toward Step 2 instead of
-        # requiring a separate manual "Release" click/QR scan right after
-        # creation — Step 1's dwell time reads as completed instantly, and
-        # the audit trail shows it was auto-forwarded rather than scanned.
-        # Every office AFTER this one still has to perform its own receive
-        # action to confirm physical arrival — this only automates the
-        # first hand-off. validate_document_type() already guarantees the
-        # creator belongs to the origin office; a release that still fails
-        # just leaves the document at origin for the ordinary manual flow.
-        route = document.document_type.route
-        if len(route) > 1:
-            next_office = resolve_office(route[1])
-            next_office_name = next_office.name if next_office else route[1]
-            try:
-                document = release_document(
-                    document, request.user,
-                    notes=(
-                        f"Document created and auto-forwarded to {next_office_name} by "
-                        f"{request.user.full_name} ({request.user.employee_id or request.user.email})."
-                    ),
-                )
-            except serializers.ValidationError:
-                pass
-
+        # No automatic send: the originating office processes the document
+        # first, on its own SLA clock from this moment, and sends it on to
+        # the next office itself when it is done.
         return document
 
 
@@ -904,7 +882,7 @@ class DocumentTransferSerializer(serializers.Serializer):
     document back to the citizen).
     """
     qr_payload = serializers.CharField()
-    action = serializers.ChoiceField(choices=['release', 'receive', 'return'], default='receive')
+    action = serializers.ChoiceField(choices=['release', 'receive', 'return', 'complete'], default='receive')
     notes = serializers.CharField(required=False, allow_blank=True, default='')
 
     def get_tracking_number(self):

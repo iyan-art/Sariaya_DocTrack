@@ -288,10 +288,23 @@ class Document(models.Model):
 
     @property
     def status_display(self):
-        """Like get_status_display(), but an internal document is released to its office, not a citizen."""
+        """Like get_status_display(), but an internal document's final step completes it; no citizen is involved."""
         if self.status == self.Status.RELEASED and self.is_internal:
-            return 'Released to Originating Office'
+            return 'Transaction Completed'
         return self.get_status_display()
+
+    @property
+    def next_office(self):
+        """The office the next "Send" goes to, or None at the final step."""
+        route = self.document_type.route
+        return route[self.route_position + 1] if self.route_position + 1 < len(route) else None
+
+    @property
+    def incoming_office(self):
+        """While In Transit: the office that has to receive it. Otherwise None."""
+        if self.status != self.Status.IN_TRANSIT:
+            return None
+        return self.return_target_office if self.is_returning else self.next_office
 
     @property
     def is_final_step(self):
@@ -338,11 +351,13 @@ class DocumentLog(models.Model):
         CREATED = 'created', 'Created'
         RELEASED = 'released', 'Released'  # sending office scans out, toward the next office in the route
         RECEIVED = 'received', 'Received'  # receiving office scans in, mid-route
-        RETURNED = 'returned', 'Returned'  # receiving office scans in on the FINAL leg — back at the origin office
+        RETURNED = 'returned', 'Returned'  # older records: final-leg receipt that completed the document at once
+        # The final office finished processing; ready for pickup (services.complete_document()).
+        COMPLETED = 'completed', 'Completed — Ready for Pickup'
         RELEASED_TO_CITIZEN = 'released_to_citizen', 'Released to Citizen'
         # The terminal step for an INTERNAL document: handed back to the office
         # that started it. Internal documents never reach a citizen.
-        RELEASED_TO_ORIGIN = 'released_to_origin', 'Released to Originating Office'
+        RELEASED_TO_ORIGIN = 'released_to_origin', 'Transaction Completed'
         FLAGGED_MISSING = 'flagged_missing', 'Flagged Missing'
         # Controlled Return to a previous office (services.py::return_document()
         # / receive_document()'s is_returning branch) — distinct from RETURNED

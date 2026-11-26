@@ -46,7 +46,8 @@ export default function DocumentRequest() {
   useEffect(() => {
     const docParam = searchParams.get('doc');
     if (docParam) {
-      setSelectedId(Number(docParam));
+      // Straight to the document's status and actions (e.g. Receive).
+      setManageId(Number(docParam));
       setSearchParams((params) => { params.delete('doc'); return params; }, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

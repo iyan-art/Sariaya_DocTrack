@@ -3,7 +3,7 @@ import { useOfflineSync } from '../context/OfflineSyncContext';
 
 const ACTION_LABELS = {
   receive: 'Receive',
-  release: 'Forward to next office',
+  release: 'Send to next office',
   return_to_office: 'Return to previous office',
 };
 

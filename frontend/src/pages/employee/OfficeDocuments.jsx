@@ -32,7 +32,8 @@ export default function OfficeDocuments() {
   useEffect(() => {
     const docParam = searchParams.get('doc');
     if (docParam) {
-      setSelectedId(Number(docParam));
+      // Straight to the document's status and actions (e.g. Receive).
+      setManageId(Number(docParam));
       setSearchParams((params) => { params.delete('doc'); return params; }, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -109,7 +110,7 @@ export default function OfficeDocuments() {
     try {
       const res = await api.patch(`/documents/${confirmRelease.id}/release/`);
       showToast(
-        res.data.released_to === 'origin_office' ? 'Document released to its originating office.' : 'Document Released successfully!',
+        res.data.released_to === 'origin_office' ? 'Transaction completed.' : 'Document Released successfully!',
         'success',
       );
       setConfirmRelease(null);
@@ -233,7 +234,7 @@ export default function OfficeDocuments() {
                       onClick={(e) => { e.stopPropagation(); setConfirmRelease(doc); }}
                       className="bg-green-600 hover:bg-green-700 text-white text-[10px] font-black px-4 py-2 rounded-xl shadow-lg shadow-green-100 dark:shadow-none transition-all uppercase"
                     >
-                      {doc.document_type_scope === 'internal' ? 'Release to Originating Office' : 'Release to Citizen'}
+                      {doc.document_type_scope === 'internal' ? 'Complete Transaction' : 'Release to Citizen'}
                     </button>
                   )}
                   {activeTab === 'to-scan' && (
@@ -263,11 +264,11 @@ export default function OfficeDocuments() {
       {showModal && <NewRequestModal onClose={() => setShowModal(false)} onCreated={loadDocs} />}
       {confirmRelease && (
         <ConfirmModal
-          title="Confirm Release"
+          title={confirmRelease.document_type_scope === 'internal' ? 'Complete Transaction' : 'Confirm Release'}
           message={confirmRelease.document_type_scope === 'internal'
-            ? 'Is the physical document ready to hand back to its originating office for pickup or filing?'
+            ? 'Has your office finished this document? This closes the transaction.'
             : 'Is the physical document ready and the citizen present for collection?'}
-          confirmLabel="Yes, Release Now"
+          confirmLabel={confirmRelease.document_type_scope === 'internal' ? 'Yes, Complete It' : 'Yes, Release Now'}
           confirmColor="bg-green-600 hover:bg-green-700"
           onCancel={() => setConfirmRelease(null)}
           onConfirm={executeRelease}

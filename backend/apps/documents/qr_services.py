@@ -141,6 +141,10 @@ def build_scan_context(document):
         Document.Status.IN_TRANSIT: 'receive',
         Document.Status.COMPLETED: 'return',
     }.get(document.status)
+    # At the last office there is nowhere to send it: finishing it there
+    # makes it ready for pickup.
+    if document.status == Document.Status.IN_PROGRESS and next_office is None:
+        suggested_action = 'complete'
 
     return {
         'suggested_action': suggested_action,

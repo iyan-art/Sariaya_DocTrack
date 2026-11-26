@@ -19,6 +19,8 @@ import { PrinterIcon } from '../Icons';
 const NEXT_ACTIONS = {
   in_progress: [
     { action: 'release', label: 'Send to Next Office' },
+    // At the workflow's last office: finished here, ready for pickup.
+    { action: 'complete', label: 'Complete — Ready for Pickup' },
     { action: 'return_to_office', label: 'Returned (send back for revision)' },
     { action: 'flagged_missing', label: 'Flag as Missing (not physically here)' },
   ],
@@ -63,9 +65,9 @@ const EMAIL_STATUS_TOAST = {
 // Same idea for the receive that completes a document's route — the moment
 // the citizen's "ready for pickup" email goes out (services.py::receive_document()).
 const READY_EMAIL_STATUS_TOAST = {
-  sent: { message: 'Document received. The citizen was emailed that it is ready for pickup.', type: 'success' },
-  skipped: { message: 'Document received, but no email is on file for this citizen. Please contact them directly.', type: 'error' },
-  failed: { message: 'Document received, but the ready-for-pickup email failed to send. Please follow up with the citizen directly.', type: 'error' },
+  sent: { message: 'Completed — ready for pickup. The citizen was emailed.', type: 'success' },
+  skipped: { message: 'Completed — ready for pickup, but no email is on file for this citizen. Please contact them directly.', type: 'error' },
+  failed: { message: 'Completed — ready for pickup, but the email failed to send. Please follow up with the citizen directly.', type: 'error' },
 };
 
 // After a requester's return is fixed (services.py::mark_corrected()).
@@ -127,6 +129,7 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
     && sameOffice(user?.office, doc.current_office);
   const ACTION_ALLOWED = {
     release: holdsIt,
+    complete: holdsIt,
     return_to_office: holdsIt,
     // An internal document may also be collected by the office that started it.
     return: holdsIt || (doc?.document_type_scope === 'internal' && sameOffice(user?.office, route[0])),
@@ -140,13 +143,37 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
   const availableActions = doc
     ? (NEXT_ACTIONS[doc.status] || [])
         .filter((a) => a.action !== 'return_to_office' || doc.route_position > 0)
+        // Send while there is a next office in the workflow; complete at the last one.
+        .filter((a) => a.action !== 'release' || doc.status === 'returned' || Boolean(doc.next_office))
+        .filter((a) => a.action !== 'complete' || !doc.next_office)
         .filter((a) => ACTION_ALLOWED[a.action] ?? true)
         .map((a) => (a.action === 'receive' && doc.is_returning) ? { ...a, label: 'Confirm Return Received' } : a)
-        // Internal documents never go to a citizen — they finish back at the office that started them.
-        .map((a) => (a.action === 'return' && isInternal) ? { ...a, label: 'Release to Originating Office' } : a)
+        // An internal document has no citizen: its final step completes the transaction.
+        .map((a) => (a.action === 'return' && isInternal) ? { ...a, label: 'Complete Transaction' } : a)
+        // "Send to <office>", never "Release": Release is only the final hand-over.
+        .map((a) => (a.action === 'release' && doc.next_office_name)
+          ? { ...a, label: a.label.replace('Next Office', doc.next_office_name) } : a)
         .map((a) => (doc.status === 'returned' && atFinalStep && a.action === 'release')
           ? { action: 'mark_corrected', label: 'Corrected — Ready for Pickup Again' } : a)
     : [];
+
+  // A document on its way to this office: one click receives it (the
+  // notification about it opens this modal straight away).
+  const canQuickReceive = doc?.status === 'in_transit' && ACTION_ALLOWED.receive;
+  const handleQuickReceive = async () => {
+    setSubmitting(true);
+    try {
+      const res = await transitionDocument(documentId, { action: 'receive', office: '', notes: '' });
+      const outcome = READY_EMAIL_STATUS_TOAST[res.data.email_status];
+      showToast(outcome?.message || `Received at ${res.data.current_office}.`, outcome?.type || 'success');
+      load();
+      onUpdated();
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Failed to receive the document.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleTransition = async (e) => {
     e.preventDefault();
@@ -162,7 +189,7 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
       if (action === 'return') {
         const res = await releaseToCitizen(documentId, { notes });
         if (res.data.released_to === 'origin_office') {
-          showToast('Document released to its originating office.', 'success');
+          showToast('Transaction completed.', 'success');
         } else {
           const outcome = EMAIL_STATUS_TOAST[res.data.email_status];
           showToast(outcome?.message || 'Document released to citizen.', outcome?.type || 'success');
@@ -186,7 +213,8 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
           : READY_EMAIL_STATUS_TOAST[res.data.email_status];
         const returnedTo = returnTo === 'origin' ? originOffice : previousOffice;
         showToast(
-          readyOutcome?.message || (action === 'return_to_office' ? `Document marked Returned and sent back to ${returnedTo}.` : 'Document status updated.'),
+          readyOutcome?.message || (action === 'return_to_office' ? `Document marked Returned and sent back to ${returnedTo}.`
+            : action === 'complete' ? 'Completed — the document is ready for pickup.' : 'Document status updated.'),
           readyOutcome?.type || 'success',
         );
       }
@@ -268,6 +296,25 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
                 </span>
               </div>
             </div>
+
+            {canQuickReceive && (
+              <div className="mt-5 rounded-xl border-2 border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 p-4">
+                <p className="text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">Incoming · Pending receipt</p>
+                <p className="mt-1 text-sm text-amber-900 dark:text-amber-200">
+                  {doc.is_returning ? 'Sent back to your office' : 'Sent to your office'} by {doc.current_office}.
+                  Receive it once the paper is in your hands.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleQuickReceive}
+                  disabled={submitting}
+                  autoFocus
+                  className="mt-3 w-full rounded-xl bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white font-bold py-3 ring-4 ring-green-200 dark:ring-green-500/30 transition-colors"
+                >
+                  {submitting ? 'Receiving…' : (doc.is_returning ? 'Receive Returned Document' : 'Receive Document')}
+                </button>
+              </div>
+            )}
 
             {/* Action form — only shown if there are valid next actions */}
             {availableActions.length > 0 && (

@@ -556,16 +556,11 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
     document.current_handler = scanning_user
     document.entered_current_office_at = now
 
-    # SCALABLE COMPLETION LOGIC:
-    # If this scan reached the LAST index in the route array, the document is
-    # back at its origin office — mark it Completed and log it as Returned.
-    # This works for [A, B, A] or [A, B, C, D, A] or even [A, B, C].
-    if next_position == len(route) - 1:
-        document.status = Document.Status.COMPLETED
-        action_type = DocumentLog.Action.RETURNED
-    else:
-        document.status = Document.Status.IN_PROGRESS
-        action_type = DocumentLog.Action.RECEIVED
+    # Every office, the final one included, processes the document after
+    # receiving it, on its own SLA clock; the final office then marks it
+    # complete (complete_document()), which makes it ready for pickup.
+    document.status = Document.Status.IN_PROGRESS
+    action_type = DocumentLog.Action.RECEIVED
 
     document.save()
 
@@ -582,39 +577,85 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
         notes=notes,
     )
 
-    if action_type == DocumentLog.Action.RETURNED:
-        advance_processing_stage(document, Document.ProcessingStage.READY_FOR_RELEASE, actor=scanning_user)
-        # Not a model field: just lets the calling view tell staff the outcome.
-        document.ready_email_status = _maybe_notify_citizen_ready(document)
-        _notify_office_ready(document)
-        final_office = _office_name(document.current_office)
-        notify_origin_office(
-            document,
-            title=f"Completed: {document.tracking_number}",
-            message=(
-                f"The {document.document_type.name} request ({document.tracking_number}) that your office "
-                f"started has completed every step and is ready for pickup at {final_office}."
-            ),
-            acting_user=scanning_user,
+    notify_citizen(
+        document,
+        title=f"Received at {_office_name(scanning_office)}",
+        message=(
+            f"Your {document.document_type.name} request ({document.tracking_number}) is now being "
+            f"processed at {_office_name(scanning_office)}."
+        ),
+    )
+
+    return document
+
+
+def complete_document(document, completing_user, notes='', qr_verified=False):
+    """
+    The final office of the workflow has finished processing: the document
+    is Completed and ready for pickup by whoever requested it. Its time at
+    the final office, from receipt to now, is recorded against that step's
+    SLA like every other office's; the wait for pickup that follows is not
+    (entered_current_office_at restarts here). The ready-for-pickup emails
+    and notices go out now.
+    """
+    if document.status != Document.Status.IN_PROGRESS:
+        raise ValidationError(f"Cannot complete a document that is '{document.status}'.")
+    if not document.is_final_step:
+        raise ValidationError(
+            f"{document.current_office} is not the last office of this workflow. "
+            f"Send it to {document.next_office} instead."
         )
-        notify_citizen(
-            document,
-            title="Ready for pickup",
-            message=(
-                f"Your {document.document_type.name} request ({document.tracking_number}) is ready for pickup "
-                f"at {_office_name(document.current_office)}. Please bring a valid ID."
-            ),
-        )
-    else:
-        notify_citizen(
-            document,
-            title=f"Received at {_office_name(scanning_office)}",
-            message=(
-                f"Your {document.document_type.name} request ({document.tracking_number}) is now being "
-                f"processed at {_office_name(scanning_office)}."
-            ),
+    if not _same_office(completing_user.office, document.current_office):
+        raise ValidationError(
+            f"Your current assigned office ('{completing_user.office or 'none'}') does not match the "
+            f"office required for this step ('{document.current_office}')."
         )
 
+    now = action_time()
+    time_spent = now - document.entered_current_office_at
+    final_office = resolve_office(document.current_office)
+    previous_handler = document.current_handler
+
+    document.status = Document.Status.COMPLETED
+    document.current_handler = completing_user
+    document.entered_current_office_at = now
+    document.save()
+
+    DocumentLog.objects.create(
+        document=document,
+        action=DocumentLog.Action.COMPLETED,
+        office=final_office,
+        sender=previous_handler,
+        acted_by=completing_user,
+        qr_verified=qr_verified,
+        duration_at_office=time_spent,
+        duration_office=final_office,
+        duration_sla_hours=step_sla_hours(document, document.route_position),
+        notes=notes,
+    )
+
+    advance_processing_stage(document, Document.ProcessingStage.READY_FOR_RELEASE, actor=completing_user)
+    # Not a model field: just lets the calling view tell staff the outcome.
+    document.ready_email_status = _maybe_notify_citizen_ready(document)
+    _notify_office_ready(document)
+    final_office_name = _office_name(document.current_office)
+    notify_origin_office(
+        document,
+        title=f"Completed: {document.tracking_number}",
+        message=(
+            f"The {document.document_type.name} request ({document.tracking_number}) that your office "
+            f"started has completed every step and is ready for pickup at {final_office_name}."
+        ),
+        acting_user=completing_user,
+    )
+    notify_citizen(
+        document,
+        title="Ready for pickup",
+        message=(
+            f"Your {document.document_type.name} request ({document.tracking_number}) is ready for pickup "
+            f"at {final_office_name}. Please bring a valid ID."
+        ),
+    )
     return document
 
 
@@ -639,14 +680,14 @@ def release_to_origin_office(document, releasing_user, notes='', qr_verified=Fal
     """
     if document.status != Document.Status.COMPLETED:
         raise ValidationError(
-            f"Only a 'completed' document can be released to its originating office. "
+            f"Only a 'completed' document can have its transaction completed. "
             f"This document is currently '{document.status}'."
         )
     origin_code = document.document_type.route[0]
     if not (_same_office(releasing_user.office, document.current_office) or _same_office(releasing_user.office, origin_code)):
         raise ValidationError(
             f"Only {_office_name(document.current_office)} or the originating office "
-            f"({_office_name(origin_code)}) can release this internal document."
+            f"({_office_name(origin_code)}) can complete this transaction."
         )
 
     previous_handler = document.current_handler
@@ -668,10 +709,10 @@ def release_to_origin_office(document, releasing_user, notes='', qr_verified=Fal
     if not _same_office(origin_code, releasing_user.office):
         notify_origin_office(
             document,
-            title=f"Released: {document.tracking_number}",
+            title=f"Completed: {document.tracking_number}",
             message=(
                 f"The {document.document_type.name} request ({document.tracking_number}) that your office "
-                f"started was released back to your office by {_office_name(document.current_office)}."
+                f"started was completed by {_office_name(document.current_office)}."
             ),
             acting_user=releasing_user,
         )

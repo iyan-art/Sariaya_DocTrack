@@ -1,3 +1,5 @@
+import { useAuth } from '../../context/AuthContext';
+
 const STATUS_STYLES = {
   released: 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30',
   completed: 'bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 border-green-300 dark:border-green-500/30',
@@ -7,15 +9,20 @@ const STATUS_STYLES = {
   missing: 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/30',
 };
 
+const sameOffice = (a, b) => Boolean(a && b) && a.trim().toUpperCase() === b.trim().toUpperCase();
+
 export default function DocumentStatusBadge({ doc }) {
+  const { user } = useAuth() || {};
   // SAFETY CHECK: Kung walang 'doc', huwag magpakita ng anuman para hindi mag-error
   if (!doc) return null;
 
-  const label = doc.status_label || doc.status;
+  // To the office it is travelling to, it is incoming, waiting for them to receive it.
+  const incomingHere = doc.status === 'in_transit' && sameOffice(user?.office, doc.incoming_office);
+  const label = incomingHere ? 'Incoming · Pending Receipt' : (doc.status_label || doc.status.replace(/_/g, ' '));
   const style = STATUS_STYLES[doc.status] || 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700';
   
   return (
-    <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border capitalize shadow-sm ${style}`}>
+    <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm ${style}`}>
       {doc.status === 'in_progress' && <span className="w-1 h-1 bg-blue-600 rounded-full animate-pulse"></span>}
       {doc.status === 'in_transit' && <span className="w-1 h-1 bg-amber-600 rounded-full animate-pulse"></span>}
       {label}

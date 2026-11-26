@@ -6,13 +6,15 @@ import DocumentStatusBadge from './DocumentStatusBadge';
 import { ArrowRightLeftIcon, CheckCircle2Icon, HandshakeIcon, Clock4Icon } from '../Icons';
 
 const ACTION_META = {
-  release: { label: 'Forward to Next Office', verb: 'Released', icon: ArrowRightLeftIcon, color: 'bg-blue-600 hover:bg-blue-700' },
+  release: { label: 'Send to Next Office', verb: 'Sent', icon: ArrowRightLeftIcon, color: 'bg-blue-600 hover:bg-blue-700' },
   receive: { label: 'Accept at My Office', verb: 'Received', icon: CheckCircle2Icon, color: 'bg-green-600 hover:bg-green-700' },
   return: { label: 'Release to Citizen', verb: 'Released to citizen', icon: HandshakeIcon, color: 'bg-indigo-600 hover:bg-indigo-700' },
+  // The workflow's last office finished processing: ready for pickup.
+  complete: { label: 'Complete — Ready for Pickup', verb: 'Completed', icon: CheckCircle2Icon, color: 'bg-green-600 hover:bg-green-700' },
 };
 
-// The final hand-over of an internal document goes back to the office that started it.
-const INTERNAL_RETURN = { ...ACTION_META.return, label: 'Release to Originating Office', verb: 'Released to originating office' };
+// An internal document has no citizen: its final step completes the transaction.
+const INTERNAL_RETURN = { ...ACTION_META.return, label: 'Complete Transaction', verb: 'Transaction completed' };
 
 /**
  * Opened immediately after EmployeeQRScanner resolves a physical QR tag.
@@ -30,7 +32,10 @@ export default function QRTransferConfirmModal({ document, scanContext, rawPaylo
   const [submitting, setSubmitting] = useState(false);
 
   const action = scanContext?.suggested_action;
-  const meta = action === 'return' && scanContext?.is_internal ? INTERNAL_RETURN : (action ? ACTION_META[action] : null);
+  const baseMeta = action === 'return' && scanContext?.is_internal ? INTERNAL_RETURN : (action ? ACTION_META[action] : null);
+  // "Send to <office>": the next step of this document's workflow.
+  const meta = action === 'release' && scanContext?.next_office
+    ? { ...baseMeta, label: `Send to ${scanContext.next_office}` } : baseMeta;
   const Icon = meta?.icon;
 
   const handleConfirm = async () => {
