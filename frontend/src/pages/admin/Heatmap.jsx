@@ -4,6 +4,7 @@ import { fetchHeatmapData } from '../../api/axios';
 import { useTheme } from '../../context/ThemeContext';
 import { BarChart3Icon } from '../../components/Icons';
 import { formatHoursMinutes } from '../../utils/duration';
+import HeatmapOfficeDocuments from '../../components/admin/HeatmapOfficeDocuments';
 
 // Color comes from how much of its own time limit (SLA) an office uses on
 // average, so an office whose work simply takes longer is not shown as slow:
@@ -42,6 +43,7 @@ export default function Heatmap() {
   const { theme } = useTheme();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [openOffice, setOpenOffice] = useState(null); // tile whose documents are shown
 
   useEffect(() => {
     fetchHeatmapData().then((res) => {
@@ -98,9 +100,12 @@ export default function Heatmap() {
             {tiles.map((o) => {
               const color = heatColor(o.avg_sla_pct, theme === 'dark');
               return (
-                <div
+                <button
+                  type="button"
                   key={o.office}
-                  className="rounded-3xl p-6 border-2 transition-transform hover:scale-[1.02]"
+                  onClick={() => setOpenOffice(o)}
+                  title="Show the documents behind this figure"
+                  className="text-left rounded-3xl p-6 border-2 transition-transform hover:scale-[1.02] focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-300 cursor-pointer"
                   style={{ backgroundColor: color.bg, borderColor: color.border }}
                 >
                   <p className="text-xs font-black uppercase tracking-widest" style={{ color: color.text }}>
@@ -122,12 +127,17 @@ export default function Heatmap() {
                     {o.count} document{o.count === 1 ? '' : 's'} processed
                     {o.over_sla > 0 && ` · ${o.over_sla} over SLA`}
                   </p>
-                </div>
+                  <p className="text-[10px] font-bold mt-2 underline underline-offset-2 opacity-80" style={{ color: color.text }}>
+                    View documents
+                  </p>
+                </button>
               );
             })}
           </div>
         )}
       </div>
+
+      {openOffice && <HeatmapOfficeDocuments office={openOffice} onClose={() => setOpenOffice(null)} />}
     </div>
   );
 }

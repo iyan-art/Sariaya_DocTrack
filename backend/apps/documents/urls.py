@@ -3,7 +3,7 @@ from .views import (
     DocumentListCreateView, DocumentDetailView,
     DocumentScanView, DocumentTransferView, OfflineSyncView, DocumentReleaseView, DocumentFlagMissingView, DocumentMarkFoundView,
     DocumentTrackingLookupView, DocumentTypeListCreateView, DocumentTypeDetailView, DocumentTypeStepsView,
-    AdminDashboardStatsView, HeatmapDataView, MyOfficePerformanceView, QRScanResolveView,
+    AdminDashboardStatsView, HeatmapDataView, HeatmapOfficeDocumentsView, MyOfficePerformanceView, QRScanResolveView,
     SurveyListCreateView, SurveyDetailView, SurveyQuestionsView, SurveyAnalyticsView, SurveyCommentsView,
     SurveyDetailedAnalyticsView, PostScanSurveyView, PublicSurveyView,
     CitizenSuggestionListCreateView, AdminSuggestionListView, AdminSuggestionDetailView,
@@ -63,6 +63,7 @@ urlpatterns = [
 
     path('dashboard-stats/', AdminDashboardStatsView.as_view(), name='admin-stats'),
     path('heatmap/', HeatmapDataView.as_view(), name='heatmap-data'),
+    path('heatmap/<str:office_code>/', HeatmapOfficeDocumentsView.as_view(), name='heatmap-office-documents'),
     path('my-office-performance/', MyOfficePerformanceView.as_view(), name='my-office-performance'),
     path('my-office-comments/', MySurveyCommentsView.as_view(), name='my-office-comments'),
     path('email-notifications/', EmailNotificationLogListView.as_view(), name='email-notification-log-list'),

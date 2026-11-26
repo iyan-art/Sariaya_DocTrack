@@ -310,6 +310,8 @@ export const qrScanResolve = (payload) => {
 
 export const fetchDashboardStats = () => api.get('/documents/dashboard-stats/');
 export const fetchHeatmapData = () => api.get('/documents/heatmap/');
+// The documents behind one Heatmap tile (its office's timed stays).
+export const fetchHeatmapOfficeDocuments = (officeCode) => api.get(`/documents/heatmap/${encodeURIComponent(officeCode)}/`);
 
 // Staff/employee-scoped equivalent of the two Admin Dashboard KPI panels
 // (avg turnaround, avg citizen rating), filtered to the requester's office.

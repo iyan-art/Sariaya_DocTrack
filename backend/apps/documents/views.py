@@ -1438,6 +1438,48 @@ class HeatmapDataView(APIView):
         return Response(_office_speed_stats())
 
 
+class HeatmapOfficeDocumentsView(APIView):
+    """
+    GET /api/documents/heatmap/<office_code>/
+    The documents behind one Heatmap tile: every timed stay the office's
+    figures are computed from (the same rows as _office_speed_stats()),
+    longest over its SLA first. A document sent back to the office and
+    handled again appears once per stay.
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request, office_code):
+        logs = (
+            DocumentLog.objects
+            .filter(duration_office__code__iexact=office_code)
+            .exclude(duration_at_office__isnull=True)
+            .select_related('document__document_type', 'duration_office')
+        )
+        rows = []
+        for log in logs:
+            hours = log.duration_at_office.total_seconds() / 3600
+            sla = log.duration_sla_hours or DEFAULT_FALLBACK_SLA_HOURS
+            rows.append({
+                "document_id": log.document_id,
+                "tracking_number": log.document.tracking_number,
+                "document_type_name": log.document.document_type.name,
+                "hours": round(hours, 2),
+                "duration_display": format_hours_minutes(hours),
+                "sla_hours": sla,
+                "sla_display": format_hours_minutes(sla),
+                "sla_pct": round(hours / sla * 100),
+                "over_sla": hours > sla,
+                "ended_at": log.timestamp,
+            })
+        rows.sort(key=lambda row: (-row["sla_pct"], row["tracking_number"]))
+        office = Office.objects.filter(code__iexact=office_code).first()
+        return Response({
+            "office": office.code if office else office_code,
+            "office_name": office.name if office else office_code,
+            "documents": rows,
+        })
+
+
 class MyOfficePerformanceView(APIView):
     """
     GET /api/documents/my-office-performance/
