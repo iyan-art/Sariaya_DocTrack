@@ -25,5 +25,7 @@ class Command(BaseCommand):
             f"{result['documents_not_received']} of them sent but not yet received "
             f"({result['emails_sent']} new warning email(s) sent), "
             f"{result['documents_due_soon']} document(s) approaching due date "
-            f"({result['due_soon_emails_sent']} new heads-up email(s) sent)."
+            f"({result['due_soon_emails_sent']} new heads-up email(s) sent), "
+            f"{result['documents_pending_receipt']} document(s) waiting to be received "
+            f"({result['pending_receipt_reminders_sent']} new reminder email(s) sent)."
         ))

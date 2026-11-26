@@ -109,11 +109,13 @@ def send_overdue_warning_email(document, staff_user, sla_hours, dwell_hours, due
     """
     overdue_by_hours = dwell_hours - sla_hours
     title = _document_title(document)
-    subject = f"[URGENT / OVERDUE] Document Tracking No. {document.tracking_number} - Action Required"
+    subject = f"[OVERDUE ALERT] Document Tracking No. {document.tracking_number} - Immediate Action Required"
+    next_step = f"send it to {document.next_office}" if document.next_office else "complete the transaction"
     body = (
         f"Good day, {staff_user.full_name}.\n\n"
-        f"A document at your office has reached its processing time limit (SLA) "
-        f"and needs action right away.\n\n"
+        f"OVERDUE: a document in your office's queue has passed its processing time limit "
+        f"(SLA) and has not been sent on or completed yet. Please process it and {next_step} "
+        f"right away.\n\n"
         f"Document Type: {document.document_type.name}\n"
         + (f"Document Title / Purpose: {title}\n" if title else "")
         + f"Tracking Code: {document.tracking_number}\n"
@@ -126,7 +128,7 @@ def send_overdue_warning_email(document, staff_user, sla_hours, dwell_hours, due
         f"Status: "
         + (f"Overdue by {_format_duration(overdue_by_hours)}" if overdue_by_hours >= 1 / 60 else "SLA limit reached")
         + "\n\n"
-        f"Open and process the document here:\n{document_portal_link(document)}\n\n"
+        f"Open the document and {next_step} here:\n{document_portal_link(document)}\n\n"
         f"This is an automated alert from Sariaya DocTrack. You will not get another "
         f"overdue alert for this document while it stays at your office.\n"
     )
@@ -148,7 +150,7 @@ def send_not_received_email(document, staff_user, destination, sent_at, sla_hour
     """
     overdue_by_hours = transit_hours - sla_hours
     title = _document_title(document)
-    subject = f"[URGENT / OVERDUE] Document Tracking No. {document.tracking_number} - Action Required"
+    subject = f"[OVERDUE ALERT] Document Tracking No. {document.tracking_number} - Immediate Action Required"
     body = (
         f"Good day, {staff_user.full_name}.\n\n"
         f"A document was sent to your office but has not been received yet, and it has "
@@ -177,6 +179,46 @@ def send_not_received_email(document, staff_user, destination, sent_at, sla_hour
         recipient_user=staff_user,
         recipient_email=staff_user.email,
         notification_type=EmailNotificationLog.NotificationType.OVERDUE_WARNING,
+        subject=subject,
+        body=body,
+    )
+
+
+def send_pending_receipt_email(document, staff_user, destination, sent_at, waited_hours, sla_hours):
+    """
+    Friendly reminder to an office that a document sent to it is still in
+    its Incoming queue, not yet received in the system — see
+    sla_scan.run_overdue_scan(). Once per trip, before the trip's SLA runs
+    out; past the SLA the office gets the overdue alert instead.
+    """
+    # Deferred import: services.py imports this module.
+    from .services import _office_name
+
+    title = _document_title(document)
+    sender = _office_name(document.current_office)
+    subject = f"[PENDING RECEIPT REMINDER] Incoming Document Tracking No. {document.tracking_number}"
+    body = (
+        f"Good day, {staff_user.full_name}.\n\n"
+        f"A friendly reminder: {sender} sent a document to your office, and it is still "
+        f"waiting in your Incoming queue. Once the paper is with you, please receive it in "
+        f"the system so its tracking stays accurate.\n\n"
+        f"Document Type: {document.document_type.name}\n"
+        + (f"Document Title / Purpose: {title}\n" if title else "")
+        + f"Tracking Code: {document.tracking_number}\n"
+        f"Sent by: {sender}\n"
+        f"Sent to: {destination}\n"
+        f"Sent on: {_format_local(sent_at)}\n"
+        f"Waiting for: {_format_duration(waited_hours)}\n"
+        f"Time limit (SLA) for this step: {format_hours_minutes(sla_hours)}\n\n"
+        f"Open the document and click Receive Document here:\n{document_portal_link(document)}\n\n"
+        f"This is an automated reminder from Sariaya DocTrack. You will get it only once "
+        f"for this document's trip to your office.\n"
+    )
+    _send_and_log(
+        document=document,
+        recipient_user=staff_user,
+        recipient_email=staff_user.email,
+        notification_type=EmailNotificationLog.NotificationType.PENDING_RECEIPT,
         subject=subject,
         body=body,
     )

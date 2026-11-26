@@ -14,6 +14,7 @@ const VISIBLE_COUNT = 8;
 const TYPE_STYLES = {
   overdue_warning: 'bg-red-50 text-red-700 border-red-200',
   due_soon: 'bg-amber-50 text-amber-700 border-amber-200',
+  pending_receipt: 'bg-blue-50 text-blue-700 border-blue-200',
   ready_for_release: 'bg-blue-50 text-blue-700 border-blue-200',
 };
 

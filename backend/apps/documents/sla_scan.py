@@ -17,7 +17,9 @@ from django.utils import timezone
 
 from .durations import format_hours_minutes
 from .models import Document, DocumentLog, EmailNotificationLog, MissingDocumentAlert, Notification, ScheduledTaskRun
-from .notifications import send_due_soon_email, send_not_received_email, send_overdue_warning_email
+from .notifications import (
+    send_due_soon_email, send_not_received_email, send_overdue_warning_email, send_pending_receipt_email,
+)
 from .services import (
     _office_name, in_transit_destination, in_transit_since, notify_admins, notify_citizen, office_employees,
     resolve_office, responsible_employees,
@@ -115,15 +117,29 @@ def _still_to_email(document, kind, staff=None, since=None):
     ]
 
 
+# A document sent to an office but not received there gets a reminder to
+# that office after PENDING_RECEIPT_HOURS, or after half the step's SLA if
+# that comes first (a 1-hour step can't wait 2 hours for a reminder).
+PENDING_RECEIPT_HOURS = 2
+PENDING_RECEIPT_SLA_RATIO = 0.5
+
+
+def pending_receipt_threshold(sla_hours):
+    return min(PENDING_RECEIPT_HOURS, sla_hours * PENDING_RECEIPT_SLA_RATIO)
+
+
 def _scan_not_received(now):
     """
-    In Transit documents (sent, not yet received) past the SLA of the step
-    they are headed to, counted from when they were sent: emails the staff
-    of the office that has to receive them, once per trip. Returns
-    (documents, emails sent).
+    In Transit documents (sent, not yet received), timed from when they were
+    sent, for the staff of the office that has to receive them:
+    - waiting past pending_receipt_threshold(): a Pending Receipt Reminder;
+    - past the SLA of the step they are headed to: an overdue alert.
+    Each once per trip. Returns (overdue documents, overdue emails,
+    documents reminded, reminder emails).
     """
-    documents = emails = 0
-    kind = EmailNotificationLog.NotificationType.OVERDUE_WARNING
+    documents = emails = reminded = reminders = 0
+    overdue_kind = EmailNotificationLog.NotificationType.OVERDUE_WARNING
+    reminder_kind = EmailNotificationLog.NotificationType.PENDING_RECEIPT
     in_transit = Document.objects.filter(status=Document.Status.IN_TRANSIT).select_related('document_type')
     for document in in_transit:
         position, destination = in_transit_destination(document)
@@ -133,14 +149,18 @@ def _scan_not_received(now):
         sla_hours = steps[position].max_hours_allowed if position < len(steps) else DEFAULT_FALLBACK_SLA_HOURS
         sent_at = in_transit_since(document)
         transit_hours = (now - sent_at).total_seconds() / 3600
-        if transit_hours < sla_hours:
-            continue
-        documents += 1
-        due_at = sent_at + timedelta(hours=sla_hours)
-        for staff in _still_to_email(document, kind, staff=office_employees(destination), since=sent_at):
-            send_not_received_email(document, staff, destination, sent_at, sla_hours, transit_hours, due_at)
-            emails += 1
-    return documents, emails
+        if transit_hours >= sla_hours:
+            documents += 1
+            due_at = sent_at + timedelta(hours=sla_hours)
+            for staff in _still_to_email(document, overdue_kind, staff=office_employees(destination), since=sent_at):
+                send_not_received_email(document, staff, destination, sent_at, sla_hours, transit_hours, due_at)
+                emails += 1
+        elif transit_hours >= pending_receipt_threshold(sla_hours):
+            reminded += 1
+            for staff in _still_to_email(document, reminder_kind, staff=office_employees(destination), since=sent_at):
+                send_pending_receipt_email(document, staff, destination, sent_at, transit_hours, sla_hours)
+                reminders += 1
+    return documents, emails, reminded, reminders
 
 
 def run_overdue_scan():
@@ -226,12 +246,14 @@ def run_overdue_scan():
                 send_due_soon_email(document, staff, sla_hours, dwell_hours, due_at)
                 due_soon_emails_sent += 1
 
-    documents_not_received, not_received_emails_sent = _scan_not_received(now)
+    documents_not_received, not_received_emails_sent, documents_pending_receipt, reminders_sent = _scan_not_received(now)
 
     return {
         'documents_overdue': documents_overdue + documents_not_received,
         'emails_sent': overdue_emails_sent + not_received_emails_sent,
         'documents_not_received': documents_not_received,
+        'documents_pending_receipt': documents_pending_receipt,
+        'pending_receipt_reminders_sent': reminders_sent,
         'documents_due_soon': documents_due_soon,
         'due_soon_emails_sent': due_soon_emails_sent,
     }

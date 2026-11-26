@@ -494,6 +494,8 @@ class EmailNotificationLog(models.Model):
     class NotificationType(models.TextChoices):
         OVERDUE_WARNING = 'overdue_warning', 'Overdue Warning'
         DUE_SOON = 'due_soon', 'Approaching Due Date'
+        # Sent to an office but not yet received there after a while.
+        PENDING_RECEIPT = 'pending_receipt', 'Pending Receipt Reminder'
         READY_FOR_RELEASE = 'ready_for_release', 'Ready for Release'
         READY_FOR_RELEASE_STAFF = 'ready_release_staff', 'Ready for Release (Staff)'
 

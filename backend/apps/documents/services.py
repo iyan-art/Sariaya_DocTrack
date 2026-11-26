@@ -591,8 +591,10 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
 
 def complete_document(document, completing_user, notes='', qr_verified=False):
     """
-    The final office of the workflow has finished processing: the document
-    is Completed and ready for pickup by whoever requested it. Its time at
+    "Complete Transaction" at the final office of the workflow, for citizen
+    and internal documents alike. A citizen's document becomes Completed,
+    ready for pickup (handed over later with release_to_citizen()); an
+    internal document is finished outright. Its time at
     the final office, from receipt to now, is recorded against that step's
     SLA like every other office's; the wait for pickup that follows is not
     (entered_current_office_at restarts here). The ready-for-pickup emails
@@ -633,6 +635,14 @@ def complete_document(document, completing_user, notes='', qr_verified=False):
         duration_sla_hours=step_sla_hours(document, document.route_position),
         notes=notes,
     )
+
+    if document.is_internal:
+        # An office's own request has no pickup step: completing it at the
+        # last office finishes the transaction, and the requesting office
+        # is told (release_to_origin_office()).
+        document = release_to_origin_office(document, completing_user, notes, qr_verified)
+        document.ready_email_status = None
+        return document
 
     advance_processing_stage(document, Document.ProcessingStage.READY_FOR_RELEASE, actor=completing_user)
     # Not a model field: just lets the calling view tell staff the outcome.

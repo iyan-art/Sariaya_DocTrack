@@ -9,8 +9,8 @@ const ACTION_META = {
   release: { label: 'Send to Next Office', verb: 'Sent', icon: ArrowRightLeftIcon, color: 'bg-blue-600 hover:bg-blue-700' },
   receive: { label: 'Accept at My Office', verb: 'Received', icon: CheckCircle2Icon, color: 'bg-green-600 hover:bg-green-700' },
   return: { label: 'Release to Citizen', verb: 'Released to citizen', icon: HandshakeIcon, color: 'bg-indigo-600 hover:bg-indigo-700' },
-  // The workflow's last office finished processing: ready for pickup.
-  complete: { label: 'Complete — Ready for Pickup', verb: 'Completed', icon: CheckCircle2Icon, color: 'bg-green-600 hover:bg-green-700' },
+  // The workflow's last office finishes it (a citizen's document then waits for pickup).
+  complete: { label: 'Complete Transaction', verb: 'Completed', icon: CheckCircle2Icon, color: 'bg-green-600 hover:bg-green-700' },
 };
 
 // An internal document has no citizen: its final step completes the transaction.

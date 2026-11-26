@@ -19,8 +19,9 @@ import { PrinterIcon } from '../Icons';
 const NEXT_ACTIONS = {
   in_progress: [
     { action: 'release', label: 'Send to Next Office' },
-    // At the workflow's last office: finished here, ready for pickup.
-    { action: 'complete', label: 'Complete — Ready for Pickup' },
+    // At the workflow's last office: finishes the workflow (a citizen's
+    // document then waits for pickup; an internal one is done).
+    { action: 'complete', label: 'Complete Transaction' },
     { action: 'return_to_office', label: 'Returned (send back for revision)' },
     { action: 'flagged_missing', label: 'Flag as Missing (not physically here)' },
   ],
@@ -214,7 +215,8 @@ export default function DocumentDetailModal({ documentId, onClose, onUpdated }) 
         const returnedTo = returnTo === 'origin' ? originOffice : previousOffice;
         showToast(
           readyOutcome?.message || (action === 'return_to_office' ? `Document marked Returned and sent back to ${returnedTo}.`
-            : action === 'complete' ? 'Completed — the document is ready for pickup.' : 'Document status updated.'),
+            : action === 'complete' ? (isInternal ? 'Transaction completed.' : 'Completed — the document is ready for pickup.')
+            : 'Document status updated.'),
           readyOutcome?.type || 'success',
         );
       }

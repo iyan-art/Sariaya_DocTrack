@@ -885,7 +885,10 @@ class DocumentTransferView(APIView):
                 message = f"{updated.tracking_number} sent to {next_office} — awaiting receipt."
             elif action == 'complete':
                 updated = complete_document(document, completing_user=request.user, notes=notes, qr_verified=True)
-                message = f"{updated.tracking_number} completed — ready for pickup at {updated.current_office}."
+                message = (
+                    f"{updated.tracking_number}: transaction completed." if updated.is_internal
+                    else f"{updated.tracking_number} completed — ready for pickup at {updated.current_office}."
+                )
                 ready_email_status = getattr(updated, 'ready_email_status', None)
                 if ready_email_status == 'sent':
                     message += " The citizen was emailed that it is ready for pickup."
