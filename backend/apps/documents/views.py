@@ -39,7 +39,7 @@ from .storage import database_storage
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from django.db.models import Count, Avg, F, Max, Prefetch, Q, Subquery, OuterRef, DurationField, ExpressionWrapper
-from django.db.models.functions import TruncDate
+from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 from datetime import timedelta
 
@@ -1240,19 +1240,27 @@ class AdminDashboardStatsView(APIView):
             )
         ]
 
-        # Average resolution time: creation -> the log that actually finished
-        # the route (RETURNED, the "back at origin" completion action) or
-        # handed the document over (RELEASED_TO_CITIZEN, or RELEASED_TO_ORIGIN
-        # for internal documents) —
-        # whichever happened for that document. NOT based on `updated_at`,
-        # which just reflects whenever the row was last touched.
-        completion_log = DocumentLog.objects.filter(
+        # Average processing time: creation -> the moment the document was
+        # first finished, i.e. first became Completed / Ready for Pickup
+        # (COMPLETED, or RETURNED for documents finished before that step
+        # existed). The wait for the citizen to pick it up is not processing
+        # time, so the later "Release to Citizen" is not the end point; it
+        # only stands in for documents with no completion record at all.
+        # NOT based on `updated_at`, which reflects any later touch.
+        ready_log = DocumentLog.objects.filter(
             document=OuterRef('pk'),
-            action__in=[DocumentLog.Action.RETURNED, DocumentLog.Action.COMPLETED, DocumentLog.Action.RELEASED_TO_CITIZEN, DocumentLog.Action.RELEASED_TO_ORIGIN],
-        ).order_by('-timestamp')
+            action__in=[DocumentLog.Action.COMPLETED, DocumentLog.Action.RETURNED],
+        ).order_by('timestamp')
+        handover_log = DocumentLog.objects.filter(
+            document=OuterRef('pk'),
+            action__in=[DocumentLog.Action.RELEASED_TO_CITIZEN, DocumentLog.Action.RELEASED_TO_ORIGIN],
+        ).order_by('timestamp')
         resolved_docs = (
             Document.objects.filter(status__in=['completed', 'released'])
-            .annotate(completed_at=Subquery(completion_log.values('timestamp')[:1]))
+            .annotate(completed_at=Coalesce(
+                Subquery(ready_log.values('timestamp')[:1]),
+                Subquery(handover_log.values('timestamp')[:1]),
+            ))
             .exclude(completed_at__isnull=True)
             .annotate(resolution_time=ExpressionWrapper(F('completed_at') - F('created_at'), output_field=DurationField()))
         )

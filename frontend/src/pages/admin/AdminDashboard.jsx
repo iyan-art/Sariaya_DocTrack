@@ -162,7 +162,7 @@ export default function AdminDashboard() {
           note={<TrendNote pct={stats.weekly_trend_pct} />} />
         <Kpi label="Average processing time" value={show(stats.avg_resolution_display || 'N/A')} icon={Clock3Icon}
           tone="bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400"
-          note="From request to completion, finished documents" />
+          note="From request to completion (ready for pickup); pickup wait not counted" />
         <Kpi label="Overdue right now" value={show(stats.overdue)} icon={BellIcon}
           tone="bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400"
           note={`${stats.missing_rate_pct}% of all documents reported missing`} />
