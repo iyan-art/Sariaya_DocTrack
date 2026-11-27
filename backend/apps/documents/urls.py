@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    HolidayListCreateView, HolidayDetailView,
     DocumentListCreateView, DocumentDetailView,
     DocumentScanView, DocumentTransferView, OfflineSyncView, DocumentReleaseView, DocumentFlagMissingView, DocumentMarkFoundView,
     DocumentTrackingLookupView, DocumentTypeListCreateView, DocumentTypeDetailView, DocumentTypeStepsView,
@@ -62,6 +63,8 @@ urlpatterns = [
     path('track/<str:tracking_number>/evaluation/', PublicDocumentEvaluationView.as_view(), name='public-document-evaluation'),
 
     path('dashboard-stats/', AdminDashboardStatsView.as_view(), name='admin-stats'),
+    path('holidays/', HolidayListCreateView.as_view(), name='holiday-list'),
+    path('holidays/<int:pk>/', HolidayDetailView.as_view(), name='holiday-detail'),
     path('heatmap/', HeatmapDataView.as_view(), name='heatmap-data'),
     path('heatmap/<str:office_code>/', HeatmapOfficeDocumentsView.as_view(), name='heatmap-office-documents'),
     path('my-office-performance/', MyOfficePerformanceView.as_view(), name='my-office-performance'),

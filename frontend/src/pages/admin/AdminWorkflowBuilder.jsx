@@ -97,8 +97,8 @@ export default function AdminWorkflowBuilder() {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const handleDeleteType = () => setConfirmingDelete(true);
   // Throws on refusal so ConfirmDeleteModal can show why and stay open.
-  const confirmDeleteType = async (password) => {
-    await deleteDocumentType(selectedId, password);
+  const confirmDeleteType = async (confirmName) => {
+    await deleteDocumentType(selectedId, confirmName);
     showToast('Document type deleted.', 'success');
     setConfirmingDelete(false);
     setSelectedId(null);
@@ -416,6 +416,7 @@ export default function AdminWorkflowBuilder() {
       {confirmingDelete && (
         <ConfirmDeleteModal
           title={`Delete "${details.name}"?`}
+          confirmText={details.name}
           message="This permanently deletes the document type and its workflow. To only hide it, archive it instead."
           onConfirm={confirmDeleteType}
           onCancel={() => setConfirmingDelete(false)}

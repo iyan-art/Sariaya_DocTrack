@@ -72,8 +72,8 @@ export default function AdminLandingContent() {
   };
 
   // Throws on refusal so ConfirmDeleteModal can show why and stay open.
-  const confirmDelete = async (password) => {
-    await deleteManagedContent(kind, deleting.id, password);
+  const confirmDelete = async (confirmName) => {
+    await deleteManagedContent(kind, deleting.id, confirmName);
     showToast(`"${deleting.title}" deleted.`, 'success');
     setDeleting(null);
     load();
@@ -176,6 +176,7 @@ export default function AdminLandingContent() {
       {deleting && (
         <ConfirmDeleteModal
           title="Delete permanently?"
+          confirmText={deleting.title}
           message={`"${deleting.title}" and its picture will be deleted. To only hide it from the landing page, archive it instead.`}
           onCancel={() => setDeleting(null)}
           onConfirm={confirmDelete}

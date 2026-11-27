@@ -7,6 +7,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from apps.accounts.models import User
 from .durations import format_hours_minutes
+from .business_hours import business_duration, business_hours_between
 from .models import Document, DocumentLog, EmailNotificationLog, MissingDocumentAlert, Notification, Office, RequestStatusHistory
 from .notifications import send_ready_for_release_email, send_ready_for_release_staff_email
 
@@ -502,7 +503,7 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
             )
 
         now = action_time()
-        time_spent = now - document.entered_current_office_at
+        time_spent = business_duration(document.entered_current_office_at, now)
         held_by = resolve_office(document.current_office)  # the office returning it
         held_sla = step_sla_hours(document, document.route_position)
         previous_handler = document.current_handler
@@ -547,7 +548,7 @@ def receive_document(document, scanning_user, scanning_office, notes='', qr_veri
         )
 
     now = action_time()
-    time_spent = now - document.entered_current_office_at
+    time_spent = business_duration(document.entered_current_office_at, now)
     held_by = resolve_office(document.current_office)  # the office that sent it
     held_sla = step_sla_hours(document, document.route_position)
     previous_handler = document.current_handler
@@ -614,7 +615,7 @@ def complete_document(document, completing_user, notes='', qr_verified=False):
         )
 
     now = action_time()
-    time_spent = now - document.entered_current_office_at
+    time_spent = business_duration(document.entered_current_office_at, now)
     final_office = resolve_office(document.current_office)
     previous_handler = document.current_handler
 
@@ -944,7 +945,7 @@ def expedite_document(document, citizen_user):
         sla_hours = steps[document.route_position].max_hours_allowed
     else:
         sla_hours = DEFAULT_FALLBACK_SLA_HOURS
-    dwell_hours = (timezone.now() - document.entered_current_office_at).total_seconds() / 3600
+    dwell_hours = business_hours_between(document.entered_current_office_at, timezone.now())
 
     if dwell_hours < sla_hours:
         raise ValidationError(

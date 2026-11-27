@@ -16,9 +16,9 @@ const ACTION_STYLES = {
 };
 
 const ACTION_FILTERS = [
-  { value: '', label: 'All Actions' },
+  // "All Activity" leaves failed logins out; they have their own filter.
+  { value: '', label: 'All Activity' },
   { value: 'login', label: 'Login' },
-  { value: 'login_failed', label: 'Login Failed' },
   { value: 'logout', label: 'Logout' },
   { value: 'view_document', label: 'Viewed Document' },
   { value: 'scan_qr', label: 'Scanned QR' },
@@ -27,6 +27,7 @@ const ACTION_FILTERS = [
   { value: 'delete_blocked', label: 'Deletion Blocked' },
   { value: 'profile_updated', label: 'Profile Updated' },
   { value: 'password_changed', label: 'Password Changed' },
+  { value: 'login_failed', label: 'Failed Logins' },
 ];
 
 export default function AdminAccessLogs() {

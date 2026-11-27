@@ -58,26 +58,26 @@ def _login_failure_reason(user, email, password):
     return 'Failed sign-in.'
 
 
-def password_confirmation_failed(request, record):
+def name_confirmation_failed(request, record, expected_name):
     """
     Every delete in the system (document requests, document types, offices,
-    surveys, landing-page items) needs the user's password typed again — a
-    second check on top of the signed-in session, so an unattended,
-    signed-in screen can't be used to wipe records. Returns a 403 Response
-    when the password is missing or wrong (and logs the blocked attempt),
-    else None.
+    surveys, landing-page items, holidays) needs the record's exact name
+    typed (or pasted) as `confirm_name`, so a delete can't happen by a
+    stray click. Checked here as well as on screen. Returns a 400 Response
+    when it doesn't match (and logs the blocked attempt), else None.
     """
-    password = request.data.get('password', '') if hasattr(request.data, 'get') else ''
-    if password and request.user.check_password(password):
+    typed = request.data.get('confirm_name', '') if hasattr(request.data, 'get') else ''
+    if str(typed or '').strip() == str(expected_name or '').strip() and str(typed or '').strip():
         return None
     AccessLog.objects.create(
         user=request.user, action=AccessLog.Action.DELETE_BLOCKED,
-        detail=f"Wrong or missing password; {record} was not deleted.",
+        detail=f"Name not confirmed; {record} was not deleted.",
         ip_address=_client_ip(request), user_agent=request.META.get('HTTP_USER_AGENT', '')[:255],
     )
     return Response(
-        {"detail": "Incorrect password. Nothing was deleted.", "password": ["Incorrect password."]},
-        status=status.HTTP_403_FORBIDDEN,
+        {"detail": f'Type "{expected_name}" exactly to delete it. Nothing was deleted.',
+         "confirm_name": ["The name does not match."]},
+        status=status.HTTP_400_BAD_REQUEST,
     )
 
 
@@ -484,8 +484,8 @@ class AccessLogPagination(PageNumberPagination):
 class AccessLogListView(generics.ListAPIView):
     """
     GET /api/accounts/access-logs/?action=login|logout|login_failed|view_document|scan_qr|other
-    Admin-only system-wide audit trail — currently populated by LoginView
-    (login/login_failed). Ordered newest-first via AccessLog.Meta.ordering.
+    Admin-only system-wide audit trail, newest first. With no action, failed
+    logins and empty rows are left out; ?action=login_failed lists those.
     """
     serializer_class = AccessLogSerializer
     permission_classes = [IsAdmin]
@@ -495,5 +495,12 @@ class AccessLogListView(generics.ListAPIView):
         qs = AccessLog.objects.select_related('user')
         action = self.request.query_params.get('action')
         if action:
-            qs = qs.filter(action=action)
-        return qs
+            return qs.filter(action=action)
+        # The main view: what users did. Failed logins are still recorded
+        # (a security trail for password guessing) but shown only under
+        # their own filter; rows that say nothing (no user, detail or
+        # attempted email) are left out.
+        return (
+            qs.exclude(action=AccessLog.Action.LOGIN_FAILED)
+            .exclude(Q(user__isnull=True) & Q(detail='') & Q(attempted_email=''))
+        )

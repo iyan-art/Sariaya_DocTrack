@@ -81,8 +81,8 @@ export default function AdminOfficeManager() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const handleDelete = (office) => setDeleteTarget(office);
   // Throws on refusal so ConfirmDeleteModal can show why and stay open.
-  const confirmDelete = async (password) => {
-    await deleteOffice(deleteTarget.id, password);
+  const confirmDelete = async (confirmName) => {
+    await deleteOffice(deleteTarget.id, confirmName);
     showToast(`"${deleteTarget.name}" deleted.`, 'success');
     setDeleteTarget(null);
     loadOffices();
@@ -267,6 +267,7 @@ export default function AdminOfficeManager() {
       {deleteTarget && (
         <ConfirmDeleteModal
           title={`Delete "${deleteTarget.name}"?`}
+          confirmText={deleteTarget.name}
           message="This permanently deletes the office and cannot be undone. To only hide it, archive it instead."
           onConfirm={confirmDelete}
           onCancel={() => setDeleteTarget(null)}

@@ -90,8 +90,8 @@ export default function AdminDocumentTypeManager() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const handleDelete = (type) => setDeleteTarget(type);
   // Throws on refusal so ConfirmDeleteModal can show why and stay open.
-  const confirmDelete = async (password) => {
-    await deleteDocumentType(deleteTarget.id, password);
+  const confirmDelete = async (confirmName) => {
+    await deleteDocumentType(deleteTarget.id, confirmName);
     showToast(`"${deleteTarget.name}" deleted.`, 'success');
     setDeleteTarget(null);
     loadTypes();
@@ -263,6 +263,7 @@ export default function AdminDocumentTypeManager() {
       {deleteTarget && (
         <ConfirmDeleteModal
           title={`Delete "${deleteTarget.name}"?`}
+          confirmText={deleteTarget.name}
           message="This permanently deletes the document type and cannot be undone. To only hide it, archive it instead."
           onConfirm={confirmDelete}
           onCancel={() => setDeleteTarget(null)}

@@ -89,7 +89,7 @@ export const fetchManagedContent = (kind) => api.get(MANAGED_CONTENT[kind]);
 export const saveManagedContent = (kind, id, formData) => (
   id ? api.patch(`${MANAGED_CONTENT[kind]}${id}/`, formData) : api.post(MANAGED_CONTENT[kind], formData)
 );
-export const deleteManagedContent = (kind, id, password) => api.delete(`${MANAGED_CONTENT[kind]}${id}/`, { data: { password } });
+export const deleteManagedContent = (kind, id, confirmName) => api.delete(`${MANAGED_CONTENT[kind]}${id}/`, { data: { confirm_name: confirmName } });
 export const fetchPublicOffices = () => api.get('/offices/public/');
 export const fetchPublicDocumentTypes = () => api.get('/documents/types/public/');
 
@@ -194,8 +194,8 @@ export const fetchDocumentDetail = (id) => {
 
 // Staff/admin delete — only while the document is still untouched at its
 // origin office, unless the caller is an admin (server-side override).
-export const deleteDocument = (id, password) => {
-  return api.delete(`/documents/${id}/`, { data: { password } });
+export const deleteDocument = (id, confirmName) => {
+  return api.delete(`/documents/${id}/`, { data: { confirm_name: confirmName } });
 };
 
 // --- Citizen "My Documents" (view/print/download own requests only, no edit) ---
@@ -211,8 +211,8 @@ export const fetchMyDocumentDetail = (id) => {
 
 // Citizen cancelling their own request — same "still untouched" rule as
 // deleteDocument above, no admin override on this endpoint.
-export const deleteMyDocument = (id, password) => {
-  return api.delete(`/documents/mine/${id}/`, { data: { password } });
+export const deleteMyDocument = (id, confirmName) => {
+  return api.delete(`/documents/mine/${id}/`, { data: { confirm_name: confirmName } });
 };
 
 // Per-office citizen evaluation of a RELEASED document — see
@@ -349,8 +349,8 @@ export const updateDocumentType = (id, data) => {
 };
 
 // Deleting important records needs the admin's password again (checked server-side).
-export const deleteDocumentType = (id, password) => {
-  return api.delete(`/documents/types/${id}/`, { data: { password } });
+export const deleteDocumentType = (id, confirmName) => {
+  return api.delete(`/documents/types/${id}/`, { data: { confirm_name: confirmName } });
 };
 
 // Atomically replaces the full ordered step list for a document type.
@@ -379,8 +379,8 @@ export const updateOffice = (id, data) => {
   return api.patch(`/offices/${id}/`, data);
 };
 
-export const deleteOffice = (id, password) => {
-  return api.delete(`/offices/${id}/`, { data: { password } });
+export const deleteOffice = (id, confirmName) => {
+  return api.delete(`/offices/${id}/`, { data: { confirm_name: confirmName } });
 };
 
 // --- Citizen Survey Engine (admin authoring) ---
@@ -398,8 +398,8 @@ export const updateSurvey = (id, data) => {
   return api.patch(`/documents/surveys/${id}/`, data);
 };
 
-export const deleteSurvey = (id, password) => {
-  return api.delete(`/documents/surveys/${id}/`, { data: { password } });
+export const deleteSurvey = (id, confirmName) => {
+  return api.delete(`/documents/surveys/${id}/`, { data: { confirm_name: confirmName } });
 };
 
 // questions: [{ order, text, question_type, options? }, ...]
@@ -469,3 +469,9 @@ export const fetchMyOfficeComments = () => {
 
 
 export default api;
+
+// Holidays (admin): days the SLA clock does not run.
+export const fetchHolidays = (year) => api.get('/documents/holidays/', { params: { year } });
+export const createHoliday = (data) => api.post('/documents/holidays/', data);
+export const updateHoliday = (id, data) => api.patch(`/documents/holidays/${id}/`, data);
+export const deleteHoliday = (id, confirmName) => api.delete(`/documents/holidays/${id}/`, { data: { confirm_name: confirmName } });

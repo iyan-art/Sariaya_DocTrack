@@ -2,27 +2,7 @@ import { useState, useEffect } from 'react';
 import { fetchDocumentEvaluation, submitDocumentEvaluation } from '../../api/axios';
 import { useToast } from '../../context/ToastContext';
 import { StarIcon, CheckCircle2Icon } from '../Icons';
-
-function StarRatingInput({ value, onChange }) {
-  const [hover, setHover] = useState(0);
-  return (
-    <div className="flex gap-1">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button
-          key={n}
-          type="button"
-          onClick={() => onChange(n)}
-          onMouseEnter={() => setHover(n)}
-          onMouseLeave={() => setHover(0)}
-          className="text-amber-400 hover:scale-110 transition-transform"
-          aria-label={`${n} star${n === 1 ? '' : 's'}`}
-        >
-          <StarIcon className="w-6 h-6" filled={n <= (hover || value)} />
-        </button>
-      ))}
-    </div>
-  );
-}
+import StarRatingInput from '../StarRating';
 
 /**
  * Evaluation of a RELEASED document — one Overall Experience Rating for the
@@ -159,7 +139,7 @@ export default function DocumentEvaluationModal({
                   )}
                   {q.question_type === 'text' && (
                     <textarea
-                      rows={2}
+                      rows={4}
                       value={answers[q.id]?.text_value || ''}
                       onChange={(e) => setText(q.id, e.target.value)}
                       placeholder="Your answer (optional)…"

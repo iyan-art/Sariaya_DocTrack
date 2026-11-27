@@ -27,7 +27,11 @@ def _send_and_log(*, document, recipient_user, recipient_email, notification_typ
     back to staff instead of assuming success.
     """
     try:
-        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [recipient_email], fail_silently=False)
+        # Plain text plus the branded HTML version (email_html.py), built from
+        # the same text so the two always say the same thing.
+        from .email_html import build_email_html
+        html = build_email_html(subject, body, notification_type)
+        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [recipient_email], fail_silently=False, html_message=html)
         result_status, error_message = EmailNotificationLog.Status.SENT, ''
     except Exception as exc:
         result_status, error_message = EmailNotificationLog.Status.FAILED, str(exc)
@@ -337,6 +341,8 @@ def send_ready_for_release_email(document):
         f"Status: Ready for Pickup\n\n"
         f"You may claim your document at {claim_where} during {office_hours}.\n\n"
         f"Please bring a valid ID (and this reference number) when claiming your document.\n\n"
+        f"You can check the status of your request here:\n"
+        f"{settings.FRONTEND_BASE_URL.rstrip('/')}/track/{document.tracking_number}\n\n"
         f"{contact_line}\n"
         f"Thank you.\n\n"
         f"Sariaya Office of the Municipal Administrator\n"

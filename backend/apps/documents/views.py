@@ -13,12 +13,15 @@ from django.shortcuts import get_object_or_404
 from django.conf import settings
 from django.utils.crypto import constant_time_compare
 from .durations import format_hours_minutes
+from .business_hours import business_hours_between
 from .models import (
+    Holiday,
     Document, DocumentType, WorkflowStep, Office, DocumentLog, MissingDocumentAlert,
     Survey, SurveyQuestion, SurveyQuestionOption, SurveyAnswer, SurveyResponse,
     CitizenSuggestion, EmailNotificationLog, Announcement, Event, Notification, StoredFile,
 )
 from .serializers import (
+    HolidaySerializer,
     DocumentSerializer, DocumentDetailSerializer, CreateDocumentSerializer, DocumentTypeSerializer,
     DocumentTypeWriteSerializer, WorkflowStepsReplaceSerializer, OfficeSerializer,
     DocumentTransferSerializer, MissingDocumentAlertSerializer, PublicDocumentTrackingSerializer,
@@ -38,13 +41,13 @@ from .offline_sync import MAX_BATCH, sync_offline_actions
 from .storage import database_storage
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
-from django.db.models import Count, Avg, F, Max, Prefetch, Q, Subquery, OuterRef, DurationField, ExpressionWrapper
+from django.db.models import Count, Avg, F, Max, Prefetch, Q, Subquery, OuterRef
 from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 from datetime import timedelta
 
 from apps.accounts.models import AccessLog
-from apps.accounts.views import _client_ip, log_record_deleted, password_confirmation_failed
+from apps.accounts.views import _client_ip, log_record_deleted, name_confirmation_failed
 
 
 class OfficeListCreateView(generics.ListCreateAPIView):
@@ -80,7 +83,7 @@ class OfficeDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        refused = password_confirmation_failed(request, f'office {instance.code}')
+        refused = name_confirmation_failed(request, f'office {instance.code}', instance.name)
         if refused:
             return refused
         if instance.workflow_steps.exists():
@@ -186,7 +189,7 @@ class AnnouncementManageDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        refused = password_confirmation_failed(request, f'"{instance.title}"')
+        refused = name_confirmation_failed(request, f'"{instance.title}"', instance.title)
         if refused:
             return refused
         response = super().destroy(request, *args, **kwargs)
@@ -268,7 +271,7 @@ class DocumentTypeDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        refused = password_confirmation_failed(request, f'document type "{instance.name}"')
+        refused = name_confirmation_failed(request, f'document type "{instance.name}"', instance.name)
         if refused:
             return refused
         if instance.documents.exists():
@@ -403,7 +406,7 @@ class DocumentDetailView(generics.RetrieveDestroyAPIView):
                 {"detail": "This document can no longer be deleted — it has already been processed by an office."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        refused = password_confirmation_failed(request, f'document request {document.tracking_number}')
+        refused = name_confirmation_failed(request, f'document request {document.tracking_number}', document.tracking_number)
         if refused:
             return refused
         _delete_document_and_log(request, document)
@@ -458,7 +461,7 @@ class MyDocumentDetailView(generics.RetrieveDestroyAPIView):
                 {"detail": "This request can no longer be cancelled — it has already been processed by an office."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        refused = password_confirmation_failed(request, f'request {document.tracking_number}')
+        refused = name_confirmation_failed(request, f'request {document.tracking_number}', document.tracking_number)
         if refused:
             return refused
         _delete_document_and_log(request, document)
@@ -1193,7 +1196,7 @@ class AdminDashboardStatsView(APIView):
                   .select_related('document_type').prefetch_related('document_type__steps')):
             steps = list(d.document_type.steps.all())
             sla_hours = steps[d.route_position].max_hours_allowed if d.route_position < len(steps) else DEFAULT_FALLBACK_SLA_HOURS
-            if (now - d.entered_current_office_at).total_seconds() / 3600 >= sla_hours:
+            if business_hours_between(d.entered_current_office_at, now) >= sla_hours:
                 overdue += 1
 
         week_start = now - timedelta(days=7)
@@ -1262,13 +1265,14 @@ class AdminDashboardStatsView(APIView):
                 Subquery(handover_log.values('timestamp')[:1]),
             ))
             .exclude(completed_at__isnull=True)
-            .annotate(resolution_time=ExpressionWrapper(F('completed_at') - F('created_at'), output_field=DurationField()))
+            .values_list('created_at', 'completed_at')
         )
-        avg_resolution = resolved_docs.aggregate(avg=Avg('resolution_time'))['avg']
-        avg_resolution_hours = round(avg_resolution.total_seconds() / 3600, 1) if avg_resolution else None
+        # Working hours only (business_hours.py), like every SLA figure.
+        resolution_hours = [business_hours_between(created, completed) for created, completed in resolved_docs]
+        avg_resolution_hours = round(sum(resolution_hours) / len(resolution_hours), 1) if resolution_hours else None
         avg_resolution_display = None
-        if avg_resolution_hours is not None:
-            avg_resolution_display = format_hours_minutes(avg_resolution.total_seconds() / 3600)
+        if resolution_hours:
+            avg_resolution_display = format_hours_minutes(sum(resolution_hours) / len(resolution_hours))
 
         # Peak scan activity — QR-verified movements per day, most recent
         # `scan_days` days (default 14).
@@ -1311,7 +1315,7 @@ class AdminDashboardStatsView(APIView):
             sla_hours = steps[position].max_hours_allowed if position < len(steps) else DEFAULT_FALLBACK_SLA_HOURS
             # Travelling time counts from when it was sent, as in the overdue email.
             since = in_transit_since(doc) if doc.status == 'in_transit' else doc.entered_current_office_at
-            dwell_hours = (now - since).total_seconds() / 3600
+            dwell_hours = business_hours_between(since, now)
             if dwell_hours < sla_hours:
                 continue
             bottlenecks.append({
@@ -1548,7 +1552,7 @@ class SurveyDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        refused = password_confirmation_failed(request, f'survey "{instance.title}"')
+        refused = name_confirmation_failed(request, f'survey "{instance.title}"', instance.title)
         if refused:
             return refused
         response = super().destroy(request, *args, **kwargs)
@@ -1807,8 +1811,9 @@ class SurveyDetailedAnalyticsView(APIView):
 
             if q.question_type == SurveyQuestion.QuestionType.RATING:
                 values = [a.rating_value for a in qa if a.rating_value]
+                # Half stars count with the whole star below them (4.5 -> 4).
                 row["distribution"] = [
-                    {"value": v, "count": sum(1 for x in values if x == v)} for v in range(1, 6)
+                    {"value": v, "count": sum(1 for x in values if max(1, int(x)) == v)} for v in range(1, 6)
                 ]
                 row["average"] = round(sum(values) / len(values), 2) if values else None
 
@@ -1960,8 +1965,13 @@ def _parse_survey_answers(survey, raw_answers):
 
         if q.question_type == SurveyQuestion.QuestionType.RATING:
             val = raw.get('rating_value')
-            if val not in (1, 2, 3, 4, 5):
-                return [], f"'{q.text}' needs a rating from 1 to 5."
+            try:
+                val = float(val)
+            except (TypeError, ValueError):
+                val = None
+            # Half stars allowed: 0.5, 1, 1.5, ... 5.
+            if val is None or not 0.5 <= val <= 5 or (val * 2) != int(val * 2):
+                return [], f"'{q.text}' needs a rating from 0.5 to 5 stars."
             cleaned.append((q, {"rating_value": val}))
 
         elif q.question_type == SurveyQuestion.QuestionType.TEXT:
@@ -2273,3 +2283,36 @@ class NotificationMarkAllReadView(APIView):
     def post(self, request):
         updated = Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
         return Response({"detail": f"{updated} notification(s) marked as read."})
+
+class HolidayListCreateView(generics.ListCreateAPIView):
+    """
+    GET  /api/documents/holidays/?year=2026   the holiday list
+    POST /api/documents/holidays/             add one (date, name, kind)
+    Admin only. SLA time does not run on these days (business_hours.py).
+    """
+    serializer_class = HolidaySerializer
+    permission_classes = [IsAdmin]
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = Holiday.objects.all()
+        year = self.request.query_params.get('year')
+        if year and year.isdigit():
+            qs = qs.filter(date__year=int(year))
+        return qs
+
+
+class HolidayDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """PATCH / DELETE /api/documents/holidays/<id>/ (delete needs the admin's password)."""
+    serializer_class = HolidaySerializer
+    permission_classes = [IsAdmin]
+    queryset = Holiday.objects.all()
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        refused = name_confirmation_failed(request, f'holiday {instance.date} ({instance.name})', instance.name)
+        if refused:
+            return refused
+        response = super().destroy(request, *args, **kwargs)
+        log_record_deleted(request, f'holiday {instance.date} ({instance.name})')
+        return response

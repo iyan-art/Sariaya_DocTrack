@@ -1,16 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchSurveyComments } from '../../api/axios';
-import { StarIcon } from '../Icons';
-
-function StarRow({ value }) {
-  return (
-    <span className="inline-flex gap-0.5">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <StarIcon key={n} className="w-3.5 h-3.5 text-amber-400" filled={n <= value} />
-      ))}
-    </span>
-  );
-}
+import { StarRow } from '../StarRating';
 
 function formatDate(value) {
   return new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });

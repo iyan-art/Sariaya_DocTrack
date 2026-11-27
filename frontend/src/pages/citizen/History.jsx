@@ -41,8 +41,8 @@ export default function History() {
   };
 
   // Throws on refusal so ConfirmDeleteModal can show why and stay open.
-  const handleConfirmCancel = async (password) => {
-    await deleteMyDocument(cancelTarget.id, password);
+  const handleConfirmCancel = async (confirmName) => {
+    await deleteMyDocument(cancelTarget.id, confirmName);
     showToast(`${cancelTarget.tracking_number} cancelled.`, 'success');
     setCancelTarget(null);
     loadDocs();
@@ -184,6 +184,7 @@ export default function History() {
       {cancelTarget && (
         <ConfirmDeleteModal
           title="Cancel this request?"
+          confirmText={cancelTarget.tracking_number}
           message={`${cancelTarget.tracking_number} (${cancelTarget.document_type_name}) will be permanently cancelled. This cannot be undone.`}
           confirmLabel="Cancel Request"
           busyLabel="Cancelling…"

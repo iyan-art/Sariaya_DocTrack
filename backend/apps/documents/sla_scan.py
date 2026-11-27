@@ -16,6 +16,7 @@ from django.db.models import F, Q
 from django.utils import timezone
 
 from .durations import format_hours_minutes
+from .business_hours import add_business_hours, business_hours_between
 from .models import Document, DocumentLog, EmailNotificationLog, MissingDocumentAlert, Notification, ScheduledTaskRun
 from .notifications import (
     send_due_soon_email, send_not_received_email, send_overdue_warning_email, send_pending_receipt_email,
@@ -118,9 +119,9 @@ def _still_to_email(document, kind, staff=None, since=None):
 
 
 # A document sent to an office but not received there gets a reminder to
-# that office after PENDING_RECEIPT_HOURS, or after half the step's SLA if
-# that comes first (a 1-hour step can't wait 2 hours for a reminder).
-PENDING_RECEIPT_HOURS = 2
+# that office after PENDING_RECEIPT_HOURS working hours, or after half the
+# step's SLA if that comes first (a 1-hour step would be overdue by then).
+PENDING_RECEIPT_HOURS = 1
 PENDING_RECEIPT_SLA_RATIO = 0.5
 
 
@@ -148,10 +149,10 @@ def _scan_not_received(now):
         steps = list(document.document_type.steps.all())
         sla_hours = steps[position].max_hours_allowed if position < len(steps) else DEFAULT_FALLBACK_SLA_HOURS
         sent_at = in_transit_since(document)
-        transit_hours = (now - sent_at).total_seconds() / 3600
+        transit_hours = business_hours_between(sent_at, now)
         if transit_hours >= sla_hours:
             documents += 1
-            due_at = sent_at + timedelta(hours=sla_hours)
+            due_at = add_business_hours(sent_at, sla_hours)
             for staff in _still_to_email(document, overdue_kind, staff=office_employees(destination), since=sent_at):
                 send_not_received_email(document, staff, destination, sent_at, sla_hours, transit_hours, due_at)
                 emails += 1
@@ -205,8 +206,8 @@ def run_overdue_scan():
         else:
             sla_hours = DEFAULT_FALLBACK_SLA_HOURS
 
-        dwell_hours = (now - document.entered_current_office_at).total_seconds() / 3600
-        due_at = document.entered_current_office_at + timedelta(hours=sla_hours)
+        dwell_hours = business_hours_between(document.entered_current_office_at, now)
+        due_at = add_business_hours(document.entered_current_office_at, sla_hours)
 
         if dwell_hours >= sla_hours:  # reached or past its SLA = Overdue
             documents_overdue += 1
@@ -283,11 +284,17 @@ def run_overdue_alert_scan(hours=DEFAULT_OVERDUE_ALERT_HOURS):
         | Q(document__status__in=[Document.Status.COMPLETED, Document.Status.RELEASED])
     ).update(status=MissingDocumentAlert.Status.RESOLVED, resolved_at=now)
 
-    stuck_documents = Document.objects.filter(
-        status__in=[*Document.ACTIONABLE_STATUSES, Document.Status.IN_TRANSIT],
-        entered_current_office_at__lte=cutoff,
-    )
-    total_stuck = stuck_documents.count()
+    # `hours` counts working hours only (business_hours.py), so a weekend or
+    # holiday never flags a document. Every working hour is also a calendar
+    # hour, so the calendar cutoff only narrows down the candidates.
+    stuck_documents = [
+        document for document in Document.objects.filter(
+            status__in=[*Document.ACTIONABLE_STATUSES, Document.Status.IN_TRANSIT],
+            entered_current_office_at__lte=cutoff,
+        )
+        if business_hours_between(document.entered_current_office_at, now) >= hours
+    ]
+    total_stuck = len(stuck_documents)
 
     alerts_created = 0
     for document in stuck_documents:

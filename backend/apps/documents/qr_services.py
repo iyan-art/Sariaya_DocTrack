@@ -10,6 +10,7 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from .models import Document, DocumentType
+from .business_hours import business_duration
 
 # Where a scanned QR actually navigates to — a plain https URL, not raw
 # JSON, so any phone's stock camera app can open it directly (citizens
@@ -126,7 +127,7 @@ def build_scan_context(document):
     (recorded on the most recent log that carries a duration).
     """
     now = timezone.now()
-    dwell = now - document.entered_current_office_at
+    dwell = business_duration(document.entered_current_office_at, now)
     last_duration_log = (
         document.logs.exclude(duration_at_office__isnull=True).order_by('-timestamp').first()
     )

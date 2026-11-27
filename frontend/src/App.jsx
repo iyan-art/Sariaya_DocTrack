@@ -7,6 +7,7 @@ import DashboardLayout from './components/DashboardLayout';
 import Users from './pages/admin/Users';
 import Archive from './pages/admin/Archive';
 import Officials from './pages/admin/Officials';
+import Holidays from './pages/admin/Holidays';
 import DocumentRequest from './pages/admin/DocumentRequest';
 import QRScan from './pages/admin/QRScan';
 import AdminWorkflowBuilder from './pages/admin/AdminWorkflowBuilder';
@@ -57,6 +58,7 @@ function App() {
           <Route path="/admin/workflow-builder" element={<AdminWorkflowBuilder />} />
           <Route path="/admin/users" element={<Users />} />
           <Route path="/admin/officials" element={<Officials />} />
+          <Route path="/admin/holidays" element={<Holidays />} />
           <Route path="/admin/archive" element={<Archive />} />
           <Route path="/admin/access-logs" element={<AdminAccessLogs />} />
           <Route path="/admin/surveys" element={<AdminSurveys />} />

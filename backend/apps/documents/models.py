@@ -692,14 +692,14 @@ class SurveyAnswer(models.Model):
     """
     One answer to one question within a SurveyResponse. Exactly one storage
     slot is used per answer, matching the question's type:
-      - RATING              -> rating_value (1-5)
+      - RATING              -> rating_value (0.5-5, in half stars)
       - TEXT                -> text_value
       - LIKERT / SINGLE     -> exactly one selected_options row
       - MULTIPLE            -> one or more selected_options rows
     """
     response = models.ForeignKey(SurveyResponse, on_delete=models.CASCADE, related_name='answers')
     question = models.ForeignKey(SurveyQuestion, on_delete=models.CASCADE, related_name='answers')
-    rating_value = models.PositiveSmallIntegerField(null=True, blank=True)  # 1-5, for RATING questions
+    rating_value = models.FloatField(null=True, blank=True)  # 0.5-5 in half stars, for RATING questions
     text_value = models.TextField(blank=True)  # for TEXT questions
     selected_options = models.ManyToManyField(
         SurveyQuestionOption, blank=True, related_name='answers',
@@ -924,3 +924,27 @@ class OfflineSyncAction(models.Model):
 
     def __str__(self):
         return f"{self.tracking_number} {self.action} ({self.outcome})"
+
+
+class Holiday(models.Model):
+    """
+    A day the municipal offices are closed (national holiday, special
+    non-working day, local holiday, work suspension). SLA time does not run
+    on these days (business_hours.py). Managed by the admin; the 2026
+    national list (Proclamation No. 1006, s. 2025) is preloaded.
+    """
+    class Kind(models.TextChoices):
+        REGULAR = 'regular', 'Regular Holiday'
+        SPECIAL = 'special', 'Special Non-Working Day'
+        LOCAL = 'local', 'Local Holiday'
+        SUSPENSION = 'suspension', 'Work Suspension'
+
+    date = models.DateField(unique=True)
+    name = models.CharField(max_length=120)
+    kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.REGULAR)
+
+    class Meta:
+        ordering = ['date']
+
+    def __str__(self):
+        return f"{self.date} {self.name}"

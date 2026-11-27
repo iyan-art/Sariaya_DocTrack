@@ -73,8 +73,8 @@ export default function DocumentRequest() {
   }, [loadDocuments]);
 
   // Throws on refusal so ConfirmDeleteModal can show why and stay open.
-  const handleConfirmDelete = async (password) => {
-    await deleteDocument(deleteTarget.id, password);
+  const handleConfirmDelete = async (confirmName) => {
+    await deleteDocument(deleteTarget.id, confirmName);
     showToast(`${deleteTarget.tracking_number} deleted.`, 'success');
     setDeleteTarget(null);
     loadDocuments();
@@ -237,6 +237,7 @@ export default function DocumentRequest() {
       {deleteTarget && (
         <ConfirmDeleteModal
           title="Delete this document request?"
+          confirmText={deleteTarget.tracking_number}
           message={`${deleteTarget.tracking_number} (${deleteTarget.document_type_name}) will be permanently deleted. This cannot be undone.`}
           onCancel={() => setDeleteTarget(null)}
           onConfirm={handleConfirmDelete}

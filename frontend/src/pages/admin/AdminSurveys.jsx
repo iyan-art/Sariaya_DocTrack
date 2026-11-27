@@ -39,8 +39,8 @@ export default function AdminSurveys() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const handleDelete = (survey) => setDeleteTarget(survey);
   // Throws on refusal so ConfirmDeleteModal can show why and stay open.
-  const confirmDelete = async (password) => {
-    await deleteSurvey(deleteTarget.id, password);
+  const confirmDelete = async (confirmName) => {
+    await deleteSurvey(deleteTarget.id, confirmName);
     showToast(`"${deleteTarget.title}" deleted.`, 'success');
     setDeleteTarget(null);
     loadSurveys();
@@ -120,6 +120,7 @@ export default function AdminSurveys() {
       {deleteTarget && (
         <ConfirmDeleteModal
           title={`Delete "${deleteTarget.title}"?`}
+          confirmText={deleteTarget.title}
           message="This permanently deletes the survey and every response to it. To stop using it, deactivate it instead."
           onConfirm={confirmDelete}
           onCancel={() => setDeleteTarget(null)}

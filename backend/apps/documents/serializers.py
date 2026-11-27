@@ -4,6 +4,7 @@ from django.db.models import Avg, Count
 from django.utils import timezone
 from rest_framework import serializers
 from .models import (
+    Holiday,
     DocumentType, WorkflowStep, Office, Document, DocumentLog, MissingDocumentAlert,
     Survey, SurveyQuestion, SurveyQuestionOption, SurveyAnswer, SurveyResponse,
     CitizenSuggestion, RequestStatusHistory,
@@ -12,6 +13,7 @@ from .models import (
 )
 from .services import EMPLOYEE_ID_RE, can_originate, originating_office, resolve_office
 from .qr_services import generate_qr_code
+from .business_hours import business_duration, business_hours_between
 from .sla_scan import DUE_SOON_THRESHOLD_RATIO
 from .validators import number_field_error
 from .images import NEWS_IMAGE_SIZE, prepare_image
@@ -493,7 +495,7 @@ class DocumentSerializer(serializers.ModelSerializer):
         # frozen snapshot. Meaningless once the document is fully done.
         if obj.status in (Document.Status.RELEASED, Document.Status.COMPLETED):
             return None
-        return format_duration(timezone.now() - obj.entered_current_office_at)
+        return format_duration(business_duration(obj.entered_current_office_at, timezone.now()))
 
     def get_step_statuses(self, obj):
         """
@@ -522,7 +524,7 @@ class DocumentSerializer(serializers.ModelSerializer):
                     # here no longer reflects this step's own SLA.
                     statuses.append('active')
                 else:
-                    dwell_hours = (timezone.now() - obj.entered_current_office_at).total_seconds() / 3600
+                    dwell_hours = business_hours_between(obj.entered_current_office_at, timezone.now())
                     if dwell_hours >= step.max_hours_allowed:
                         statuses.append('delayed')
                     elif dwell_hours >= step.max_hours_allowed * DUE_SOON_THRESHOLD_RATIO:
@@ -1129,3 +1131,27 @@ class NotificationSerializer(serializers.ModelSerializer):
         return obj.sender.full_name if obj.sender else None
 
 
+
+
+class HolidaySerializer(serializers.ModelSerializer):
+    """A day the offices are closed; SLA time does not run on it."""
+    kind_label = serializers.CharField(source='get_kind_display', read_only=True)
+
+    class Meta:
+        model = Holiday
+        fields = ['id', 'date', 'name', 'kind', 'kind_label']
+        extra_kwargs = {'date': {'validators': []}}
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Please enter the holiday's name.")
+        return value
+
+    def validate_date(self, value):
+        others = Holiday.objects.filter(date=value)
+        if self.instance:
+            others = others.exclude(pk=self.instance.pk)
+        if others.exists():
+            raise serializers.ValidationError(f"{value:%B %d, %Y} is already on the list.")
+        return value
