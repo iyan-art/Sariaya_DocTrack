@@ -185,7 +185,7 @@ export default function History() {
         <ConfirmDeleteModal
           title="Cancel this request?"
           confirmText={cancelTarget.tracking_number}
-          message={`${cancelTarget.tracking_number} (${cancelTarget.document_type_name}) will be permanently cancelled. This cannot be undone.`}
+          message={<>{cancelTarget.tracking_number} (<strong>{cancelTarget.document_type_name}</strong>) will be permanently cancelled. This cannot be undone.</>}
           confirmLabel="Cancel Request"
           busyLabel="Cancelling…"
           onCancel={() => setCancelTarget(null)}

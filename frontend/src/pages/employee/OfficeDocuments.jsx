@@ -278,7 +278,7 @@ export default function OfficeDocuments() {
         <ConfirmDeleteModal
           title="Delete this document request?"
           confirmText={deleteTarget.tracking_number}
-          message={`${deleteTarget.tracking_number} (${deleteTarget.document_type_name}) will be permanently deleted. This cannot be undone.`}
+          message={<>{deleteTarget.tracking_number} (<strong>{deleteTarget.document_type_name}</strong>) will be permanently deleted. This cannot be undone.</>}
           onCancel={() => setDeleteTarget(null)}
           onConfirm={handleConfirmDelete}
         />
