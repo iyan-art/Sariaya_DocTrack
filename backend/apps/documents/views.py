@@ -15,13 +15,11 @@ from django.utils.crypto import constant_time_compare
 from .durations import format_hours_minutes
 from .business_hours import business_hours_between
 from .models import (
-    Holiday,
     Document, DocumentType, WorkflowStep, Office, DocumentLog, MissingDocumentAlert,
     Survey, SurveyQuestion, SurveyQuestionOption, SurveyAnswer, SurveyResponse,
     CitizenSuggestion, EmailNotificationLog, Announcement, Event, Notification, StoredFile,
 )
 from .serializers import (
-    HolidaySerializer,
     DocumentSerializer, DocumentDetailSerializer, CreateDocumentSerializer, DocumentTypeSerializer,
     DocumentTypeWriteSerializer, WorkflowStepsReplaceSerializer, OfficeSerializer,
     DocumentTransferSerializer, MissingDocumentAlertSerializer, PublicDocumentTrackingSerializer,
@@ -2283,36 +2281,3 @@ class NotificationMarkAllReadView(APIView):
     def post(self, request):
         updated = Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
         return Response({"detail": f"{updated} notification(s) marked as read."})
-
-class HolidayListCreateView(generics.ListCreateAPIView):
-    """
-    GET  /api/documents/holidays/?year=2026   the holiday list
-    POST /api/documents/holidays/             add one (date, name, kind)
-    Admin only. SLA time does not run on these days (business_hours.py).
-    """
-    serializer_class = HolidaySerializer
-    permission_classes = [IsAdmin]
-    pagination_class = None
-
-    def get_queryset(self):
-        qs = Holiday.objects.all()
-        year = self.request.query_params.get('year')
-        if year and year.isdigit():
-            qs = qs.filter(date__year=int(year))
-        return qs
-
-
-class HolidayDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """PATCH / DELETE /api/documents/holidays/<id>/ (delete needs the admin's password)."""
-    serializer_class = HolidaySerializer
-    permission_classes = [IsAdmin]
-    queryset = Holiday.objects.all()
-
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        refused = name_confirmation_failed(request, f'holiday {instance.date} ({instance.name})', instance.name)
-        if refused:
-            return refused
-        response = super().destroy(request, *args, **kwargs)
-        log_record_deleted(request, f'holiday {instance.date} ({instance.name})')
-        return response

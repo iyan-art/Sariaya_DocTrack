@@ -469,9 +469,3 @@ export const fetchMyOfficeComments = () => {
 
 
 export default api;
-
-// Holidays (admin): days the SLA clock does not run.
-export const fetchHolidays = (year) => api.get('/documents/holidays/', { params: { year } });
-export const createHoliday = (data) => api.post('/documents/holidays/', data);
-export const updateHoliday = (id, data) => api.patch(`/documents/holidays/${id}/`, data);
-export const deleteHoliday = (id, confirmName) => api.delete(`/documents/holidays/${id}/`, { data: { confirm_name: confirmName } });

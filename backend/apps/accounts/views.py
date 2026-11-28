@@ -61,7 +61,7 @@ def _login_failure_reason(user, email, password):
 def name_confirmation_failed(request, record, expected_name):
     """
     Every delete in the system (document requests, document types, offices,
-    surveys, landing-page items, holidays) needs the record's exact name
+    surveys, landing-page items) needs the record's exact name
     typed (or pasted) as `confirm_name`, so a delete can't happen by a
     stray click. Checked here as well as on screen. Returns a 400 Response
     when it doesn't match (and logs the blocked attempt), else None.

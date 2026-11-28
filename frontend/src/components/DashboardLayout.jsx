@@ -18,7 +18,6 @@ import {
   HandshakeIcon,
   HomeIcon,
   LayoutGridIcon,
-  CalendarIcon,
   LogOutIcon,
   MapPinIcon,
   MenuIcon,
@@ -43,7 +42,6 @@ const MENUS = {
     { label: 'Document Types', path: '/admin/document-types', icon: ClipboardListIcon },
     { label: 'Offices', path: '/admin/offices', icon: MapPinIcon },
     { label: 'Workflow Builder', path: '/admin/workflow-builder', icon: ArrowRightLeftIcon },
-    { label: 'Holidays', path: '/admin/holidays', icon: CalendarIcon },
     {
       label: 'User Management', icon: UsersIcon,
       children: [

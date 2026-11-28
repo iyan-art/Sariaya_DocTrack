@@ -32,13 +32,3 @@ def notify_admins_of_low_rating(sender, instance, created, **kwargs):
         notification_type=Notification.NotificationType.SYSTEM_ALERT,
         related_document=instance.response.document,
     )
-
-
-# A holiday added, edited or removed applies to SLA time straight away.
-from django.db.models.signals import post_delete as _post_delete, post_save as _post_save  # noqa: E402
-
-from .business_hours import clear_holiday_cache  # noqa: E402
-from .models import Holiday  # noqa: E402
-
-_post_save.connect(clear_holiday_cache, sender=Holiday, dispatch_uid='holiday_cache_save')
-_post_delete.connect(clear_holiday_cache, sender=Holiday, dispatch_uid='holiday_cache_delete')

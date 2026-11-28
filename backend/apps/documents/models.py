@@ -924,27 +924,3 @@ class OfflineSyncAction(models.Model):
 
     def __str__(self):
         return f"{self.tracking_number} {self.action} ({self.outcome})"
-
-
-class Holiday(models.Model):
-    """
-    A day the municipal offices are closed (national holiday, special
-    non-working day, local holiday, work suspension). SLA time does not run
-    on these days (business_hours.py). Managed by the admin; the 2026
-    national list (Proclamation No. 1006, s. 2025) is preloaded.
-    """
-    class Kind(models.TextChoices):
-        REGULAR = 'regular', 'Regular Holiday'
-        SPECIAL = 'special', 'Special Non-Working Day'
-        LOCAL = 'local', 'Local Holiday'
-        SUSPENSION = 'suspension', 'Work Suspension'
-
-    date = models.DateField(unique=True)
-    name = models.CharField(max_length=120)
-    kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.REGULAR)
-
-    class Meta:
-        ordering = ['date']
-
-    def __str__(self):
-        return f"{self.date} {self.name}"

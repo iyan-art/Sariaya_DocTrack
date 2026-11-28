@@ -4,7 +4,6 @@ from django.db.models import Avg, Count
 from django.utils import timezone
 from rest_framework import serializers
 from .models import (
-    Holiday,
     DocumentType, WorkflowStep, Office, Document, DocumentLog, MissingDocumentAlert,
     Survey, SurveyQuestion, SurveyQuestionOption, SurveyAnswer, SurveyResponse,
     CitizenSuggestion, RequestStatusHistory,
@@ -1129,29 +1128,3 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     def get_sender_name(self, obj):
         return obj.sender.full_name if obj.sender else None
-
-
-
-
-class HolidaySerializer(serializers.ModelSerializer):
-    """A day the offices are closed; SLA time does not run on it."""
-    kind_label = serializers.CharField(source='get_kind_display', read_only=True)
-
-    class Meta:
-        model = Holiday
-        fields = ['id', 'date', 'name', 'kind', 'kind_label']
-        extra_kwargs = {'date': {'validators': []}}
-
-    def validate_name(self, value):
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError("Please enter the holiday's name.")
-        return value
-
-    def validate_date(self, value):
-        others = Holiday.objects.filter(date=value)
-        if self.instance:
-            others = others.exclude(pk=self.instance.pk)
-        if others.exists():
-            raise serializers.ValidationError(f"{value:%B %d, %Y} is already on the list.")
-        return value

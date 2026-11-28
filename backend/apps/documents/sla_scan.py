@@ -284,8 +284,8 @@ def run_overdue_alert_scan(hours=DEFAULT_OVERDUE_ALERT_HOURS):
         | Q(document__status__in=[Document.Status.COMPLETED, Document.Status.RELEASED])
     ).update(status=MissingDocumentAlert.Status.RESOLVED, resolved_at=now)
 
-    # `hours` counts working hours only (business_hours.py), so a weekend or
-    # holiday never flags a document. Every working hour is also a calendar
+    # `hours` counts working hours only (business_hours.py), so a weekend
+    # never flags a document. Every working hour is also a calendar
     # hour, so the calendar cutoff only narrows down the candidates.
     stuck_documents = [
         document for document in Document.objects.filter(
