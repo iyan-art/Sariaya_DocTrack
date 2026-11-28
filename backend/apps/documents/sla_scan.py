@@ -141,7 +141,7 @@ def _scan_not_received(now):
     documents = emails = reminded = reminders = 0
     overdue_kind = EmailNotificationLog.NotificationType.OVERDUE_WARNING
     reminder_kind = EmailNotificationLog.NotificationType.PENDING_RECEIPT
-    in_transit = Document.objects.filter(status=Document.Status.IN_TRANSIT).select_related('document_type')
+    in_transit = Document.objects.filter(status=Document.Status.IN_TRANSIT, is_sample=False).select_related('document_type')
     for document in in_transit:
         position, destination = in_transit_destination(document)
         if destination is None:
@@ -190,8 +190,10 @@ def run_overdue_scan():
     never keep generating warnings after that.
     """
     now = timezone.now()
+    # Sample data (seed_supabase_data) is never emailed about: its overdue
+    # documents would otherwise alert the real staff of those offices.
     active_documents = Document.objects.filter(
-        status__in=Document.ACTIONABLE_STATUSES,
+        status__in=Document.ACTIONABLE_STATUSES, is_sample=False,
     ).select_related('document_type', 'current_handler')
 
     documents_overdue = 0

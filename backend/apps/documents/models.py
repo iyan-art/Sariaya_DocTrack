@@ -227,6 +227,9 @@ class Document(models.Model):
     entered_current_office_at = models.DateTimeField(auto_now_add=True)
 
     qr_code = models.ImageField(upload_to='document_qr/', blank=True, null=True)
+    # Historical sample data from `manage.py seed_supabase_data` (removable
+    # with --purge). The overdue scan sends no email about these.
+    is_sample = models.BooleanField(default=False, db_index=True)
 
     class Meta:
         indexes = [
